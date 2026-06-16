@@ -27,6 +27,21 @@ local function setupPlayer(player)
 	local vit = Instance.new("IntValue", stats) vit.Name = "VIT" vit.Value = 1
 	local int = Instance.new("IntValue", stats) int.Name = "INT" int.Value = 1
 	local dex = Instance.new("IntValue", stats) dex.Name = "DEX" dex.Value = 1
+	
+	local unlockedPages = Instance.new("IntValue", stats) 
+	unlockedPages.Name = "UnlockedPages" 
+	unlockedPages.Value = 1
+
+	-- ÚJ: 128 REKESZ LÉTREHOZÁSA (4 oldal * 32)
+	local inv = Instance.new("Folder", player)
+	inv.Name = "Inventory"
+	for i = 1, 128 do 
+		local slot = Instance.new("StringValue", inv)
+		slot.Name = "Slot_" .. i
+		local amt = Instance.new("IntValue", slot)
+		amt.Name = "Amount"
+		amt.Value = 0
+	end
 
 	local mana = Instance.new("IntValue", stats) mana.Name = "Mana" mana.Value = 100
 	local maxMana = Instance.new("IntValue", stats) maxMana.Name = "MaxMana" maxMana.Value = 100
@@ -68,6 +83,9 @@ local function setupPlayer(player)
 				if player.PlayerStats:FindFirstChild(statName) then player.PlayerStats[statName].Value = statValue end
 			end
 			leaderLevel.Value = level.Value 
+
+			-- ÚJ: Visszatöltjük a megvásárolt oldalakat
+			if data.Stats.UnlockedPages then unlockedPages.Value = data.Stats.UnlockedPages end
 		end
 
 		-- ÚJ: TÁSKA BETÖLTÉS (Biztonságos az új és régi formátumhoz is)

@@ -33,12 +33,15 @@ PickupItems.OnServerEvent:Connect(function(player)
 				local itemData = ItemDatabase[itemName]
 				local maxStack = (itemData and itemData.MaxStack) or 1
 
-				-- ==========================================
+				-- A maxStack ellenőrzés után így nézzen ki:
+				local stats = player:FindFirstChild("PlayerStats")
+				local maxUnlockedSlots = (stats and stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+
 				-- 1. ELŐSZÖR PRÓBÁLJUK MEGLÉVŐ STACK-HEZ ADNI
-				-- ==========================================
 				if maxStack > 1 then
-					for i = 1, 8 do
+					for i = 1, maxUnlockedSlots do
 						local slot = inv:FindFirstChild("Slot_" .. i)
+						-- [...] (A többi része marad ugyanaz)
 						if slot and slot.Value == itemName then
 							local amt = slot:FindFirstChild("Amount")
 							-- Ha van már ilyen tárgy, és még fér a stackbe

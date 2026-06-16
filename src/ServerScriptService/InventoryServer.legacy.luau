@@ -2,31 +2,81 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService") 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local MoveItem = Events:WaitForChild("MoveItem")
 local DropItem = Events:WaitForChild("DropItem")
 
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
+-- IDE ÍRD BE A LÉTREHOZOTT ROBUX PRODUCT ID-DAT!
+local PAGE_UNLOCK_PRODUCT_ID = 3604998372 
+
+-- ÚJ: EVENTEK A VÁSÁRLÁSHOZ
+local UnlockPageGold = Events:FindFirstChild("UnlockPageGold") or Instance.new("RemoteEvent", Events)
+UnlockPageGold.Name = "UnlockPageGold"
+local PromptRobuxUnlock = Events:FindFirstChild("PromptRobuxUnlock") or Instance.new("RemoteEvent", Events)
+PromptRobuxUnlock.Name = "PromptRobuxUnlock"
+
 local typeToSlot = {
-	["Fegyver"] = "Fegyver",
-	["Páncél"] = "Pancel",
-	["Cipő"] = "Cipo",
-	["Nyaklánc"] = "Nyaklanc",
-	["Sapka"] = "Sapka",
-	["Fülbevaló"] = "Fulbevalo",
-	["Pajzs"] = "Pajzs",
-	["Karkötő"] = "Karkoto"
+	["Sapka"] = "Sapka", ["Páncél"] = "Pancel", ["Cipő"] = "Cipo", 
+	["Fegyver"] = "Fegyver", ["Fülbevaló"] = "Fulbevalo", ["Nyaklánc"] = "Nyaklanc", 
+	["Pajzs"] = "Pajzs", ["Karkötő"] = "Karkoto"
 }
--- (A fájl többi része marad ahogy volt!)
 
 -- ==========================================
--- TÁRGYAK MOZGATÁSA ÉS FELSZERELÉSE
+-- TÁSKA OLDAL FELOLDÁSA
 -- ==========================================
-MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName)
+UnlockPageGold.OnServerEvent:Connect(function(player)
+	local stats = player:FindFirstChild("PlayerStats")
+	if not stats then return end
+	local gold = stats:FindFirstChild("Gold")
+	local unlockedPages = stats:FindFirstChild("UnlockedPages")
+
+	if gold and unlockedPages and unlockedPages.Value < 4 then
+		local cost = unlockedPages.Value * 25000 -- Árnövekedés (1->2 = 25k, 2->3 = 50k, 3->4 = 75k)
+		if gold.Value >= cost then
+			gold.Value -= cost
+			unlockedPages.Value += 1
+		end
+	end
+end)
+
+PromptRobuxUnlock.OnServerEvent:Connect(function(player)
+	MarketplaceService:PromptProductPurchase(player, PAGE_UNLOCK_PRODUCT_ID)
+end)
+
+MarketplaceService.ProcessReceipt = function(receiptInfo)
+	if receiptInfo.ProductId == PAGE_UNLOCK_PRODUCT_ID then
+		local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+		if player then
+			local stats = player:FindFirstChild("PlayerStats")
+			if stats and stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value < 4 then
+				stats.UnlockedPages.Value += 1
+				return Enum.ProductPurchaseDecision.PurchaseGranted
+			end
+		end
+	end
+	return Enum.ProductPurchaseDecision.NotProcessedYet
+end
+
+-- ==========================================
+-- TÁRGYAK MOZGATÁSA, FELSZERELÉSE ÉS SZÉTBONTÁSA
+-- ==========================================
+MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName, splitAmount)
 	local inv = player:FindFirstChild("Inventory")
 	local eq = player:FindFirstChild("Equipment")
-	if not inv or not eq then return end
+	local stats = player:FindFirstChild("PlayerStats")
+	if not inv or not eq or not stats then return end
+
+	-- BIZTONSÁG: Ne tudjon zárt oldalra mozgatni semmit!
+	if toFolderStr == "Inventory" then
+		local toSlotNum = tonumber(toSlotName:match("%d+"))
+		if toSlotNum then
+			local maxUnlocked = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+			if toSlotNum > maxUnlocked then return end 
+		end
+	end
 
 	local fromFolder = (fromFolderStr == "Inventory") and inv or eq
 	local toFolder = (toFolderStr == "Inventory") and inv or eq
@@ -42,13 +92,13 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 		if not itemData then return end
 		local maxStack = itemData.MaxStack or 1
 
-		-- HA A FELSZERELÉSBE HÚZZUK (Felvétel)
+		-- Felszerelés ellenőrzés
 		if toFolderStr == "Equipment" then
 			local expectedSlot = typeToSlot[itemData.Type]
 			if expectedSlot ~= toSlotName then return end 
 		end
 
-		-- HA CSERÉLÜNK (Táskából Felszerelésbe, és a felszerelésen is van valami)
+		-- Csere ellenőrzés (táska -> felszerelésre húzva)
 		if toFolderStr == "Inventory" and fromFolderStr == "Equipment" and targetItemName ~= "" then
 			local targetItemData = ItemDatabase[targetItemName]
 			if not targetItemData then return end
@@ -56,54 +106,74 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 			if expectedSlot ~= fromSlotName then return end 
 		end
 
-		-- ==========================================
-		-- ÚJ: KÉZI STACKELÉS (Egymásra húzás táskán belül)
-		-- ==========================================
+		-- ÚJ: SHIFT + KLIKK SPLIT (Felezés)
+		if splitAmount and splitAmount > 0 and fromFolderStr == "Inventory" and toFolderStr == "Inventory" then
+			local fromAmtObj = fromSlot:FindFirstChild("Amount")
+			if not fromAmtObj or fromAmtObj.Value < splitAmount then return end
+
+			if toSlot.Value == "" then
+				toSlot.Value = itemName
+				if not toSlot:FindFirstChild("Amount") then
+					local newAmt = Instance.new("IntValue", toSlot)
+					newAmt.Name = "Amount"
+				end
+				toSlot.Amount.Value = splitAmount
+				fromAmtObj.Value = fromAmtObj.Value - splitAmount
+				if fromAmtObj.Value <= 0 then fromSlot.Value = "" end
+				return
+			elseif toSlot.Value == itemName and fromSlot ~= toSlot then
+				local toAmtObj = toSlot:FindFirstChild("Amount")
+				local toAmt = toAmtObj and toAmtObj.Value or 1
+				local spaceLeft = maxStack - toAmt
+
+				if spaceLeft > 0 then
+					local transferAmt = math.min(splitAmount, spaceLeft)
+					toAmtObj.Value = toAmtObj.Value + transferAmt
+					fromAmtObj.Value = fromAmtObj.Value - transferAmt
+					if fromAmtObj.Value <= 0 then fromSlot.Value = "" end
+				end
+				return
+			else
+				return -- Más tárgyra nem lehet ráhúzni a splitet
+			end
+		end
+
+		-- KÉZI STACKELÉS (Egész kupac egyesítése)
 		if fromFolderStr == "Inventory" and toFolderStr == "Inventory" and itemName == targetItemName and maxStack > 1 and fromSlot ~= toSlot then
 			local fromAmt = fromSlot:FindFirstChild("Amount") and fromSlot.Amount.Value or 1
 			local toAmt = toSlot:FindFirstChild("Amount") and toSlot.Amount.Value or 1
-
 			local total = fromAmt + toAmt
 
-			-- Ha belefér egy stackbe
 			if total <= maxStack then
 				toSlot.Amount.Value = total
 				fromSlot.Value = ""
 				fromSlot.Amount.Value = 0
 			else
-				-- Ha nem fér bele, feltöltjük a stacket maximumra, a maradékot visszahagyjuk
 				toSlot.Amount.Value = maxStack
-				fromSlot.Amount.Value = total - maxStack
+				if fromSlot:FindFirstChild("Amount") then
+					fromSlot.Amount.Value = total - maxStack
+				end
 			end
-			return -- Készen vagyunk a stackeléssel, megszakítjuk a további cserét!
+			return 
 		end
 
-		-- ==========================================
-		-- BIZTONSÁGOS CSERE (Duplikáció elleni védelemmel!)
-		-- ==========================================
+		-- NORMÁL CSERE (Drag & Drop)
 		local tempVal = toSlot.Value
 		local tempAmt = (toSlot:FindFirstChild("Amount")) and toSlot.Amount.Value or 1
-
 		local fromAmt = (fromSlot:FindFirstChild("Amount")) and fromSlot.Amount.Value or 1
 
-		-- 1. Új hely feltöltése
 		toSlot.Value = fromSlot.Value
-		if toSlot:FindFirstChild("Amount") then 
-			toSlot.Amount.Value = fromAmt 
-		end
+		if toSlot:FindFirstChild("Amount") then toSlot.Amount.Value = fromAmt end
 
-		-- 2. Régi hely felülírása (vagy kiürítése)
 		fromSlot.Value = tempVal
-		if fromSlot:FindFirstChild("Amount") then 
-			fromSlot.Amount.Value = tempAmt 
-		end
+		if fromSlot:FindFirstChild("Amount") then fromSlot.Amount.Value = tempAmt end
 	end
 end)
 
 -- ==========================================
 -- TÁRGYAK ELDOBÁSA A FÖLDRE
 -- ==========================================
-DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
+DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
 	local folder = (folderStr == "Inventory") and player:FindFirstChild("Inventory") or player:FindFirstChild("Equipment")
 	if folder then
 		local slot = folder:FindFirstChild(slotName)
@@ -111,16 +181,22 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 			local itemName = slot.Value
 			local itemData = ItemDatabase[itemName]
 
-			-- Ha táskában van és van Amount, akkor csak 1 darabot dobunk el!
+			-- Levonás a táskából
+			local dropQty = 1
 			if slot:FindFirstChild("Amount") then
-				slot.Amount.Value = slot.Amount.Value - 1
-				if slot.Amount.Value <= 0 then 
-					slot.Value = "" 
+				if splitAmount and splitAmount > 0 and splitAmount <= slot.Amount.Value then
+					dropQty = splitAmount
+				else
+					dropQty = 1 
 				end
+
+				slot.Amount.Value = slot.Amount.Value - dropQty
+				if slot.Amount.Value <= 0 then slot.Value = "" end
 			else
-				slot.Value = "" -- Ha felszerelésről dobja el, egyből törlődik
+				slot.Value = "" 
 			end
 
+			-- Földre dobás
 			local character = player.Character
 			if character and character:FindFirstChild("HumanoidRootPart") then
 				local rootPart = character.HumanoidRootPart
@@ -131,6 +207,12 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 				droppedItem.Name = "LootPart"
 				droppedItem.Size = Vector3.new(0.5, 0.2, 3) 
 				droppedItem.Position = rootPart.Position + (rootPart.CFrame.LookVector * 5) + Vector3.new(0, 3, 0)
+
+				-- Belerakjuk, hogy mennyi van benne
+				local amountTag = Instance.new("IntValue")
+				amountTag.Name = "ItemAmount"
+				amountTag.Value = dropQty
+				amountTag.Parent = droppedItem
 
 				local partColor = Color3.fromRGB(150, 150, 150)
 				local textColor = Color3.new(1, 1, 1)
@@ -164,7 +246,13 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 				local nameLabel = Instance.new("TextLabel")
 				nameLabel.Size = UDim2.new(1, 0, 1, 0)
 				nameLabel.BackgroundTransparency = 1
-				nameLabel.Text = itemName
+
+				if dropQty > 1 then
+					nameLabel.Text = itemName .. " (x" .. dropQty .. ")"
+				else
+					nameLabel.Text = itemName
+				end
+
 				nameLabel.Font = Enum.Font.GothamBold
 				nameLabel.TextScaled = true
 				nameLabel.TextStrokeTransparency = 0 
