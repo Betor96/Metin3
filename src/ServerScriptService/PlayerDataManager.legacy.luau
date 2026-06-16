@@ -49,7 +49,7 @@ local function setupPlayer(player)
 
 	local hotbar = Instance.new("Folder", player)
 	hotbar.Name = "Hotbar"
-	for i = 1, 4 do Instance.new("StringValue", hotbar).Name = "Hotbar_" .. i end
+	for i = 1, 8 do Instance.new("StringValue", hotbar).Name = "Hotbar_" .. i end
 
 	-- [C] ADATOK BETÖLTÉSE
 	local success, data = pcall(function() 

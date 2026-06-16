@@ -1,9 +1,10 @@
+-- Fájl helye: StarterPlayer -> StarterPlayerScripts -> ShopUIClient
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local BuyItem = Events:WaitForChild("BuyItem")
 
--- BEKÖTJÜK A KÖZPONTI ADATBÁZIST
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
 local player = Players.LocalPlayer
@@ -16,7 +17,8 @@ screenGui.Parent = playerGui
 
 local shopFrame = Instance.new("Frame")
 shopFrame.Size = UDim2.new(0, 250, 0, 350)
-shopFrame.Position = UDim2.new(0.1, 0, 0.2, 0) 
+shopFrame.AnchorPoint = Vector2.new(0, 0.5) -- FIX: Bal-közép horgony
+shopFrame.Position = UDim2.new(0.05, 0, 0.5, 0) -- FIX: Bal oldalon középen (a karakter ablakkal egy helyen)
 shopFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
 shopFrame.BorderColor3 = Color3.fromRGB(100, 80, 50)
 shopFrame.BorderSizePixel = 3
@@ -31,7 +33,36 @@ shopTitle.TextColor3 = Color3.new(1, 1, 1)
 shopTitle.Text = "BOLT"
 shopTitle.Font = Enum.Font.GothamBold
 shopTitle.TextSize = 14
+shopTitle.Active = true -- FONTOS (húzáshoz)
 shopTitle.Parent = shopFrame
+
+-- ==========================================
+-- ABLAK MOZGATÁSA CSAK A CÍMSORRÓL (ÚJ!)
+-- ==========================================
+local UserInputService = game:GetService("UserInputService")
+local draggingShop, dragInputShop, mousePosShop, framePosShop
+
+shopTitle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingShop = true
+		mousePosShop = input.Position
+		framePosShop = shopFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then draggingShop = false end
+		end)
+	end
+end)
+
+shopTitle.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then dragInputShop = input end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInputShop and draggingShop then
+		local delta = input.Position - mousePosShop
+		shopFrame.Position = UDim2.new(framePosShop.X.Scale, framePosShop.X.Offset + delta.X, framePosShop.Y.Scale, framePosShop.Y.Offset + delta.Y)
+	end
+end)
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -59,13 +90,10 @@ gridLayout.CellPadding = UDim2.new(0, 5, 0, 5)
 gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 gridLayout.Parent = scrollFrame
 
--- ==========================================
--- A 3 BOLT ÁRUKÉSZLETE (CSAK NEVEK!)
--- ==========================================
 local SHOPS = {
 	["Fegyverkereskedo"] = {
 		Title = "FEGYVERKERESKEDŐ",
-		Items = {"Kezdőkard", "Hosszúkard"}
+		Items = {"Kezdőkard", "Hosszúkard","Szabi farka"}
 	},
 	["Pancelkereskedo"] = {
 		Title = "PÁNCÉLKERESKEDŐ",
@@ -83,16 +111,11 @@ local function openShop(npcName)
 
 	shopTitle.Text = shopData.Title
 
-	-- Töröljük a régi (előző bolt) listáját
 	for _, child in pairs(scrollFrame:GetChildren()) do
 		if child:IsA("Frame") then child:Destroy() end
 	end
 
-	-- ==========================================
-	-- TÁRGYAK LEKÉRÉSE ÉS MEGJELENÍTÉSE
-	-- ==========================================
 	for _, itemName in ipairs(shopData.Items) do
-		-- Kikeressük az adatbázisból az árat!
 		local itemData = ItemDatabase[itemName]
 
 		if itemData then
@@ -106,7 +129,7 @@ local function openShop(npcName)
 			nameLabel.Position = UDim2.new(0, 10, 0, 0)
 			nameLabel.BackgroundTransparency = 1
 			nameLabel.TextColor3 = Color3.new(1, 1, 1)
-			nameLabel.Text = itemName -- Itt a név
+			nameLabel.Text = itemName 
 			nameLabel.Font = Enum.Font.GothamBold
 			nameLabel.TextSize = 12
 			nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -117,7 +140,6 @@ local function openShop(npcName)
 			buyBtn.Position = UDim2.new(0.55, 0, 0.2, 0)
 			buyBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
 			buyBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
-			-- Itt beállítjuk a gomb szövegét az adatbázis ára alapján!
 			buyBtn.Text = itemData.Price .. " Pénz"
 			buyBtn.Font = Enum.Font.GothamBold
 			buyBtn.TextSize = 12

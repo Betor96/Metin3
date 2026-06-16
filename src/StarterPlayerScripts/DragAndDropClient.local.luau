@@ -1,3 +1,5 @@
+-- Fájl helye: StarterPlayer -> StarterPlayerScripts -> DragAndDropClient
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -149,7 +151,6 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Okos Tooltip szöveg generáló az Adatbázisból
 local function getTooltipText(itemName)
 	local data = ItemDatabase[itemName]
 	if not data then return "Nincs információ erről a tárgyról." end
@@ -239,15 +240,12 @@ local originSlotUI = nil
 local dragConnection = nil
 
 local function getSlotData(guiObject)
-	-- Inventory (Táska)
 	if guiObject.Name:match("InvSlot_") then
 		local num = guiObject.Name:match("%d+")
 		return "Inventory", "Slot_" .. num, invFolder:FindFirstChild("Slot_" .. num)
-		-- Equipment (Felszerelés)
 	elseif eqNameToServer[guiObject.Name] then
 		local serverName = eqNameToServer[guiObject.Name]
 		return "Equipment", serverName, eqFolder:FindFirstChild(serverName)
-		-- ÚJ: Hotbar (Gyorsgombok)
 	elseif guiObject.Name:match("HotbarSlotUI_") then
 		local num = guiObject.Name:match("%d+")
 		local hotbarFolder = player:FindFirstChild("Hotbar")
@@ -280,6 +278,7 @@ UserInputService.InputBegan:Connect(function(input)
 				dragClone.Font = Enum.Font.GothamBold
 				dragClone.ZIndex = 10
 				dragClone.Parent = playerGui:WaitForChild("InventoryHUD")
+				dragClone.Active = false -- BIZTONSÁG: Ne blokkolja az alatta lévő dolgokat!
 
 				dragConnection = RunService.RenderStepped:Connect(function()
 					local mousePos = UserInputService:GetMouseLocation()
@@ -311,44 +310,77 @@ UserInputService.InputEnded:Connect(function(input)
 
 		local fromFolderStr, fromSlotName = getSlotData(originSlotUI)
 		local itemName = nil
-		if fromFolderStr == "Inventory" then itemName = invFolder:FindFirstChild(fromSlotName).Value end
-		if fromFolderStr == "Equipment" then itemName = eqFolder:FindFirstChild(fromSlotName).Value end
+
+		-- Tárgy nevének megkeresése (A Hotbar-t is vizsgáljuk most már!)
+		if fromFolderStr == "Inventory" then 
+			itemName = invFolder:FindFirstChild(fromSlotName).Value 
+		elseif fromFolderStr == "Equipment" then 
+			itemName = eqFolder:FindFirstChild(fromSlotName).Value 
+		elseif fromFolderStr == "Hotbar" then 
+			local hbFolder = player:FindFirstChild("Hotbar")
+			if hbFolder and hbFolder:FindFirstChild(fromSlotName) then
+				itemName = hbFolder:FindFirstChild(fromSlotName).Value
+			end
+		end
 
 		if targetSlotUI then
 			local toFolderStr, toSlotName = getSlotData(targetSlotUI)
 
-			-- Ha a táskából a HOTBAR-RA húzza:
-			if toFolderStr == "Hotbar" and fromFolderStr == "Inventory" then
-				-- Jelenleg kliens oldalon állítjuk be a shortcutot (később szerveresítjük mentéshez)
+			-- 1. ESET: Hotbarból húzunk ki valamit
+			if fromFolderStr == "Hotbar" then
+				local hbFolder = player:FindFirstChild("Hotbar")
+				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then
+					hbFolder[fromSlotName].Value = "" -- Eredeti helyről töröljük a gyorsgombot
+				end
+				-- Ha ráhúztuk egy másik Hotbar helyre, oda áttesszük
+				if toFolderStr == "Hotbar" then
+					local targetHb = player.Hotbar:FindFirstChild(toSlotName)
+					if targetHb then targetHb.Value = itemName end
+				end
+				-- Ha táskára húztuk, az is törli a gombot (mert feljebb megcsináltuk), de az item biztonságban a táskában marad!
+
+				-- 2. ESET: Táskából Hotbarra húzunk (Új gomb beállítása)
+			elseif toFolderStr == "Hotbar" and fromFolderStr == "Inventory" then
 				local hotbarSlot = player.Hotbar:FindFirstChild(toSlotName)
 				if hotbarSlot then
 					hotbarSlot.Value = itemName
 				end
 
-				-- Sima tárgymozgatás táskán belül/felszerelésbe
-			elseif fromSlotName ~= toSlotName or fromFolderStr ~= toFolderStr then
-				MoveItem:FireServer(fromFolderStr, fromSlotName, toFolderStr, toSlotName)
+				-- 3. ESET: Sima fizikai tárgymozgatás (Táska <-> Felszerelés)
+			elseif fromFolderStr ~= "Hotbar" and toFolderStr ~= "Hotbar" then
+				if fromSlotName ~= toSlotName or fromFolderStr ~= toFolderStr then
+					MoveItem:FireServer(fromFolderStr, fromSlotName, toFolderStr, toSlotName)
+				end
 			end
 		else
-			-- HA NINCS UI CÉLPONT, MEGNÉZZÜK, HOGY A KOVÁCSRA HÚZTUK-E!
-			local target3D = mouse.Target
-			if target3D and (target3D.Name == "Kovacs" or target3D:FindFirstAncestor("Kovacs")) then
-				local info = ItemDatabase[itemName]
-				if info and info.UpgradeTo then
-					currentUpgradeSlot = {Folder = fromFolderStr, Slot = fromSlotName}
-					bsInfo.Text = "Tárgy: " .. itemName .. "\nCél: " .. info.UpgradeTo .. "\nEsély: " .. info.UpgradeChance .. "%\nÁr: " .. info.UpgradeCost .. " Pénz"
-					if info.ReqItem then
-						bsInfo.Text = bsInfo.Text .. "\nSzükséges: " .. info.ReqCount .. "x " .. info.ReqItem
-					end
-					bsFrame.Visible = true
-				else
-					bsInfo.Text = "Ezt a tárgyat nem tudom fejleszteni!"
-					currentUpgradeSlot = {Folder = nil, Slot = nil}
-					bsFrame.Visible = true
+			-- HA NINCS UI CÉLPONT:
+			if fromFolderStr == "Hotbar" then
+				-- Ha a levegőbe húztuk a hotbarról, akkor csak kitöröljük a gyorsgombot!
+				local hbFolder = player:FindFirstChild("Hotbar")
+				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then
+					hbFolder[fromSlotName].Value = ""
 				end
 			else
-				-- Ha csak a levegőbe húzta, akkor eldobja a földre
-				DropItem:FireServer(fromFolderStr, fromSlotName)
+				-- KOVÁCS VIZSGÁLAT ÉS TÉNYLEGES ELDOBÁS
+				local target3D = mouse.Target
+				if target3D and (target3D.Name == "Kovacs" or target3D:FindFirstAncestor("Kovacs")) then
+					local info = ItemDatabase[itemName]
+					if info and info.UpgradeTo then
+						currentUpgradeSlot = {Folder = fromFolderStr, Slot = fromSlotName}
+						bsInfo.Text = "Tárgy: " .. itemName .. "\nCél: " .. info.UpgradeTo .. "\nEsély: " .. info.UpgradeChance .. "%\nÁr: " .. info.UpgradeCost .. " Pénz"
+						if info.ReqItem then
+							bsInfo.Text = bsInfo.Text .. "\nSzükséges: " .. info.ReqCount .. "x " .. info.ReqItem
+						end
+						bsFrame.Visible = true
+					else
+						bsInfo.Text = "Ezt a tárgyat nem tudom fejleszteni!"
+						currentUpgradeSlot = {Folder = nil, Slot = nil}
+						bsFrame.Visible = true
+					end
+				else
+					-- Tényleges fizikai eldobás a földre!
+					DropItem:FireServer(fromFolderStr, fromSlotName)
+				end
 			end
 		end
 		originSlotUI = nil

@@ -6,14 +6,19 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 local MoveItem = Events:WaitForChild("MoveItem")
 local DropItem = Events:WaitForChild("DropItem")
 
--- Melyik tárgy hova való?
-local itemTypes = {
-	["Kezdőkard"] = "Fegyver",
-	["Vadfarkas Páncél"] = "Pancel",
-	["Vas Páncél"] = "Pancel",
-	["Hosszúkard"] = "Fegyver"
+-- BEKÖTJÜK A KÖZPONTI ADATBÁZIST! (Itt dől el, hogy mi micsoda)
+local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
+
+-- Magyar típusnevekből szerveres slot nevek
+local typeToSlot = {
+	["Fegyver"] = "Fegyver",
+	["Páncél"] = "Pancel"
+	-- Ide jöhet majd a "Cipő", "Sisak" stb.
 }
 
+-- ==========================================
+-- TÁRGYAK MOZGATÁSA ÉS FELSZERELÉSE
+-- ==========================================
 MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName)
 	local inv = player:FindFirstChild("Inventory")
 	local eq = player:FindFirstChild("Equipment")
@@ -27,39 +32,77 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 
 	if fromSlot and toSlot and fromSlot.Value ~= "" then
 		local itemName = fromSlot.Value
+		local targetItemName = toSlot.Value
+
+		-- Megnézzük az adatbázisban, hogy létezik-e (és +1, +2 stb.)
+		local itemData = ItemDatabase[itemName]
+		if not itemData then return end
+
+		-- HA A FELSZERELÉSBE HÚZZUK (Felvétel)
 		if toFolderStr == "Equipment" then
-			local requiredType = itemTypes[itemName]
-			if requiredType ~= toSlotName then return end
+			local expectedSlot = typeToSlot[itemData.Type]
+			if expectedSlot ~= toSlotName then return end -- Ha nem a megfelelő helyre húzta, megszakítjuk!
 		end
+
+		-- HA CSERÉLÜNK (Táskából Felszerelésbe vagy fordítva, és mindkettőben van valami)
+		if toFolderStr == "Inventory" and fromFolderStr == "Equipment" and targetItemName ~= "" then
+			local targetItemData = ItemDatabase[targetItemName]
+			if not targetItemData then return end
+			local expectedSlot = typeToSlot[targetItemData.Type]
+			if expectedSlot ~= fromSlotName then return end -- A táskában lévő tárgy nem mehet a felszerelés adott helyére!
+		end
+
+		-- Sikeres csere / áthelyezés
 		local temp = toSlot.Value
 		toSlot.Value = fromSlot.Value
 		fromSlot.Value = temp
 	end
 end)
 
+-- ==========================================
+-- TÁRGYAK ELDOBÁSA A FÖLDRE
+-- ==========================================
 DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 	local folder = (folderStr == "Inventory") and player:FindFirstChild("Inventory") or player:FindFirstChild("Equipment")
 	if folder then
 		local slot = folder:FindFirstChild(slotName)
 		if slot and slot.Value ~= "" then
 			local itemName = slot.Value
-			slot.Value = ""
+			local itemData = ItemDatabase[itemName]
+
+			slot.Value = "" -- Töröljük a táskából
 
 			local character = player.Character
 			if character and character:FindFirstChild("HumanoidRootPart") then
 				local rootPart = character.HumanoidRootPart
-				local droppedFolder = workspace:FindFirstChild("DroppedItems")
-				if not droppedFolder then
-					droppedFolder = Instance.new("Folder")
-					droppedFolder.Name = "DroppedItems"
-					droppedFolder.Parent = workspace
-				end
+				local droppedFolder = workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", workspace)
+				droppedFolder.Name = "DroppedItems"
 
 				local droppedItem = Instance.new("Part")
 				droppedItem.Name = "LootPart"
 				droppedItem.Size = Vector3.new(0.5, 0.2, 3) 
 				droppedItem.Position = rootPart.Position + (rootPart.CFrame.LookVector * 5) + Vector3.new(0, 3, 0)
-				droppedItem.Color = (itemName == "Kezdőkard") and Color3.fromRGB(150, 150, 150) or Color3.fromRGB(130, 80, 50)
+
+				-- ==========================================
+				-- DINAMIKUS SZÍNBEÁLLÍTÁS ADATBÁZISBÓL
+				-- ==========================================
+				local partColor = Color3.fromRGB(150, 150, 150)
+				local textColor = Color3.new(1, 1, 1)
+
+				if itemData then
+					if itemData.Type == "Fegyver" then 
+						partColor = Color3.fromRGB(150, 150, 150)
+						textColor = Color3.fromRGB(220, 220, 220)
+					elseif itemData.Type == "Páncél" then 
+						partColor = Color3.fromRGB(80, 100, 80)
+						textColor = Color3.fromRGB(100, 255, 100)
+					elseif itemData.Type == "Fogyóeszköz" then
+						partColor = Color3.fromRGB(150, 50, 50)
+						textColor = Color3.fromRGB(255, 100, 100)
+					end
+				end
+
+				droppedItem.Color = partColor
 
 				local itemTag = Instance.new("StringValue")
 				itemTag.Name = "ItemName"
@@ -79,10 +122,7 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 				nameLabel.Font = Enum.Font.GothamBold
 				nameLabel.TextScaled = true
 				nameLabel.TextStrokeTransparency = 0 
-
-				if itemName == "Kezdőkard" then nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-				elseif itemName == "Vadfarkas Páncél" then nameLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-				else nameLabel.TextColor3 = Color3.new(1, 1, 1) end
+				nameLabel.TextColor3 = textColor
 
 				nameLabel.Parent = billboard
 				billboard.Parent = droppedItem

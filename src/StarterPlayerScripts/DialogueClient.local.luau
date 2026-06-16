@@ -1,10 +1,11 @@
+-- Fájl helye: StarterPlayer -> StarterPlayerScripts -> DialogueClient
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local AcceptQuest = Events:WaitForChild("AcceptQuest")
 local TurnInQuest = Events:WaitForChild("TurnInQuest")
 
--- BEKÖTJÜK AZ ÚJ ADATBÁZISOKAT
 local QuestDatabase = require(ReplicatedStorage:WaitForChild("QuestDatabase"))
 local NPCDatabase = require(ReplicatedStorage:WaitForChild("NPCDatabase"))
 
@@ -18,7 +19,8 @@ screenGui.Parent = playerGui
 
 local dialogFrame = Instance.new("Frame")
 dialogFrame.Size = UDim2.new(0, 600, 0, 150)
-dialogFrame.Position = UDim2.new(0.5, -300, 1, -180)
+dialogFrame.AnchorPoint = Vector2.new(0.5, 1) -- FIX: Alsó-középpont horgony
+dialogFrame.Position = UDim2.new(0.5, 0, 1, -100) -- FIX: A képernyő alján, középen
 dialogFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 dialogFrame.BackgroundTransparency = 0.1
 dialogFrame.BorderColor3 = Color3.fromRGB(180, 150, 80)
@@ -62,7 +64,8 @@ uiListLayout.Parent = buttonContainer
 
 local questTracker = Instance.new("Frame")
 questTracker.Size = UDim2.new(0, 250, 0, 80)
-questTracker.Position = UDim2.new(0, 20, 0, 20)
+questTracker.AnchorPoint = Vector2.new(0, 0) -- FIX: Bal-felső sarok horgony
+questTracker.Position = UDim2.new(0, 20, 0, 20) -- FIX: Bal felső sarokban
 questTracker.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 questTracker.BackgroundTransparency = 0.3
 questTracker.BorderColor3 = Color3.fromRGB(100, 80, 40)
@@ -92,9 +95,6 @@ trackerInfo.TextXAlignment = Enum.TextXAlignment.Left
 trackerInfo.TextYAlignment = Enum.TextYAlignment.Top
 trackerInfo.Parent = questTracker
 
--- ==========================================
--- UNIVERZÁLIS KÜLDETÉSKÖVETŐ MEGJELENÍTÉS
--- ==========================================
 local function updateQuestTracker()
 	local quests = player:WaitForChild("Quests")
 	local activeQuestFound = false
@@ -109,10 +109,10 @@ local function updateQuestTracker()
 				trackerInfo.Text = qData.Title .. "\nÖlj meg " .. qData.Count .. " " .. qData.Target .. "-t!\nÁllapot: " .. qVal.Value .. " / " .. qData.Count
 				trackerInfo.TextColor3 = Color3.new(1, 1, 1)
 			else
-				trackerInfo.Text = qData.Title .. "\nÁllapot: KÉSZ! Beszélj az NPC-vel."
+				trackerInfo.Text = qData.Title .. "\nÁllapot: KÉSZ!\nBeszélj az NPC-vel."
 				trackerInfo.TextColor3 = Color3.fromRGB(100, 255, 100)
 			end
-			break -- Egyszerre egy aktív küldetést listázunk ki a követőre
+			break
 		end
 	end
 
@@ -147,22 +147,17 @@ local function showDialogue(name, text, options)
 	dialogFrame.Visible = true
 end
 
--- ==========================================
--- NPC KATTINTÁSOK UNIVERZÁLIS KEZELÉSE
--- ==========================================
 local function setupNPCs()
 	for npcPartName, npcData in pairs(NPCDatabase) do
 		local npc = workspace:FindFirstChild(npcPartName)
 		if npc and npc:FindFirstChildOfClass("ClickDetector") then
 
 			npc.ClickDetector.MouseClick:Connect(function()
-				-- 1. TÍPUS: Sima pletykáló falusi
 				if npcData.Type == "Regular" then
 					local lines = npcData.Dialogues
-					local randomLine = lines[math.random(1, #lines)] -- Kiválaszt egy véletlenszerű szöveget
+					local randomLine = lines[math.random(1, #lines)] 
 					showDialogue(npcData.Name, randomLine, {{Text = "Bezár", Action = function() end}})
 
-					-- 2. TÍPUS: Küldetést adó karakter
 				elseif npcData.Type == "QuestGiver" then
 					local questName = npcData.QuestName
 					local qVal = player.Quests:FindFirstChild(questName)
@@ -170,7 +165,6 @@ local function setupNPCs()
 
 					if qVal and qData then
 						if qVal.Value == -1 then
-							-- NINCS ELKEZDVE
 							local rewardText = string.format("\n\nJutalom: %d EXP, %d Pénz", qData.Rewards.Exp, qData.Rewards.Gold)
 							if qData.Rewards.Item then rewardText = rewardText .. ", " .. qData.Rewards.Item end
 
@@ -179,15 +173,12 @@ local function setupNPCs()
 								{Text = "Mégse", Action = function() end}
 							})
 						elseif qVal.Value >= 0 and qVal.Value < qData.Count then
-							-- FOLYAMATBAN
 							showDialogue(npcData.Name, npcData.Dialogues.InProgress, {{Text = "Rendben", Action = function() end}})
 						elseif qVal.Value == qData.Count then
-							-- KÉSZ, LEADÁS REGGELÉSE
 							showDialogue(npcData.Name, npcData.Dialogues.ReadyToTurnIn, {
 								{Text = "Jutalom átvétele", Action = function() TurnInQuest:FireServer(questName) task.wait(0.2) updateQuestTracker() end}
 							})
 						elseif qVal.Value == 9999 then
-							-- MÁR RÉGEBBEN BEFEJEZTE
 							showDialogue(npcData.Name, npcData.Dialogues.Completed, {{Text = "Viszlát", Action = function() end}})
 						end
 					end

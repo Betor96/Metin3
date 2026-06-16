@@ -1,3 +1,5 @@
+-- Fájl helye: StarterPlayer -> StarterPlayerScripts -> MainHUDClient
+
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -5,7 +7,6 @@ local humanoid = character:WaitForChild("Humanoid")
 
 local playerGui = player:WaitForChild("PlayerGui")
 
--- 1. KÉPERNYŐ LÉTREHOZÁSA
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MetinHUD"
 screenGui.ResetOnSpawn = false
@@ -17,13 +18,13 @@ screenGui.Parent = playerGui
 -- ==========================================
 local statusContainer = Instance.new("Frame")
 statusContainer.Size = UDim2.new(0, 300, 0, 80)
-statusContainer.Position = UDim2.new(0, 20, 1, -100)
+statusContainer.AnchorPoint = Vector2.new(0, 1) -- FIX: Bal alsó sarok horgony
+statusContainer.Position = UDim2.new(0, 20, 1, -20) -- FIX: Fixen 20 pixelre a bal alsó saroktól
 statusContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
 statusContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
 statusContainer.BorderSizePixel = 2
 statusContainer.Parent = screenGui
 
--- Életerő (HP) Piros
 local hpBg = Instance.new("Frame", statusContainer)
 hpBg.Size = UDim2.new(1, -20, 0, 20)
 hpBg.Position = UDim2.new(0, 10, 0, 10)
@@ -42,9 +43,8 @@ hpText.BackgroundTransparency = 1
 hpText.TextColor3 = Color3.new(1,1,1)
 hpText.Font = Enum.Font.GothamBold
 hpText.TextSize = 12
-hpText.Text = "0 / 0" -- FIX: Ne maradjon ott a Label felirat az elején
+hpText.Text = "0 / 0"
 
--- Mana (MP) Kék
 local mpBg = Instance.new("Frame", statusContainer)
 mpBg.Size = UDim2.new(1, -20, 0, 20)
 mpBg.Position = UDim2.new(0, 10, 0, 35)
@@ -63,9 +63,8 @@ mpText.BackgroundTransparency = 1
 mpText.TextColor3 = Color3.new(1,1,1)
 mpText.Font = Enum.Font.GothamBold
 mpText.TextSize = 12
-mpText.Text = "0 / 0" -- FIX: Ne maradjon ott a Label felirat az elején
+mpText.Text = "0 / 0"
 
--- Tapasztalat (EXP) Arany
 local expBg = Instance.new("Frame", statusContainer)
 expBg.Size = UDim2.new(1, -20, 0, 10)
 expBg.Position = UDim2.new(0, 10, 0, 60)
@@ -77,7 +76,6 @@ expBar.Size = UDim2.new(0.5, 0, 1, 0)
 expBar.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
 expBar.BorderSizePixel = 0
 
--- Frissítő funkciók
 local function updateHP()
 	local percent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
 	hpBar.Size = UDim2.new(percent, 0, 1, 0)
@@ -90,7 +88,6 @@ updateHP()
 local function updateMPXP()
 	local stats = player:FindFirstChild("PlayerStats")
 	if stats then
-		-- Mana frissítése
 		local mana = stats:FindFirstChild("Mana")
 		local maxMana = stats:FindFirstChild("MaxMana")
 		if mana and maxMana and maxMana.Value > 0 then
@@ -99,7 +96,6 @@ local function updateMPXP()
 			mpText.Text = mana.Value .. " / " .. maxMana.Value
 		end
 
-		-- ÚJ: XP Frissítése
 		local exp = stats:FindFirstChild("Experience")
 		local maxExp = stats:FindFirstChild("MaxExperience")
 		if exp and maxExp and maxExp.Value > 0 then
@@ -109,22 +105,23 @@ local function updateMPXP()
 	end
 end
 
--- Folyamatos frissítés bekapcsolása és azonnali indítás
 task.spawn(function()
-	task.wait(0.5) -- Egy pillanat türelmi idő a PlayerInit scriptnek
+	task.wait(0.5)
 	updateMPXP()
 	while task.wait(0.5) do updateMPXP() end
 end)
 
 -- ==========================================
--- KÖZÉPSŐ GYORSGOMBOK (HOTBAR 1-4)
+-- KÖZÉPSŐ GYORSGOMBOK (HOTBAR 1-8)
 -- ==========================================
 local hotbarContainer = Instance.new("Frame")
-hotbarContainer.Size = UDim2.new(0, 220, 0, 60)
-hotbarContainer.Position = UDim2.new(0.5, -110, 1, -80)
+hotbarContainer.Size = UDim2.new(0, 440, 0, 60)
+hotbarContainer.AnchorPoint = Vector2.new(0.5, 1) 
+hotbarContainer.Position = UDim2.new(0.5, 0, 1, -20) 
 hotbarContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
 hotbarContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
 hotbarContainer.BorderSizePixel = 2
+hotbarContainer.Active = true -- <----- EZ A SOR FOGJA FEL A KATTINTÁSOKAT!
 hotbarContainer.Parent = screenGui
 
 local uiList = Instance.new("UIListLayout", hotbarContainer)
@@ -133,13 +130,22 @@ uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 uiList.VerticalAlignment = Enum.VerticalAlignment.Center
 uiList.Padding = UDim.new(0, 5)
 
-for i = 1, 4 do
+for i = 1, 8 do
+	if i == 5 then
+		local gap = Instance.new("Frame")
+		gap.Name = "HotbarGap"
+		gap.Size = UDim2.new(0, 20, 0, 45) 
+		gap.BackgroundTransparency = 1
+		gap.Parent = hotbarContainer
+	end
+
 	local slotFrame = Instance.new("Frame")
 	slotFrame.Name = "HotbarSlotUI_" .. i
 	slotFrame.Size = UDim2.new(0, 45, 0, 45)
 	slotFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
 	slotFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
 	slotFrame.BorderSizePixel = 1
+	slotFrame.Active = true -- <----- ÉS EZ IS SEGÍT BLOKKOLNI A MOZGÁST!
 	slotFrame.Parent = hotbarContainer
 
 	local numLabel = Instance.new("TextLabel", slotFrame)
@@ -170,7 +176,7 @@ local function renderHotbar()
 	local hotbarFolder = player:FindFirstChild("Hotbar")
 	if not hotbarFolder then return end
 
-	for i = 1, 4 do
+	for i = 1, 8 do
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
 		local uiSlot = hotbarContainer:FindFirstChild("HotbarSlotUI_" .. i)
 

@@ -1,3 +1,5 @@
+-- Fájl helye: StarterPlayer -> StarterPlayerScripts -> CharacterUIClient
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -15,14 +17,13 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 250, 0, 300)
-mainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+mainFrame.AnchorPoint = Vector2.new(0, 0.5) -- FIX: Bal-közép horgony
+mainFrame.Position = UDim2.new(0.05, 0, 0.5, 0) -- FIX: Bal oldalon középen
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 2
-mainFrame.Active = true -- Felfogja az egérkattintásokat
+mainFrame.Active = true 
 mainFrame.Visible = false
 mainFrame.Parent = screenGui
-
-
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 40)
@@ -34,9 +35,6 @@ titleLabel.TextSize = 18
 titleLabel.Active = true -- FONTOS
 titleLabel.Parent = mainFrame
 
--- ==========================================
--- ABLAK MOZGATÁSA CSAK A CÍMSORRÓL
--- ==========================================
 local draggingChar, dragInputChar, mousePosChar, framePosChar
 
 titleLabel.InputBegan:Connect(function(input)
@@ -133,14 +131,8 @@ stats.VIT.Changed:Connect(updateUI)
 stats.INT.Changed:Connect(updateUI)
 stats.STR.Changed:Connect(updateUI)
 stats.DEX.Changed:Connect(updateUI)
-
 updateUI()
 
-
-
--- ==========================================
--- ABLAK ELŐTÉRBE HOZÁSA KATTINTÁSKOR
--- ==========================================
 mainFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local highest = 0
@@ -155,21 +147,18 @@ mainFrame.InputBegan:Connect(function(input)
 	end
 end)
 
--- ==========================================
--- BEZÁRÓ "X" GOMB LÉTREHOZÁSA
--- ==========================================
 local charCloseBtn = Instance.new("TextButton")
 charCloseBtn.Size = UDim2.new(0, 30, 0, 30)
-charCloseBtn.Position = UDim2.new(1, -5, 0, 5) -- Jobb felső sarok pici margóval
+charCloseBtn.Position = UDim2.new(1, -5, 0, 5) 
 charCloseBtn.AnchorPoint = Vector2.new(1, 0)
-charCloseBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30) -- Pirosas háttér
+charCloseBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30) 
 charCloseBtn.BorderColor3 = Color3.fromRGB(80, 20, 20)
 charCloseBtn.BorderSizePixel = 2
 charCloseBtn.Text = "X"
 charCloseBtn.TextColor3 = Color3.new(1, 1, 1)
 charCloseBtn.Font = Enum.Font.GothamBold
 charCloseBtn.TextSize = 14
-charCloseBtn.Parent = mainFrame -- A karakter ablakhoz csatoljuk
+charCloseBtn.Parent = mainFrame 
 
 charCloseBtn.MouseButton1Click:Connect(function()
 	mainFrame.Visible = false
