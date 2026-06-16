@@ -5,8 +5,9 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
+local Events = ReplicatedStorage:WaitForChild("Events")
+local UseItem = Events:WaitForChild("UseItem") -- ÚJ: Bekötjük a kommunikációs csatornát
 
--- A billentyűzetek (1-től 8-ig) hozzárendelése a számokhoz
 local keyMap = {
 	[Enum.KeyCode.One] = 1,
 	[Enum.KeyCode.Two] = 2,
@@ -18,9 +19,11 @@ local keyMap = {
 	[Enum.KeyCode.Eight] = 8
 }
 
+local isCooldown = false -- Védelem a Potion-spam ellen
+
 UserInputService.InputBegan:Connect(function(input, isTyping)
-	-- Ha épp chatel a játékos, nem sülnek el a gombok
-	if isTyping then return end
+	-- Ha épp chatel a játékos, vagy várakozási időn van, nem sülnek el a gombok
+	if isTyping or isCooldown then return end
 
 	local slotNum = keyMap[input.KeyCode]
 	if slotNum then
@@ -28,8 +31,13 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. slotNum)
 
 		if slotVal and slotVal.Value ~= "" then
-			-- KÉSŐBB IDE JÖN A GYÓGYITAL MEGIVÁSA!
-			print("Megnyomtad a(z) " .. slotNum .. ". gombot, amin ez van: " .. slotVal.Value)
+			-- Elküldjük a Szervernek, hogy mit akarunk használni!
+			isCooldown = true
+			UseItem:FireServer(slotVal.Value)
+
+			-- 0.2 másodperc múlva ihat ismét (MMO alapértelmezés)
+			task.wait(0.2)
+			isCooldown = false
 		end
 	end
 end)

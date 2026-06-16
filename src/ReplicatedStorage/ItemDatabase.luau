@@ -86,12 +86,14 @@ local ItemDatabase = {
 		Type = "Fogyóeszköz",
 		HealAmount = 50,
 		Price = 20,
+		MaxStack = 200,
 		Description = "Azonnal visszatölt 50 Életerőt."
 	},
 	["Mana Ital"] = {
 		Type = "Fogyóeszköz",
 		HealAmount = 50,
 		Price = 20,
+		MaxStack = 200,
 		Description = "Azonnal visszatölt 50 Manát."
 	},
 
@@ -101,6 +103,7 @@ local ItemDatabase = {
 	["Kutya Fog"] = {
 		Type = "Alapanyag",
 		Price = 5,
+		MaxStack = 50,
 		Description = "A Kovácsnak van rá szüksége a fejlesztésekhez."
 	}
 }

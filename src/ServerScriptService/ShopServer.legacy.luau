@@ -17,19 +17,44 @@ BuyItem.OnServerEvent:Connect(function(player, itemName)
 
 	local gold = stats:FindFirstChild("Gold")
 
+	-- Fájl helye: ServerScriptService -> ShopServer
+	-- (A vásárlás ellenőrzésnél cseréld le a freeSlot keresést erre:)
+
 	if gold.Value >= itemData.Price then
-		local freeSlot = nil
-		for i = 1, 8 do
-			local slot = inv:FindFirstChild("Slot_" .. i)
-			if slot and slot.Value == "" then
-				freeSlot = slot
-				break
+		local targetSlot = nil
+		local maxStack = itemData.MaxStack or 1
+
+		-- Keresünk nem teli stacket
+		if maxStack > 1 then
+			for i = 1, 8 do
+				local slot = inv:FindFirstChild("Slot_" .. i)
+				if slot and slot.Value == itemName and slot.Amount.Value < maxStack then
+					targetSlot = slot
+					break
+				end
 			end
 		end
 
-		if freeSlot then
+		-- Ha nincs, keresünk üres helyet
+		if not targetSlot then
+			for i = 1, 8 do
+				local slot = inv:FindFirstChild("Slot_" .. i)
+				if slot and slot.Value == "" then
+					targetSlot = slot
+					break
+				end
+			end
+		end
+
+		-- Levonjuk a pénzt és beadjuk a tárgyat
+		if targetSlot then
 			gold.Value = gold.Value - itemData.Price
-			freeSlot.Value = itemName
+			if targetSlot.Value == itemName then
+				targetSlot.Amount.Value = targetSlot.Amount.Value + 1
+			else
+				targetSlot.Value = itemName
+				targetSlot.Amount.Value = 1
+			end
 		end
 	end
 end)

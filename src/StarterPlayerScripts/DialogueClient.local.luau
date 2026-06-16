@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- ÚJ: Folyamatos távolságméréshez
 local Events = ReplicatedStorage:WaitForChild("Events")
 local AcceptQuest = Events:WaitForChild("AcceptQuest")
 local TurnInQuest = Events:WaitForChild("TurnInQuest")
@@ -19,8 +20,8 @@ screenGui.Parent = playerGui
 
 local dialogFrame = Instance.new("Frame")
 dialogFrame.Size = UDim2.new(0, 600, 0, 150)
-dialogFrame.AnchorPoint = Vector2.new(0.5, 1) -- FIX: Alsó-középpont horgony
-dialogFrame.Position = UDim2.new(0.5, 0, 1, -100) -- FIX: A képernyő alján, középen
+dialogFrame.AnchorPoint = Vector2.new(0.5, 1) 
+dialogFrame.Position = UDim2.new(0.5, 0, 1, -100) 
 dialogFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 dialogFrame.BackgroundTransparency = 0.1
 dialogFrame.BorderColor3 = Color3.fromRGB(180, 150, 80)
@@ -64,8 +65,8 @@ uiListLayout.Parent = buttonContainer
 
 local questTracker = Instance.new("Frame")
 questTracker.Size = UDim2.new(0, 250, 0, 80)
-questTracker.AnchorPoint = Vector2.new(0, 0) -- FIX: Bal-felső sarok horgony
-questTracker.Position = UDim2.new(0, 20, 0, 20) -- FIX: Bal felső sarokban
+questTracker.AnchorPoint = Vector2.new(0, 0) 
+questTracker.Position = UDim2.new(0, 20, 0, 20) 
 questTracker.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 questTracker.BackgroundTransparency = 0.3
 questTracker.BorderColor3 = Color3.fromRGB(100, 80, 40)
@@ -95,6 +96,12 @@ trackerInfo.TextXAlignment = Enum.TextXAlignment.Left
 trackerInfo.TextYAlignment = Enum.TextYAlignment.Top
 trackerInfo.Parent = questTracker
 
+-- ==========================================
+-- ÚJ: TÁVOLSÁGMÉRÉS VÁLTOZÓI
+-- ==========================================
+local currentInteractNPC = nil
+local MAX_INTERACT_DISTANCE = 15
+
 local function updateQuestTracker()
 	local quests = player:WaitForChild("Quests")
 	local activeQuestFound = false
@@ -116,9 +123,7 @@ local function updateQuestTracker()
 		end
 	end
 
-	if not activeQuestFound then
-		questTracker.Visible = false
-	end
+	if not activeQuestFound then questTracker.Visible = false end
 end
 
 local function showDialogue(name, text, options)
@@ -142,6 +147,7 @@ local function showDialogue(name, text, options)
 		btn.MouseButton1Click:Connect(function()
 			if opt.Action then opt.Action() end
 			dialogFrame.Visible = false
+			currentInteractNPC = nil -- Töröljük a fókuszt
 		end)
 	end
 	dialogFrame.Visible = true
@@ -153,6 +159,15 @@ local function setupNPCs()
 		if npc and npc:FindFirstChildOfClass("ClickDetector") then
 
 			npc.ClickDetector.MouseClick:Connect(function()
+				-- ÚJ: Csak akkor nyitja meg, ha elég közel vagyunk!
+				local char = player.Character
+				if char and char:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("HumanoidRootPart") then
+					local dist = (char.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+					if dist > MAX_INTERACT_DISTANCE then return end -- Túl messze van!
+				end
+
+				currentInteractNPC = npc -- Eltároljuk, kivel beszélünk épp
+
 				if npcData.Type == "Regular" then
 					local lines = npcData.Dialogues
 					local randomLine = lines[math.random(1, #lines)] 
@@ -188,16 +203,30 @@ local function setupNPCs()
 	end
 end
 
+-- ==========================================
+-- ÚJ: FOLYAMATOS TÁVOLSÁG ELLENŐRZÉS (Párbeszéd bezárása)
+-- ==========================================
+RunService.Heartbeat:Connect(function()
+	if dialogFrame.Visible and currentInteractNPC then
+		local char = player.Character
+		if char and char:FindFirstChild("HumanoidRootPart") and currentInteractNPC:FindFirstChild("HumanoidRootPart") then
+			local dist = (char.HumanoidRootPart.Position - currentInteractNPC.HumanoidRootPart.Position).Magnitude
+			if dist > MAX_INTERACT_DISTANCE then
+				dialogFrame.Visible = false -- Ha túl messze mész, rácsapja az ablakot!
+				currentInteractNPC = nil
+			end
+		else
+			dialogFrame.Visible = false
+			currentInteractNPC = nil
+		end
+	end
+end)
+
 player:WaitForChild("Quests")
-for _, qVal in pairs(player.Quests:GetChildren()) do
-	qVal.Changed:Connect(updateQuestTracker)
-end
+for _, qVal in pairs(player.Quests:GetChildren()) do qVal.Changed:Connect(updateQuestTracker) end
 updateQuestTracker()
 
 workspace.ChildAdded:Connect(function(child)
-	if NPCDatabase[child.Name] then
-		task.wait(0.5)
-		setupNPCs()
-	end
+	if NPCDatabase[child.Name] then task.wait(0.5) setupNPCs() end
 end)
 setupNPCs()

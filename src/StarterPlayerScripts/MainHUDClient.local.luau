@@ -172,9 +172,11 @@ for i = 1, 8 do
 	itemIcon.ZIndex = 2
 end
 
+-- Fájl helye: StarterPlayerScripts -> MainHUDClient (részlet!)
 local function renderHotbar()
 	local hotbarFolder = player:FindFirstChild("Hotbar")
-	if not hotbarFolder then return end
+	local invFolder = player:FindFirstChild("Inventory")
+	if not hotbarFolder or not invFolder then return end
 
 	for i = 1, 8 do
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
@@ -183,10 +185,46 @@ local function renderHotbar()
 		if slotVal and uiSlot then
 			local icon = uiSlot:FindFirstChild("ItemIcon")
 			if icon then
+				for _, c in pairs(icon:GetChildren()) do c:Destroy() end -- Töröljük a régi számot
+
 				if slotVal.Value ~= "" then
 					icon.Text = slotVal.Value
-					icon.BackgroundTransparency = 0
-					icon.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+
+					-- Megkeressük, mennyi van a táskában összesen ebből a tárgyból!
+					local totalAmount = 0
+					for j = 1, 8 do
+						local invSlot = invFolder:FindFirstChild("Slot_" .. j)
+						if invSlot and invSlot.Value == slotVal.Value then
+							local amt = invSlot:FindFirstChild("Amount")
+							totalAmount = totalAmount + (amt and amt.Value or 1)
+						end
+					end
+
+					if totalAmount > 0 then
+						-- VAN BELŐLE: Piros és aktív
+						icon.BackgroundTransparency = 0
+						icon.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+						icon.TextTransparency = 0
+
+						-- Szám csak akkor, ha > 1
+						if totalAmount > 1 then
+							local amtLabel = Instance.new("TextLabel")
+							amtLabel.Size = UDim2.new(0, 15, 0, 15)
+							amtLabel.Position = UDim2.new(1, -15, 1, -15)
+							amtLabel.BackgroundTransparency = 1
+							amtLabel.TextColor3 = Color3.new(1,1,1)
+							amtLabel.TextStrokeTransparency = 0
+							amtLabel.Text = tostring(totalAmount)
+							amtLabel.Font = Enum.Font.GothamBold
+							amtLabel.TextSize = 12
+							amtLabel.Parent = icon
+						end
+					else
+						-- ELFOGYOTT: Szürke, lebegő, szám nélküli
+						icon.BackgroundTransparency = 0
+						icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+						icon.TextTransparency = 0.6 
+					end
 				else
 					icon.Text = ""
 					icon.BackgroundTransparency = 1
@@ -195,6 +233,19 @@ local function renderHotbar()
 		end
 	end
 end
+
+player:WaitForChild("Hotbar").ChildAdded:Connect(renderHotbar)
+for _, child in pairs(player:WaitForChild("Hotbar"):GetChildren()) do child.Changed:Connect(renderHotbar) end
+
+-- ÚJ: A táska változását is figyelnie kell a hotbarnak!
+task.spawn(function()
+	local inv = player:WaitForChild("Inventory")
+	for _, slot in pairs(inv:GetChildren()) do
+		slot.Changed:Connect(renderHotbar)
+		local amt = slot:WaitForChild("Amount", 2)
+		if amt then amt.Changed:Connect(renderHotbar) end
+	end
+end)
 
 player:WaitForChild("Hotbar").ChildAdded:Connect(renderHotbar)
 for _, child in pairs(player:WaitForChild("Hotbar"):GetChildren()) do

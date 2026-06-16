@@ -6,28 +6,21 @@ local playerDataStore = DataStoreService:GetDataStore("PlayerSaveData_V2")
 local savingPlayers = {} 
 
 local function setupPlayer(player)
-	-- [A] LEADERSTATS (Jobb felső sarok a Tab menühöz)
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
 	leaderstats.Parent = player
 
-	local leaderLevel = Instance.new("IntValue")
+	local leaderLevel = Instance.new("IntValue", leaderstats)
 	leaderLevel.Name = "Level"
 	leaderLevel.Value = 1
-	leaderLevel.Parent = leaderstats
 
-	-- [B] MAPPÁK ÉS ALAPÉRTÉKEK LÉTREHOZÁSA
 	local stats = Instance.new("Folder")
 	stats.Name = "PlayerStats"
 	stats.Parent = player
 
 	Instance.new("IntValue", stats).Name = "Experience"
 	Instance.new("IntValue", stats).Name = "Gold"
-
-	local level = Instance.new("IntValue", stats)
-	level.Name = "Level"
-	level.Value = 1
-
+	local level = Instance.new("IntValue", stats) level.Name = "Level" level.Value = 1
 	Instance.new("IntValue", stats).Name = "StatPoints"
 
 	local str = Instance.new("IntValue", stats) str.Name = "STR" str.Value = 1
@@ -38,9 +31,16 @@ local function setupPlayer(player)
 	local mana = Instance.new("IntValue", stats) mana.Name = "Mana" mana.Value = 100
 	local maxMana = Instance.new("IntValue", stats) maxMana.Name = "MaxMana" maxMana.Value = 100
 
+	-- ÚJ: TÁSKA LÉTREHOZÁSA DARABSZÁMMAL
 	local inv = Instance.new("Folder", player)
 	inv.Name = "Inventory"
-	for i = 1, 8 do Instance.new("StringValue", inv).Name = "Slot_" .. i end
+	for i = 1, 8 do 
+		local slot = Instance.new("StringValue", inv)
+		slot.Name = "Slot_" .. i
+		local amt = Instance.new("IntValue", slot) -- ÚJ: Darabszám tároló
+		amt.Name = "Amount"
+		amt.Value = 0
+	end
 
 	local eq = Instance.new("Folder", player)
 	eq.Name = "Equipment"
@@ -51,23 +51,30 @@ local function setupPlayer(player)
 	hotbar.Name = "Hotbar"
 	for i = 1, 8 do Instance.new("StringValue", hotbar).Name = "Hotbar_" .. i end
 
-	-- [C] ADATOK BETÖLTÉSE
-	local success, data = pcall(function() 
-		return playerDataStore:GetAsync("Player_" .. player.UserId) 
-	end)
+	-- ADATOK BETÖLTÉSE
+	local success, data = pcall(function() return playerDataStore:GetAsync("Player_" .. player.UserId) end)
 
 	if success and data then
 		if data.Stats then
 			for statName, statValue in pairs(data.Stats) do
-				if player.PlayerStats:FindFirstChild(statName) then
-					player.PlayerStats[statName].Value = statValue
-				end
+				if player.PlayerStats:FindFirstChild(statName) then player.PlayerStats[statName].Value = statValue end
 			end
-			leaderLevel.Value = level.Value -- Szinkronizáljuk a Leaderstat-ot
+			leaderLevel.Value = level.Value 
 		end
+
+		-- ÚJ: TÁSKA BETÖLTÉS (Biztonságos az új és régi formátumhoz is)
 		if data.Inventory then
 			for name, val in pairs(data.Inventory) do 
-				if player.Inventory:FindFirstChild(name) then player.Inventory[name].Value = val end 
+				local slot = player.Inventory:FindFirstChild(name)
+				if slot then 
+					if type(val) == "string" then
+						slot.Value = val
+						slot.Amount.Value = (val ~= "") and 1 or 0
+					else
+						slot.Value = val.Name or ""
+						slot.Amount.Value = val.Amount or 0
+					end
+				end 
 			end
 		end
 		if data.Equipment then
@@ -77,9 +84,9 @@ local function setupPlayer(player)
 		end
 		print(player.Name .. " adatai sikeresen betöltve!")
 	else
-		-- [D] ÚJ JÁTÉKOS: Itt adjuk a Kezdőkardot!
 		print(player.Name .. " új játékos, alapértékek beállítva.")
 		inv.Slot_1.Value = "Kezdőkard"
+		inv.Slot_1.Amount.Value = 1 -- Első kard
 	end
 end
 
@@ -90,27 +97,22 @@ local function savePlayerData(player)
 	local data = { Stats = {}, Inventory = {}, Equipment = {} }
 
 	if player:FindFirstChild("PlayerStats") then
-		for _, stat in pairs(player.PlayerStats:GetChildren()) do
-			data.Stats[stat.Name] = stat.Value
+		for _, stat in pairs(player.PlayerStats:GetChildren()) do data.Stats[stat.Name] = stat.Value end
+	end
+
+	-- ÚJ: MENTÉS DARABSZÁMMAL EGYÜTT
+	if player:FindFirstChild("Inventory") then
+		for _, slot in pairs(player.Inventory:GetChildren()) do 
+			data.Inventory[slot.Name] = {Name = slot.Value, Amount = slot.Amount.Value}
 		end
 	end
-	if player:FindFirstChild("Inventory") then
-		for _, slot in pairs(player.Inventory:GetChildren()) do data.Inventory[slot.Name] = slot.Value end
-	end
+
 	if player:FindFirstChild("Equipment") then
 		for _, slot in pairs(player.Equipment:GetChildren()) do data.Equipment[slot.Name] = slot.Value end
 	end
 
-	local success, errorMessage = pcall(function() 
-		playerDataStore:SetAsync("Player_" .. player.UserId, data) 
-	end)
-
-	if success then
-		print(player.Name .. " adatai elmentve!")
-	else
-		warn("Nem sikerült menteni " .. player.Name .. " adatait! Hiba: " .. tostring(errorMessage))
-	end
-
+	local success, errorMessage = pcall(function() playerDataStore:SetAsync("Player_" .. player.UserId, data) end)
+	if success then print(player.Name .. " adatai elmentve!") else warn("Nem sikerült menteni! " .. tostring(errorMessage)) end
 	savingPlayers[player.UserId] = nil
 end
 
@@ -118,8 +120,6 @@ game.Players.PlayerAdded:Connect(setupPlayer)
 game.Players.PlayerRemoving:Connect(savePlayerData)
 
 game:BindToClose(function()
-	for _, player in pairs(game.Players:GetPlayers()) do 
-		task.spawn(function() savePlayerData(player) end)
-	end
+	for _, player in pairs(game.Players:GetPlayers()) do task.spawn(function() savePlayerData(player) end) end
 	task.wait(2) 
 end)

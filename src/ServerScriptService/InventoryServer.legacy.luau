@@ -26,36 +26,46 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 
 	local fromFolder = (fromFolderStr == "Inventory") and inv or eq
 	local toFolder = (toFolderStr == "Inventory") and inv or eq
-
 	local fromSlot = fromFolder:FindFirstChild(fromSlotName)
 	local toSlot = toFolder:FindFirstChild(toSlotName)
 
 	if fromSlot and toSlot and fromSlot.Value ~= "" then
 		local itemName = fromSlot.Value
 		local targetItemName = toSlot.Value
-
-		-- Megnézzük az adatbázisban, hogy létezik-e (és +1, +2 stb.)
 		local itemData = ItemDatabase[itemName]
 		if not itemData then return end
+		local maxStack = itemData.MaxStack or 1
 
-		-- HA A FELSZERELÉSBE HÚZZUK (Felvétel)
-		if toFolderStr == "Equipment" then
-			local expectedSlot = typeToSlot[itemData.Type]
-			if expectedSlot ~= toSlotName then return end -- Ha nem a megfelelő helyre húzta, megszakítjuk!
-		end
-
-		-- HA CSERÉLÜNK (Táskából Felszerelésbe vagy fordítva, és mindkettőben van valami)
+		-- Felszerelés biztonsági ellenőrzések... (marad ahogy volt)
+		if toFolderStr == "Equipment" and typeToSlot[itemData.Type] ~= toSlotName then return end
 		if toFolderStr == "Inventory" and fromFolderStr == "Equipment" and targetItemName ~= "" then
-			local targetItemData = ItemDatabase[targetItemName]
-			if not targetItemData then return end
-			local expectedSlot = typeToSlot[targetItemData.Type]
-			if expectedSlot ~= fromSlotName then return end -- A táskában lévő tárgy nem mehet a felszerelés adott helyére!
+			local tData = ItemDatabase[targetItemName]
+			if not tData or typeToSlot[tData.Type] ~= fromSlotName then return end
 		end
 
-		-- Sikeres csere / áthelyezés
-		local temp = toSlot.Value
+		-- ÚJ: STACKEK EGYESÍTÉSE TÁSKÁN BELÜL
+		if fromFolderStr == "Inventory" and toFolderStr == "Inventory" and itemName == targetItemName and maxStack > 1 and fromSlot ~= toSlot then
+			local total = fromSlot.Amount.Value + toSlot.Amount.Value
+			if total <= maxStack then
+				toSlot.Amount.Value = total
+				fromSlot.Value = ""
+				fromSlot.Amount.Value = 0
+			else
+				toSlot.Amount.Value = maxStack
+				fromSlot.Amount.Value = total - maxStack
+			end
+			return -- Egyesítettünk, nem cserélünk tovább
+		end
+
+		-- SIMA CSERE (Név ÉS Darabszám)
+		local tempVal = toSlot.Value
+		local tempAmt = (toSlot:FindFirstChild("Amount")) and toSlot.Amount.Value or 1
+
 		toSlot.Value = fromSlot.Value
-		fromSlot.Value = temp
+		if toSlot:FindFirstChild("Amount") then toSlot.Amount.Value = fromSlot.Amount.Value end
+
+		fromSlot.Value = tempVal
+		if fromSlot:FindFirstChild("Amount") then fromSlot.Amount.Value = tempAmt end
 	end
 end)
 

@@ -166,6 +166,7 @@ local function getTooltipText(itemName)
 	return text
 end
 
+-- Fájl helye: StarterPlayerScripts -> DragAndDropClient (részlet!)
 local function renderItems()
 	for i = 1, 8 do
 		local slotVal = invFolder:FindFirstChild("Slot_" .. i)
@@ -184,6 +185,21 @@ local function renderItems()
 				itemIcon.Font = Enum.Font.GothamBold
 				itemIcon.Parent = uiSlot
 
+				-- ÚJ: DARABSZÁM KIJELZÉSE, HA TÖBB MINT 1
+				local amtVal = slotVal:FindFirstChild("Amount")
+				if amtVal and amtVal.Value > 1 then
+					local amtLabel = Instance.new("TextLabel")
+					amtLabel.Size = UDim2.new(0, 15, 0, 15)
+					amtLabel.Position = UDim2.new(1, -15, 1, -15) -- Jobb alsó sarok
+					amtLabel.BackgroundTransparency = 1
+					amtLabel.TextColor3 = Color3.new(1, 1, 1)
+					amtLabel.TextStrokeTransparency = 0 -- Fekete körvonal
+					amtLabel.Text = tostring(amtVal.Value)
+					amtLabel.Font = Enum.Font.GothamBold
+					amtLabel.TextSize = 12
+					amtLabel.Parent = itemIcon
+				end
+
 				itemIcon.MouseEnter:Connect(function()
 					tooltipTitle.Text = slotVal.Value
 					tooltipDesc.Text = getTooltipText(slotVal.Value)
@@ -193,37 +209,18 @@ local function renderItems()
 			end
 		end
 	end
+	-- [A felszerelés rész marad...]
+end
 
-	for uiName, serverName in pairs(eqNameToServer) do
-		local slotVal = eqFolder:FindFirstChild(serverName)
-		local uiSlot = eqHud:FindFirstChild(uiName, true)
-		if slotVal and uiSlot then
-			local oldIcon = uiSlot:FindFirstChild("ItemIcon")
-			if oldIcon then oldIcon:Destroy() end
-
-			if slotVal.Value ~= "" then
-				local itemIcon = Instance.new("TextLabel")
-				itemIcon.Name = "ItemIcon"
-				itemIcon.Size = UDim2.new(1, -4, 1, -4)
-				itemIcon.Position = UDim2.new(0, 2, 0, 2)
-				itemIcon.BackgroundColor3 = Color3.fromRGB(100, 80, 80)
-				itemIcon.TextColor3 = Color3.new(1, 1, 1)
-				itemIcon.Text = slotVal.Value
-				itemIcon.TextScaled = true
-				itemIcon.Font = Enum.Font.GothamBold
-				itemIcon.ZIndex = 2
-				itemIcon.Parent = uiSlot
-
-				itemIcon.MouseEnter:Connect(function()
-					tooltipTitle.Text = slotVal.Value
-					tooltipDesc.Text = getTooltipText(slotVal.Value) .. "\n\n[Felszerelve]"
-					tooltip.Visible = true
-				end)
-				itemIcon.MouseLeave:Connect(function() tooltip.Visible = false end)
-			end
-		end
+-- ÚJ FRISSÍTÉS EVENT (Mert a darabszám is változhat!)
+local function bindInvEvents()
+	for _, child in pairs(invFolder:GetChildren()) do
+		child.Changed:Connect(renderItems)
+		local amt = child:WaitForChild("Amount", 2)
+		if amt then amt.Changed:Connect(renderItems) end
 	end
 end
+task.spawn(bindInvEvents)
 
 invFolder.ChildAdded:Connect(renderItems)
 eqFolder.ChildAdded:Connect(renderItems)

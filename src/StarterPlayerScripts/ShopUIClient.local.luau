@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService") -- ÚJ: Folyamatos ellenőrzés
 local Events = ReplicatedStorage:WaitForChild("Events")
 local BuyItem = Events:WaitForChild("BuyItem")
 
@@ -17,8 +18,8 @@ screenGui.Parent = playerGui
 
 local shopFrame = Instance.new("Frame")
 shopFrame.Size = UDim2.new(0, 250, 0, 350)
-shopFrame.AnchorPoint = Vector2.new(0, 0.5) -- FIX: Bal-közép horgony
-shopFrame.Position = UDim2.new(0.05, 0, 0.5, 0) -- FIX: Bal oldalon középen (a karakter ablakkal egy helyen)
+shopFrame.AnchorPoint = Vector2.new(0, 0.5) 
+shopFrame.Position = UDim2.new(0.05, 0, 0.5, 0) 
 shopFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
 shopFrame.BorderColor3 = Color3.fromRGB(100, 80, 50)
 shopFrame.BorderSizePixel = 3
@@ -33,12 +34,10 @@ shopTitle.TextColor3 = Color3.new(1, 1, 1)
 shopTitle.Text = "BOLT"
 shopTitle.Font = Enum.Font.GothamBold
 shopTitle.TextSize = 14
-shopTitle.Active = true -- FONTOS (húzáshoz)
+shopTitle.Active = true 
 shopTitle.Parent = shopFrame
 
--- ==========================================
--- ABLAK MOZGATÁSA CSAK A CÍMSORRÓL (ÚJ!)
--- ==========================================
+-- ABLAK MOZGATÁSA
 local UserInputService = game:GetService("UserInputService")
 local draggingShop, dragInputShop, mousePosShop, framePosShop
 
@@ -64,6 +63,10 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
+-- ÚJ: TÁVOLSÁG VÁLTOZÓK A BOLTNAK IS
+local currentShopNPC = nil
+local MAX_SHOP_DISTANCE = 15
+
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -30, 0, 0)
@@ -75,6 +78,7 @@ closeBtn.Parent = shopFrame
 
 closeBtn.MouseButton1Click:Connect(function()
 	shopFrame.Visible = false
+	currentShopNPC = nil
 end)
 
 local scrollFrame = Instance.new("ScrollingFrame")
@@ -93,7 +97,7 @@ gridLayout.Parent = scrollFrame
 local SHOPS = {
 	["Fegyverkereskedo"] = {
 		Title = "FEGYVERKERESKEDŐ",
-		Items = {"Kezdőkard", "Hosszúkard","Szabi farka"}
+		Items = {"Kezdőkard", "Hosszúkard"}
 	},
 	["Pancelkereskedo"] = {
 		Title = "PÁNCÉLKERESKEDŐ",
@@ -145,9 +149,7 @@ local function openShop(npcName)
 			buyBtn.TextSize = 12
 			buyBtn.Parent = itemRow
 
-			buyBtn.MouseButton1Click:Connect(function()
-				BuyItem:FireServer(itemName)
-			end)
+			buyBtn.MouseButton1Click:Connect(function() BuyItem:FireServer(itemName) end)
 		end
 	end
 
@@ -162,6 +164,14 @@ local function setupNPCs()
 			local clickDetector = npc:FindFirstChildOfClass("ClickDetector")
 			if clickDetector then
 				clickDetector.MouseClick:Connect(function()
+					-- ÚJ: Közelség ellenőrzés
+					local char = player.Character
+					if char and char:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("HumanoidRootPart") then
+						local dist = (char.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+						if dist > MAX_SHOP_DISTANCE then return end
+					end
+
+					currentShopNPC = npc
 					openShop(npcName)
 				end)
 			end
@@ -169,10 +179,26 @@ local function setupNPCs()
 	end
 end
 
-workspace.ChildAdded:Connect(function(child)
-	if SHOPS[child.Name] then
-		task.wait(0.5)
-		setupNPCs()
+-- ==========================================
+-- ÚJ: FOLYAMATOS TÁVOLSÁG ELLENŐRZÉS (Bolt bezárása)
+-- ==========================================
+RunService.Heartbeat:Connect(function()
+	if shopFrame.Visible and currentShopNPC then
+		local char = player.Character
+		if char and char:FindFirstChild("HumanoidRootPart") and currentShopNPC:FindFirstChild("HumanoidRootPart") then
+			local dist = (char.HumanoidRootPart.Position - currentShopNPC.HumanoidRootPart.Position).Magnitude
+			if dist > MAX_SHOP_DISTANCE then
+				shopFrame.Visible = false
+				currentShopNPC = nil
+			end
+		else
+			shopFrame.Visible = false
+			currentShopNPC = nil
+		end
 	end
+end)
+
+workspace.ChildAdded:Connect(function(child)
+	if SHOPS[child.Name] then task.wait(0.5) setupNPCs() end
 end)
 setupNPCs()
