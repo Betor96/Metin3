@@ -31,7 +31,7 @@ local eqNameToServer = {
 }
 
 -- ==========================================
--- KOVÁCS (UPGRADE) FELÜLET
+-- KOVÁCS ÉS ELADÁS ABLAKOK
 -- ==========================================
 local bsFrame = Instance.new("Frame")
 bsFrame.Size = UDim2.new(0, 250, 0, 200)
@@ -44,16 +44,15 @@ bsFrame.Visible = false
 bsFrame.ZIndex = 50
 bsFrame.Parent = invHud
 
-local bsTitle = Instance.new("TextLabel")
+local bsTitle = Instance.new("TextLabel", bsFrame)
 bsTitle.Size = UDim2.new(1, 0, 0, 30)
 bsTitle.BackgroundColor3 = Color3.fromRGB(50, 30, 30)
 bsTitle.TextColor3 = Color3.new(1, 1, 1)
 bsTitle.Text = "KOVÁCS"
 bsTitle.Font = Enum.Font.GothamBold
 bsTitle.ZIndex = 51
-bsTitle.Parent = bsFrame
 
-local bsInfo = Instance.new("TextLabel")
+local bsInfo = Instance.new("TextLabel", bsFrame)
 bsInfo.Size = UDim2.new(1, -20, 1, -80)
 bsInfo.Position = UDim2.new(0, 10, 0, 40)
 bsInfo.BackgroundTransparency = 1
@@ -61,9 +60,8 @@ bsInfo.TextColor3 = Color3.new(1, 1, 1)
 bsInfo.Font = Enum.Font.Gotham
 bsInfo.TextSize = 14
 bsInfo.ZIndex = 51
-bsInfo.Parent = bsFrame
 
-local bsYesBtn = Instance.new("TextButton")
+local bsYesBtn = Instance.new("TextButton", bsFrame)
 bsYesBtn.Size = UDim2.new(0, 100, 0, 30)
 bsYesBtn.Position = UDim2.new(0, 15, 1, -40)
 bsYesBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
@@ -71,9 +69,8 @@ bsYesBtn.TextColor3 = Color3.new(1, 1, 1)
 bsYesBtn.Text = "Fejlesztés"
 bsYesBtn.Font = Enum.Font.GothamBold
 bsYesBtn.ZIndex = 51
-bsYesBtn.Parent = bsFrame
 
-local bsNoBtn = Instance.new("TextButton")
+local bsNoBtn = Instance.new("TextButton", bsFrame)
 bsNoBtn.Size = UDim2.new(0, 100, 0, 30)
 bsNoBtn.Position = UDim2.new(1, -115, 1, -40)
 bsNoBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
@@ -81,12 +78,10 @@ bsNoBtn.TextColor3 = Color3.new(1, 1, 1)
 bsNoBtn.Text = "Mégse"
 bsNoBtn.Font = Enum.Font.GothamBold
 bsNoBtn.ZIndex = 51
-bsNoBtn.Parent = bsFrame
 
 local currentUpgradeSlot = {Folder = nil, Slot = nil}
 
 bsNoBtn.MouseButton1Click:Connect(function() bsFrame.Visible = false end)
-
 bsYesBtn.MouseButton1Click:Connect(function()
 	if currentUpgradeSlot.Folder and currentUpgradeSlot.Slot then
 		ProcessUpgrade:FireServer(currentUpgradeSlot.Folder, currentUpgradeSlot.Slot)
@@ -106,76 +101,6 @@ UpgradeResult.OnClientEvent:Connect(function(msg)
 	bsNoBtn.Text = "Mégse"
 end)
 
--- ==========================================
--- TOOLTIP RENDSZER
--- ==========================================
-local tooltip = Instance.new("Frame")
-tooltip.Size = UDim2.new(0, 200, 0, 100)
-tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
-tooltip.BorderSizePixel = 2
-tooltip.ZIndex = 999 
-tooltip.Visible = false
-tooltip.Parent = invHud
-
-local tooltipTitle = Instance.new("TextLabel")
-tooltipTitle.Size = UDim2.new(1, 0, 0, 25)
-tooltipTitle.BackgroundTransparency = 1
-tooltipTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
-tooltipTitle.Font = Enum.Font.GothamBold
-tooltipTitle.ZIndex = 1000
-tooltipTitle.Parent = tooltip
-
-local tooltipDesc = Instance.new("TextLabel")
-tooltipDesc.Size = UDim2.new(1, -10, 1, -30)
-tooltipDesc.Position = UDim2.new(0, 5, 0, 30)
-tooltipDesc.BackgroundTransparency = 1
-tooltipDesc.TextColor3 = Color3.new(1, 1, 1)
-tooltipDesc.Font = Enum.Font.Gotham
-tooltipDesc.TextSize = 12
-tooltipDesc.TextWrapped = true
-tooltipDesc.TextYAlignment = Enum.TextYAlignment.Top
-tooltipDesc.ZIndex = 1000
-tooltipDesc.Parent = tooltip
-
-local function updateTooltipPosition()
-	if not tooltip.Visible then return end
-
-	local mousePos = UserInputService:GetMouseLocation()
-	local viewportSize = Camera.ViewportSize
-	local inset = GuiService:GetGuiInset()
-
-	local tipWidth = 200 
-	local tipHeight = 100 
-
-	local xPos = mousePos.X + 15
-	local yPos = mousePos.Y - inset.Y + 15
-
-	if xPos + tipWidth > viewportSize.X then xPos = mousePos.X - tipWidth - 15 end
-	if yPos + tipHeight > viewportSize.Y then yPos = mousePos.Y - inset.Y - tipHeight - 15 end
-
-	tooltip.Position = UDim2.new(0, xPos, 0, yPos)
-end
-RunService.RenderStepped:Connect(updateTooltipPosition)
-
-local function getTooltipText(itemName)
-	local data = ItemDatabase[itemName]
-	if not data then return "Nincs információ erről a tárgyról." end
-
-	local text = ""
-	if data.Type == "Fegyver" then
-		text = "Szint: " .. (data.Level or 1) .. "\nSebzés: " .. (data.MinDmg or 0) .. " - " .. (data.MaxDmg or 0) .. "\n\n"
-	elseif data.Type == "Páncél" then
-		text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n"
-	end
-
-	text = text .. (data.Description or "")
-	return text
-end
-
--- ==========================================
--- ELADÁS ABLAK 
--- ==========================================
 local sellFrame = Instance.new("Frame")
 sellFrame.Size = UDim2.new(0, 250, 0, 150)
 sellFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
@@ -187,16 +112,15 @@ sellFrame.Visible = false
 sellFrame.ZIndex = 60
 sellFrame.Parent = invHud
 
-local sellTitle = Instance.new("TextLabel")
+local sellTitle = Instance.new("TextLabel", sellFrame)
 sellTitle.Size = UDim2.new(1, 0, 0, 30)
 sellTitle.BackgroundColor3 = Color3.fromRGB(30, 50, 70)
 sellTitle.TextColor3 = Color3.new(1, 1, 1)
 sellTitle.Text = "ELADÁS"
 sellTitle.Font = Enum.Font.GothamBold
 sellTitle.ZIndex = 61
-sellTitle.Parent = sellFrame
 
-local sellInfo = Instance.new("TextLabel")
+local sellInfo = Instance.new("TextLabel", sellFrame)
 sellInfo.Size = UDim2.new(1, -20, 1, -80)
 sellInfo.Position = UDim2.new(0, 10, 0, 40)
 sellInfo.BackgroundTransparency = 1
@@ -204,9 +128,8 @@ sellInfo.TextColor3 = Color3.new(1, 1, 1)
 sellInfo.Font = Enum.Font.Gotham
 sellInfo.TextSize = 14
 sellInfo.ZIndex = 61
-sellInfo.Parent = sellFrame
 
-local sellYesBtn = Instance.new("TextButton")
+local sellYesBtn = Instance.new("TextButton", sellFrame)
 sellYesBtn.Size = UDim2.new(0, 100, 0, 30)
 sellYesBtn.Position = UDim2.new(0, 15, 1, -40)
 sellYesBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
@@ -214,9 +137,8 @@ sellYesBtn.TextColor3 = Color3.new(1, 1, 1)
 sellYesBtn.Text = "Eladás"
 sellYesBtn.Font = Enum.Font.GothamBold
 sellYesBtn.ZIndex = 61
-sellYesBtn.Parent = sellFrame
 
-local sellNoBtn = Instance.new("TextButton")
+local sellNoBtn = Instance.new("TextButton", sellFrame)
 sellNoBtn.Size = UDim2.new(0, 100, 0, 30)
 sellNoBtn.Position = UDim2.new(1, -115, 1, -40)
 sellNoBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
@@ -224,12 +146,10 @@ sellNoBtn.TextColor3 = Color3.new(1, 1, 1)
 sellNoBtn.Text = "Mégse"
 sellNoBtn.Font = Enum.Font.GothamBold
 sellNoBtn.ZIndex = 61
-sellNoBtn.Parent = sellFrame
 
 local currentSellSlot = nil
 
 sellNoBtn.MouseButton1Click:Connect(function() sellFrame.Visible = false currentSellSlot = nil end)
-
 sellYesBtn.MouseButton1Click:Connect(function()
 	if currentSellSlot then
 		local SellItem = ReplicatedStorage.Events:FindFirstChild("SellItem")
@@ -242,7 +162,6 @@ end)
 local function promptSell(slotName, itemName)
 	local itemData = ItemDatabase[itemName]
 	local sellPrice = math.floor((itemData and itemData.Price or 0) / 2)
-
 	if sellPrice <= 0 then
 		sellInfo.Text = "Ezt a tárgyat nem lehet eladni!"
 		sellYesBtn.Visible = false
@@ -251,12 +170,9 @@ local function promptSell(slotName, itemName)
 		sellFrame.Visible = true
 		return
 	end
-
 	local slotVal = invFolder:FindFirstChild(slotName)
 	local amount = slotVal:FindFirstChild("Amount") and slotVal.Amount.Value or 1
-	local totalVal = sellPrice * amount
-
-	sellInfo.Text = "Biztos eladod ezt: " .. itemName .. " (x" .. amount .. ")?\nKapsz érte: " .. totalVal .. " Pénzt."
+	sellInfo.Text = "Biztos eladod ezt: " .. itemName .. " (x" .. amount .. ")?\nKapsz érte: " .. (sellPrice * amount) .. " Pénzt."
 	sellYesBtn.Visible = true
 	sellNoBtn.Text = "Mégse"
 	currentSellSlot = slotName
@@ -264,36 +180,104 @@ local function promptSell(slotName, itemName)
 end
 
 -- ==========================================
--- 32 HELYES TÁSKA ÉS LAPOZÁS GENERÁLÁSA
+-- TOOLTIP RENDSZER
+-- ==========================================
+local tooltip = Instance.new("Frame", invHud)
+tooltip.Size = UDim2.new(0, 200, 0, 100)
+tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
+tooltip.BorderSizePixel = 2
+tooltip.ZIndex = 999 
+tooltip.Visible = false
+
+local tooltipTitle = Instance.new("TextLabel", tooltip)
+tooltipTitle.Size = UDim2.new(1, 0, 0, 25)
+tooltipTitle.BackgroundTransparency = 1
+tooltipTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
+tooltipTitle.Font = Enum.Font.GothamBold
+tooltipTitle.ZIndex = 1000
+
+local tooltipDesc = Instance.new("TextLabel", tooltip)
+tooltipDesc.Size = UDim2.new(1, -10, 1, -30)
+tooltipDesc.Position = UDim2.new(0, 5, 0, 30)
+tooltipDesc.BackgroundTransparency = 1
+tooltipDesc.TextColor3 = Color3.new(1, 1, 1)
+tooltipDesc.Font = Enum.Font.Gotham
+tooltipDesc.TextSize = 12
+tooltipDesc.TextWrapped = true
+tooltipDesc.TextYAlignment = Enum.TextYAlignment.Top
+tooltipDesc.ZIndex = 1000
+
+local function updateTooltipPosition()
+	if not tooltip.Visible then return end
+	local mousePos = UserInputService:GetMouseLocation()
+	local viewportSize = Camera.ViewportSize
+	local inset = GuiService:GetGuiInset()
+	local tipWidth, tipHeight = 200, 100 
+	local xPos, yPos = mousePos.X + 15, mousePos.Y - inset.Y + 15
+
+	if xPos + tipWidth > viewportSize.X then xPos = mousePos.X - tipWidth - 15 end
+	if yPos + tipHeight > viewportSize.Y then yPos = mousePos.Y - inset.Y - tipHeight - 15 end
+	tooltip.Position = UDim2.new(0, xPos, 0, yPos)
+end
+RunService.RenderStepped:Connect(updateTooltipPosition)
+
+local function getTooltipText(itemName)
+	local data = ItemDatabase[itemName]
+	if not data then return "Nincs információ erről a tárgyról." end
+	local text = ""
+	if data.Type == "Fegyver" then text = "Szint: " .. (data.Level or 1) .. "\nSebzés: " .. (data.MinDmg or 0) .. " - " .. (data.MaxDmg or 0) .. "\n\n"
+	elseif data.Type == "Páncél" then text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n" end
+	return text .. (data.Description or "")
+end
+
+-- ==========================================
+-- TAKARÍTÁS ÉS UI GENERÁLÁS (Hibajavítás!)
 -- ==========================================
 local currentPage = 1
 local maxPages = 4
 
-local invGrid = invHud:FindFirstChild("UIGridLayout")
-if not invGrid then
-	invGrid = Instance.new("UIGridLayout", invHud)
-	invGrid.CellSize = UDim2.new(0, 45, 0, 45)
-	invGrid.CellPadding = UDim2.new(0, 5, 0, 5)
+local invMainFrame = invHud:WaitForChild("MainFrame")
+
+-- 1. BIZTONSÁGI TAKARÍTÁS: Törlünk mindent, ami a régi kódból maradt!
+if invMainFrame:FindFirstChild("SlotContainer") then invMainFrame.SlotContainer:Destroy() end
+if invMainFrame:FindFirstChild("PageNav") then invMainFrame.PageNav:Destroy() end
+if invMainFrame:FindFirstChild("LockOverlay") then invMainFrame.LockOverlay:Destroy() end
+if invMainFrame:FindFirstChildOfClass("UIGridLayout") then invMainFrame:FindFirstChildOfClass("UIGridLayout"):Destroy() end
+for _, child in pairs(invMainFrame:GetChildren()) do
+	if child.Name:match("InvSlot_") then child:Destroy() end
 end
 
--- 32 darab UI rekesz létrehozása
+-- 2. Tiszta tartály létrehozása a rekeszeknek (Y = 40)
+local slotContainer = Instance.new("Frame", invMainFrame)
+slotContainer.Name = "SlotContainer"
+slotContainer.Size = UDim2.new(0, 195, 0, 395)
+slotContainer.Position = UDim2.new(0.5, -97.5, 0, 40)
+slotContainer.BackgroundTransparency = 1
+
+local invGrid = Instance.new("UIGridLayout", slotContainer)
+invGrid.CellSize = UDim2.new(0, 45, 0, 45)
+invGrid.CellPadding = UDim2.new(0, 5, 0, 5)
+invGrid.SortOrder = Enum.SortOrder.LayoutOrder 
+
 for i = 1, 32 do
-	if not invHud:FindFirstChild("InvSlot_" .. i) then
-		local newSlot = Instance.new("Frame", invHud)
-		newSlot.Name = "InvSlot_" .. i
-		newSlot.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-		newSlot.BorderColor3 = Color3.fromRGB(80, 80, 80)
-		newSlot.BorderSizePixel = 1
-	end
+	local uiSlot = Instance.new("Frame", slotContainer)
+	uiSlot.Name = "InvSlot_" .. i
+	uiSlot.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	uiSlot.BorderColor3 = Color3.fromRGB(80, 80, 80)
+	uiSlot.BorderSizePixel = 1
+	uiSlot.LayoutOrder = i 
 end
 
--- Lapozó UI
-local pageNav = Instance.new("Frame", invHud)
-pageNav.Size = UDim2.new(1, 0, 0, 30)
-pageNav.Position = UDim2.new(0, 0, 1, 10)
+-- 3. Lapozó gombok (Y = 440)
+local pageNav = Instance.new("Frame", invMainFrame)
+pageNav.Name = "PageNav"
+pageNav.Size = UDim2.new(1, -20, 0, 30)
+pageNav.Position = UDim2.new(0, 10, 0, 440)
 pageNav.BackgroundTransparency = 1
 
 local prevBtn = Instance.new("TextButton", pageNav)
+prevBtn.Name = "PrevBtn"
 prevBtn.Size = UDim2.new(0, 30, 1, 0)
 prevBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 prevBtn.TextColor3 = Color3.new(1,1,1)
@@ -301,6 +285,7 @@ prevBtn.Text = "<"
 prevBtn.Font = Enum.Font.GothamBold
 
 local nextBtn = Instance.new("TextButton", pageNav)
+nextBtn.Name = "NextBtn"
 nextBtn.Size = UDim2.new(0, 30, 1, 0)
 nextBtn.Position = UDim2.new(1, -30, 0, 0)
 nextBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -309,45 +294,50 @@ nextBtn.Text = ">"
 nextBtn.Font = Enum.Font.GothamBold
 
 local pageLabel = Instance.new("TextLabel", pageNav)
-pageLabel.Size = UDim2.new(1, -60, 1, 0)
-pageLabel.Position = UDim2.new(0, 30, 0, 0)
+pageLabel.Name = "PageLabel"
+pageLabel.Size = UDim2.new(1, -70, 1, 0)
+pageLabel.Position = UDim2.new(0, 35, 0, 0)
 pageLabel.BackgroundTransparency = 1
 pageLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
 pageLabel.Text = "Oldal: 1 / 4"
 pageLabel.Font = Enum.Font.GothamBold
 
--- Zárolt Képernyő
-local lockOverlay = Instance.new("Frame", invHud)
-lockOverlay.Size = UDim2.new(1, 0, 1, 0)
+-- 4. Zárolt Képernyő (Szépen elrendezve)
+local lockOverlay = Instance.new("Frame", invMainFrame)
+lockOverlay.Name = "LockOverlay"
+lockOverlay.Size = UDim2.new(1, -10, 0, 395)
+lockOverlay.Position = UDim2.new(0, 5, 0, 40)
 lockOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-lockOverlay.BackgroundTransparency = 0.3
+lockOverlay.BackgroundTransparency = 0.15
 lockOverlay.ZIndex = 20
 lockOverlay.Visible = false
 
 local lockText = Instance.new("TextLabel", lockOverlay)
 lockText.Size = UDim2.new(1, 0, 0, 40)
-lockText.Position = UDim2.new(0, 0, 0.3, 0)
+lockText.Position = UDim2.new(0, 0, 0, 100)
 lockText.BackgroundTransparency = 1
 lockText.TextColor3 = Color3.fromRGB(255, 100, 100)
 lockText.Text = "EZ AZ OLDAL LE VAN ZÁRVA"
 lockText.Font = Enum.Font.GothamBlack
-lockText.TextSize = 16
+lockText.TextSize = 14
 lockText.ZIndex = 21
 
 local buyGoldBtn = Instance.new("TextButton", lockOverlay)
-buyGoldBtn.Size = UDim2.new(0.8, 0, 0, 35)
-buyGoldBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
+buyGoldBtn.Name = "BuyGoldBtn"
+buyGoldBtn.Size = UDim2.new(0.8, 0, 0, 40)
+buyGoldBtn.Position = UDim2.new(0.1, 0, 0, 160)
 buyGoldBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
 buyGoldBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
 buyGoldBtn.Font = Enum.Font.GothamBold
 buyGoldBtn.ZIndex = 21
 
 local buyRobuxBtn = Instance.new("TextButton", lockOverlay)
-buyRobuxBtn.Size = UDim2.new(0.8, 0, 0, 35)
-buyRobuxBtn.Position = UDim2.new(0.1, 0, 0.5, 45)
+buyRobuxBtn.Name = "BuyRobuxBtn"
+buyRobuxBtn.Size = UDim2.new(0.8, 0, 0, 40)
+buyRobuxBtn.Position = UDim2.new(0.1, 0, 0, 210)
 buyRobuxBtn.BackgroundColor3 = Color3.fromRGB(30, 150, 30)
 buyRobuxBtn.TextColor3 = Color3.new(1, 1, 1)
-buyRobuxBtn.Text = "Feloldás: 10 Robux"
+buyRobuxBtn.Text = "Feloldás: 55 Robux"
 buyRobuxBtn.Font = Enum.Font.GothamBold
 buyRobuxBtn.ZIndex = 21
 
@@ -362,22 +352,20 @@ local function renderItems()
 
 	if unlockedPages and currentPage > unlockedPages.Value then
 		lockOverlay.Visible = true
-		local cost = unlockedPages.Value * 25000
-		buyGoldBtn.Text = "Feloldás: " .. cost .. " Arany"
+		buyGoldBtn.Text = "Feloldás: " .. (unlockedPages.Value * 25000) .. " Arany"
 	else
 		lockOverlay.Visible = false
 	end
 
-	-- 1. Táska rajzolás
 	for i = 1, 32 do
 		local serverSlotNum = ((currentPage - 1) * 32) + i
 		local slotVal = invFolder:FindFirstChild("Slot_" .. serverSlotNum)
-		local uiSlot = invHud:FindFirstChild("InvSlot_" .. i)
+		local uiSlot = slotContainer:FindFirstChild("InvSlot_" .. i)
 
 		if slotVal and uiSlot then
 			uiSlot:ClearAllChildren()
 			if slotVal.Value ~= "" then
-				local itemIcon = Instance.new("TextLabel")
+				local itemIcon = Instance.new("TextLabel", uiSlot)
 				itemIcon.Name = "ItemIcon"
 				itemIcon.Size = UDim2.new(1, -4, 1, -4)
 				itemIcon.Position = UDim2.new(0, 2, 0, 2)
@@ -386,11 +374,10 @@ local function renderItems()
 				itemIcon.Text = slotVal.Value
 				itemIcon.TextScaled = true
 				itemIcon.Font = Enum.Font.GothamBold
-				itemIcon.Parent = uiSlot
 
 				local amtVal = slotVal:FindFirstChild("Amount")
 				if amtVal and amtVal.Value > 1 then
-					local amtLabel = Instance.new("TextLabel")
+					local amtLabel = Instance.new("TextLabel", itemIcon)
 					amtLabel.Size = UDim2.new(0, 15, 0, 15)
 					amtLabel.Position = UDim2.new(1, -15, 1, -15) 
 					amtLabel.BackgroundTransparency = 1
@@ -399,7 +386,6 @@ local function renderItems()
 					amtLabel.Text = tostring(amtVal.Value)
 					amtLabel.Font = Enum.Font.GothamBold
 					amtLabel.TextSize = 12
-					amtLabel.Parent = itemIcon
 				end
 
 				itemIcon.MouseEnter:Connect(function()
@@ -412,7 +398,6 @@ local function renderItems()
 		end
 	end
 
-	-- 2. Felszerelés rajzolás
 	for uiName, serverName in pairs(eqNameToServer) do
 		local slotVal = eqFolder:FindFirstChild(serverName)
 		local uiSlot = eqHud:FindFirstChild(uiName, true)
@@ -421,7 +406,7 @@ local function renderItems()
 			if oldIcon then oldIcon:Destroy() end
 
 			if slotVal.Value ~= "" then
-				local itemIcon = Instance.new("TextLabel")
+				local itemIcon = Instance.new("TextLabel", uiSlot)
 				itemIcon.Name = "ItemIcon"
 				itemIcon.Size = UDim2.new(1, -4, 1, -4)
 				itemIcon.Position = UDim2.new(0, 2, 0, 2)
@@ -431,7 +416,6 @@ local function renderItems()
 				itemIcon.TextScaled = true
 				itemIcon.Font = Enum.Font.GothamBold
 				itemIcon.ZIndex = 2
-				itemIcon.Parent = uiSlot
 
 				itemIcon.MouseEnter:Connect(function()
 					tooltipTitle.Text = slotVal.Value
@@ -445,17 +429,11 @@ local function renderItems()
 end
 
 nextBtn.MouseButton1Click:Connect(function()
-	if currentPage < maxPages then
-		currentPage += 1
-		renderItems()
-	end
+	if currentPage < maxPages then currentPage += 1 renderItems() end
 end)
 
 prevBtn.MouseButton1Click:Connect(function()
-	if currentPage > 1 then
-		currentPage -= 1
-		renderItems()
-	end
+	if currentPage > 1 then currentPage -= 1 renderItems() end
 end)
 
 local function bindInvEvents()
@@ -472,12 +450,9 @@ eqFolder.ChildAdded:Connect(renderItems)
 for _, child in pairs(invFolder:GetChildren()) do child.Changed:Connect(renderItems) end
 for _, child in pairs(eqFolder:GetChildren()) do child.Changed:Connect(renderItems) end
 
--- Várunk kicsit, hogy a statok felálljanak
 task.delay(1, function()
 	local stats = player:WaitForChild("PlayerStats")
-	if stats:FindFirstChild("UnlockedPages") then
-		stats.UnlockedPages.Changed:Connect(renderItems)
-	end
+	if stats:FindFirstChild("UnlockedPages") then stats.UnlockedPages.Changed:Connect(renderItems) end
 	renderItems()
 end)
 
@@ -504,9 +479,7 @@ local function getSlotData(guiObject)
 	elseif guiObject.Name:match("HotbarSlotUI_") then
 		local num = guiObject.Name:match("%d+")
 		local hotbarFolder = player:FindFirstChild("Hotbar")
-		if hotbarFolder then
-			return "Hotbar", "Hotbar_" .. num, hotbarFolder:FindFirstChild("Hotbar_" .. num)
-		end
+		if hotbarFolder then return "Hotbar", "Hotbar_" .. num, hotbarFolder:FindFirstChild("Hotbar_" .. num) end
 	end
 	return nil, nil, nil
 end
@@ -583,19 +556,18 @@ UserInputService.InputBegan:Connect(function(input)
 					dragSplitAmount = math.floor(currentAmt / 2)
 				end
 
-				dragClone = Instance.new("TextLabel")
+				dragClone = Instance.new("TextLabel", playerGui:WaitForChild("InventoryHUD"))
 				dragClone.Size = UDim2.new(0, 40, 0, 40)
 				dragClone.BackgroundColor3 = Color3.fromRGB(150, 150, 50)
 				dragClone.Text = slotVal.Value
 				dragClone.TextScaled = true
 				dragClone.Font = Enum.Font.GothamBold
 				dragClone.ZIndex = 10
-				dragClone.Parent = invHud
 				dragClone.Active = false 
 
 				local showAmt = dragSplitAmount or currentAmt
 				if showAmt > 1 then
-					local amtLabel = Instance.new("TextLabel")
+					local amtLabel = Instance.new("TextLabel", dragClone)
 					amtLabel.Size = UDim2.new(0, 15, 0, 15)
 					amtLabel.Position = UDim2.new(1, -15, 1, -15) 
 					amtLabel.BackgroundTransparency = 1
@@ -604,7 +576,6 @@ UserInputService.InputBegan:Connect(function(input)
 					amtLabel.Text = tostring(showAmt)
 					amtLabel.Font = Enum.Font.GothamBold
 					amtLabel.TextSize = 12
-					amtLabel.Parent = dragClone
 				end
 
 				dragConnection = RunService.RenderStepped:Connect(function()

@@ -10,9 +10,11 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local invFrame = Instance.new("Frame")
-invFrame.Size = UDim2.new(0, 200, 0, 360)
-invFrame.AnchorPoint = Vector2.new(1, 0.5) -- FIX: Jobb-közép horgony
-invFrame.Position = UDim2.new(0.95, 0, 0.5, 0) -- FIX: Jobb oldalon középen
+invFrame.Name = "MainFrame" 
+-- FIX: 520 pixel magas, hogy minden (Rekeszek, Lapozó, Pénz) tökéletesen elférjen egymás alatt!
+invFrame.Size = UDim2.new(0, 220, 0, 520) 
+invFrame.AnchorPoint = Vector2.new(1, 0.5)
+invFrame.Position = UDim2.new(0.95, 0, 0.5, 0)
 invFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
 invFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
 invFrame.BorderSizePixel = 3
@@ -30,8 +32,8 @@ invTitle.TextSize = 14
 invTitle.Active = true 
 invTitle.Parent = invFrame
 
+-- Ablak mozgatása
 local draggingInv, dragInputInv, mousePosInv, framePosInv
-
 invTitle.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		draggingInv = true
@@ -54,9 +56,11 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
+-- Pénz kijelző (A legalsó sorban: Y = 480)
 local goldContainer = Instance.new("Frame")
-goldContainer.Size = UDim2.new(1, -10, 0, 30)
-goldContainer.Position = UDim2.new(0, 5, 1, -35)
+goldContainer.Name = "GoldContainer"
+goldContainer.Size = UDim2.new(1, -20, 0, 30)
+goldContainer.Position = UDim2.new(0, 10, 0, 480)
 goldContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 goldContainer.BorderColor3 = Color3.fromRGB(100, 80, 50)
 goldContainer.BorderSizePixel = 1
@@ -79,45 +83,23 @@ local goldStat = stats:WaitForChild("Gold")
 local function updateGold()
 	goldLabel.Text = "Pénz: " .. goldStat.Value
 end
-
 goldStat.Changed:Connect(updateGold)
 updateGold() 
 
-local gridFrame = Instance.new("Frame")
-gridFrame.Size = UDim2.new(1, -20, 1, -85) 
-gridFrame.Position = UDim2.new(0, 10, 0, 40)
-gridFrame.BackgroundTransparency = 1
-gridFrame.Parent = invFrame
-
-local gridLayout = Instance.new("UIGridLayout")
-gridLayout.CellSize = UDim2.new(0, 40, 0, 40)
-gridLayout.CellPadding = UDim2.new(0, 5, 0, 5)
-gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-gridLayout.Parent = gridFrame
-
-for i = 1, 8 do
-	local invSlot = Instance.new("Frame")
-	invSlot.Name = "InvSlot_" .. i
-	invSlot.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-	invSlot.BorderColor3 = Color3.fromRGB(100, 80, 50)
-	invSlot.BorderSizePixel = 2
-	invSlot.Parent = gridFrame
-end
-
+-- Z-Index kezelés (Kattintásra előtérbe jön)
 invFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local highest = 0
 		for _, gui in pairs(player.PlayerGui:GetChildren()) do
 			if gui:IsA("ScreenGui") and gui ~= screenGui then
-				if gui.DisplayOrder > highest then
-					highest = gui.DisplayOrder
-				end
+				if gui.DisplayOrder > highest then highest = gui.DisplayOrder end
 			end
 		end
 		screenGui.DisplayOrder = highest + 1
 	end
 end)
 
+-- Bezárás gomb
 local invCloseBtn = Instance.new("TextButton")
 invCloseBtn.Size = UDim2.new(0, 30, 0, 30)
 invCloseBtn.Position = UDim2.new(1, -5, 0, 5)
@@ -131,6 +113,4 @@ invCloseBtn.Font = Enum.Font.GothamBold
 invCloseBtn.TextSize = 14
 invCloseBtn.Parent = invFrame 
 
-invCloseBtn.MouseButton1Click:Connect(function()
-	invFrame.Visible = false
-end)
+invCloseBtn.MouseButton1Click:Connect(function() invFrame.Visible = false end)
