@@ -6,7 +6,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local stats = player:WaitForChild("PlayerStats")
-
 local Events = ReplicatedStorage:WaitForChild("Events")
 local AddStatPoint = Events:WaitForChild("AddStatPoint")
 
@@ -16,9 +15,9 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 300)
-mainFrame.AnchorPoint = Vector2.new(0, 0.5) -- FIX: Bal-közép horgony
-mainFrame.Position = UDim2.new(0.05, 0, 0.5, 0) -- FIX: Bal oldalon középen
+mainFrame.Size = UDim2.new(0, 250, 0, 400)
+mainFrame.AnchorPoint = Vector2.new(0, 0.5) 
+mainFrame.Position = UDim2.new(0.05, 0, 0.5, 0) 
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 2
 mainFrame.Active = true 
@@ -29,29 +28,37 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 40)
 titleLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
-titleLabel.Text = "KARAKTER (C)"
+titleLabel.Text = "KARAKTER"
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 18
-titleLabel.Active = true -- FONTOS
+titleLabel.TextSize = 16
+titleLabel.Active = true 
 titleLabel.Parent = mainFrame
 
-local draggingChar, dragInputChar, mousePosChar, framePosChar
+local charCloseBtn = Instance.new("TextButton")
+charCloseBtn.Size = UDim2.new(0, 30, 0, 30)
+charCloseBtn.Position = UDim2.new(1, -5, 0, 5) 
+charCloseBtn.AnchorPoint = Vector2.new(1, 0)
+charCloseBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30) 
+charCloseBtn.TextColor3 = Color3.new(1, 1, 1)
+charCloseBtn.Text = "X"
+charCloseBtn.Font = Enum.Font.GothamBold
+charCloseBtn.Parent = mainFrame 
 
+charCloseBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+
+-- Ablak mozgatása
+local draggingChar, dragInputChar, mousePosChar, framePosChar
 titleLabel.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		draggingChar = true
 		mousePosChar = input.Position
 		framePosChar = mainFrame.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then draggingChar = false end
-		end)
+		input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then draggingChar = false end end)
 	end
 end)
-
 titleLabel.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement then dragInputChar = input end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
 	if input == dragInputChar and draggingChar then
 		local delta = input.Position - mousePosChar
@@ -59,107 +66,147 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
-local pointsLabel = Instance.new("TextLabel")
+-- ==========================================
+-- OLDALAK (PAGES) LÉTREHOZÁSA
+-- ==========================================
+local page1 = Instance.new("Frame", mainFrame)
+page1.Size = UDim2.new(1, 0, 1, -80)
+page1.Position = UDim2.new(0, 0, 0, 40)
+page1.BackgroundTransparency = 1
+
+local page2 = Instance.new("Frame", mainFrame)
+page2.Size = UDim2.new(1, 0, 1, -80)
+page2.Position = UDim2.new(0, 0, 0, 40)
+page2.BackgroundTransparency = 1
+page2.Visible = false
+
+local togglePageBtn = Instance.new("TextButton", mainFrame)
+togglePageBtn.Size = UDim2.new(1, 0, 0, 30)
+togglePageBtn.Position = UDim2.new(0, 0, 1, -30)
+togglePageBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+togglePageBtn.TextColor3 = Color3.new(1, 1, 1)
+togglePageBtn.Text = "Bónuszok mutatása >>>"
+togglePageBtn.Font = Enum.Font.GothamBold
+
+togglePageBtn.MouseButton1Click:Connect(function()
+	page1.Visible = not page1.Visible
+	page2.Visible = not page1.Visible
+	togglePageBtn.Text = page1.Visible and "Bónuszok mutatása >>>" or "<<< Vissza az Alapokhoz"
+end)
+
+-- ==========================================
+-- 1. OLDAL (ALAP STATOK)
+-- ==========================================
+local pointsLabel = Instance.new("TextLabel", page1)
 pointsLabel.Size = UDim2.new(1, 0, 0, 30)
-pointsLabel.Position = UDim2.new(0, 0, 0, 45)
 pointsLabel.BackgroundTransparency = 1
 pointsLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
 pointsLabel.Text = "Elosztható pontok: 0"
-pointsLabel.Font = Enum.Font.Gotham
-pointsLabel.TextSize = 16
-pointsLabel.Parent = mainFrame
+pointsLabel.Font = Enum.Font.GothamBold
 
-local function createStatRow(statId, displayName, yPos)
-	local row = Instance.new("Frame")
+local function createBaseStatRow(statId, displayName, yPos)
+	local row = Instance.new("Frame", page1)
 	row.Size = UDim2.new(1, -20, 0, 40)
 	row.Position = UDim2.new(0, 10, 0, yPos)
 	row.BackgroundTransparency = 1
-	row.Parent = mainFrame
 
-	local nameLabel = Instance.new("TextLabel")
+	local nameLabel = Instance.new("TextLabel", row)
 	nameLabel.Size = UDim2.new(0.6, 0, 1, 0)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.TextColor3 = Color3.new(1, 1, 1)
-	nameLabel.Text = displayName .. ":"
+	nameLabel.Text = displayName
 	nameLabel.Font = Enum.Font.Gotham
-	nameLabel.TextSize = 16
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.Parent = row
 
-	local valLabel = Instance.new("TextLabel")
+	local valLabel = Instance.new("TextLabel", row)
 	valLabel.Size = UDim2.new(0.2, 0, 1, 0)
 	valLabel.Position = UDim2.new(0.6, 0, 0, 0)
 	valLabel.BackgroundTransparency = 1
 	valLabel.TextColor3 = Color3.new(1, 1, 1)
 	valLabel.Text = "1"
 	valLabel.Font = Enum.Font.GothamBold
-	valLabel.TextSize = 18
-	valLabel.Parent = row
 
-	local plusBtn = Instance.new("TextButton")
+	local plusBtn = Instance.new("TextButton", row)
 	plusBtn.Size = UDim2.new(0, 30, 0, 30)
 	plusBtn.Position = UDim2.new(0.85, 0, 0.5, -15)
 	plusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 	plusBtn.TextColor3 = Color3.new(1, 1, 1)
 	plusBtn.Text = "+"
 	plusBtn.Font = Enum.Font.GothamBold
-	plusBtn.TextSize = 20
-	plusBtn.Parent = row
 
-	plusBtn.MouseButton1Click:Connect(function()
-		AddStatPoint:FireServer(statId)
-	end)
-
+	plusBtn.MouseButton1Click:Connect(function() AddStatPoint:FireServer(statId) end)
 	return valLabel
 end
 
-local vitValue = createStatRow("VIT", "VIT (Életerő)", 90)
-local intValue = createStatRow("INT", "INT (Mágia)", 135)
-local strValue = createStatRow("STR", "STR (Erő)", 180)
-local dexValue = createStatRow("DEX", "DEX (Ügyesség)", 225)
+local vitValue = createBaseStatRow("VIT", "VIT (Életerő):", 40)
+local intValue = createBaseStatRow("INT", "INT (Mágia):", 80)
+local strValue = createBaseStatRow("STR", "STR (Erő):", 120)
+local dexValue = createBaseStatRow("DEX", "DEX (Ügyesség):", 160)
 
-local function updateUI()
-	pointsLabel.Text = "Elosztható pontok: " .. stats.StatPoints.Value
-	vitValue.Text = tostring(stats.VIT.Value)
-	intValue.Text = tostring(stats.INT.Value)
-	strValue.Text = tostring(stats.STR.Value)
-	dexValue.Text = tostring(stats.DEX.Value)
+-- ==========================================
+-- 2. OLDAL (BÓNUSZOK)
+-- ==========================================
+local layout2 = Instance.new("UIListLayout", page2)
+layout2.Padding = UDim.new(0, 5)
+layout2.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local bonusLabels = {}
+
+local function createBonusRow(statName, displayName, suffix)
+	local row = Instance.new("Frame", page2)
+	row.Size = UDim2.new(1, -20, 0, 20)
+	row.BackgroundTransparency = 1
+
+	local nameLabel = Instance.new("TextLabel", row)
+	nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	nameLabel.Text = displayName
+	nameLabel.Font = Enum.Font.Gotham
+	nameLabel.TextSize = 12
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	local valLabel = Instance.new("TextLabel", row)
+	valLabel.Size = UDim2.new(0.3, 0, 1, 0)
+	valLabel.Position = UDim2.new(0.7, 0, 0, 0)
+	valLabel.BackgroundTransparency = 1
+	valLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+	valLabel.Text = "0" .. suffix
+	valLabel.Font = Enum.Font.GothamBold
+	valLabel.TextSize = 12
+	valLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+	bonusLabels[statName] = {Label = valLabel, Suffix = suffix}
 end
 
-stats.StatPoints.Changed:Connect(updateUI)
-stats.VIT.Changed:Connect(updateUI)
-stats.INT.Changed:Connect(updateUI)
-stats.STR.Changed:Connect(updateUI)
-stats.DEX.Changed:Connect(updateUI)
-updateUI()
+createBonusRow("Defense", "Páncélzat (Védelem):", "")
+createBonusRow("StrongVsMonster", "Szörnyek elleni erő:", "%")
+createBonusRow("StrongVsMetin", "Metinkövek elleni erő:", "%")
+createBonusRow("StrongVsPlayer", "Ember elleni erő:", "%")
+createBonusRow("CritChance", "Kritikus találat esélye:", "%")
+createBonusRow("LifeSteal", "Életvarázs (Life Steal):", "%")
+createBonusRow("AttackSpeed", "Támadási sebesség:", "%")
+createBonusRow("MovementSpeed", "Mozgási sebesség:", "%")
+createBonusRow("DodgeChance", "Kitérési esély:", "%")
+createBonusRow("DoubleDrop", "Dupla tárgydobás esélye:", "%")
+createBonusRow("DoubleGold", "Dupla pénz esélye:", "%")
 
-mainFrame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		local highest = 0
-		for _, gui in pairs(player.PlayerGui:GetChildren()) do
-			if gui:IsA("ScreenGui") and gui ~= screenGui then
-				if gui.DisplayOrder > highest then
-					highest = gui.DisplayOrder
-				end
-			end
-		end
-		screenGui.DisplayOrder = highest + 1
+-- ==========================================
+-- FRISSÍTÉS
+-- ==========================================
+local function updateUI()
+	if not stats then return end
+	pointsLabel.Text = "Elosztható pontok: " .. (stats:FindFirstChild("StatPoints") and stats.StatPoints.Value or 0)
+	if stats:FindFirstChild("VIT") then vitValue.Text = tostring(stats.VIT.Value) end
+	if stats:FindFirstChild("INT") then intValue.Text = tostring(stats.INT.Value) end
+	if stats:FindFirstChild("STR") then strValue.Text = tostring(stats.STR.Value) end
+	if stats:FindFirstChild("DEX") then dexValue.Text = tostring(stats.DEX.Value) end
+
+	for statName, data in pairs(bonusLabels) do
+		local st = stats:FindFirstChild(statName)
+		if st then data.Label.Text = tostring(st.Value) .. data.Suffix end
 	end
-end)
+end
 
-local charCloseBtn = Instance.new("TextButton")
-charCloseBtn.Size = UDim2.new(0, 30, 0, 30)
-charCloseBtn.Position = UDim2.new(1, -5, 0, 5) 
-charCloseBtn.AnchorPoint = Vector2.new(1, 0)
-charCloseBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30) 
-charCloseBtn.BorderColor3 = Color3.fromRGB(80, 20, 20)
-charCloseBtn.BorderSizePixel = 2
-charCloseBtn.Text = "X"
-charCloseBtn.TextColor3 = Color3.new(1, 1, 1)
-charCloseBtn.Font = Enum.Font.GothamBold
-charCloseBtn.TextSize = 14
-charCloseBtn.Parent = mainFrame 
-
-charCloseBtn.MouseButton1Click:Connect(function()
-	mainFrame.Visible = false
-end)
+for _, child in pairs(stats:GetChildren()) do child.Changed:Connect(updateUI) end
+updateUI()

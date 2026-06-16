@@ -1,70 +1,69 @@
+-- Fájl helye: ServerScriptService -> CombatHandler
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local MeleeAttack = Events:WaitForChild("MeleeAttack")
 local ShowDamage = Events:WaitForChild("ShowDamage")
-
--- BEKÖTJÜK A KÖZPONTI ADATBÁZIST
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
-local ATTACK_RANGE = 6 
-local SERVER_COOLDOWN = 0.75 
-local playerAttackTimes = {}
-
 MeleeAttack.OnServerEvent:Connect(function(player)
-	local currentTime = tick()
-	local lastTime = playerAttackTimes[player.UserId] or 0
-	if currentTime - lastTime < SERVER_COOLDOWN then return end
-	playerAttackTimes[player.UserId] = currentTime
-
 	local character = player.Character
-	if not character then return end
+	local stats = player:FindFirstChild("PlayerStats")
+	local equipment = player:FindFirstChild("Equipment")
+	if not character or not stats or not equipment then return end
 
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	if not rootPart then return end
+	local weaponName = equipment:FindFirstChild("Fegyver") and equipment.Fegyver.Value or ""
 
-	local stats = player:FindFirstChild("PlayerStats")
-	local str = (stats and stats:FindFirstChild("STR")) and stats.STR.Value or 1
-	local baseMin = math.floor(5 + (str * 1.5))
-	local baseMax = math.floor(10 + (str * 2))
-
-	local wepMin, wepMax = 0, 0
-	local eqFolder = player:FindFirstChild("Equipment")
-	if eqFolder and eqFolder:FindFirstChild("Fegyver") then
-		local wepName = eqFolder.Fegyver.Value
-
-		-- ==========================================
-		-- FEGYVER STATISZTIKA LEKÉRÉSE AZ ADATBÁZISBÓL!
-		-- ==========================================
-		local itemData = ItemDatabase[wepName]
-		if itemData and itemData.Type == "Fegyver" then
-			wepMin = itemData.MinDmg
-			wepMax = itemData.MaxDmg
-		end
+	local minDmg, maxDmg = 1, 5 -- Alap ökölsebzés
+	if weaponName ~= "" and ItemDatabase[weaponName] then
+		minDmg = ItemDatabase[weaponName].MinDmg or 1
+		maxDmg = ItemDatabase[weaponName].MaxDmg or 5
 	end
 
-	local finalDamage = math.random(baseMin + wepMin, baseMax + wepMax)
+	-- Erő (STR) bónusz
+	local baseDamage = math.random(minDmg, maxDmg) + (stats.STR.Value * 2)
 
-	local protectedNPCs = {
-		["Fegyverkereskedo"] = true, ["Pancelkereskedo"] = true, 
-		["Vegyesbolt"] = true, ["Kovacs"] = true, ["Faluose"] = true, ["Varosor"] = true
-	}
+	for _, obj in pairs(workspace:GetChildren()) do
+		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
+			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
+			local targetHum = obj.Humanoid
 
-	for _, object in pairs(workspace:GetDescendants()) do
-		if object:IsA("Humanoid") and object.Parent ~= character then
-			if not protectedNPCs[object.Parent.Name] then
-				local enemyRoot = object.Parent:FindFirstChild("HumanoidRootPart")
-				if enemyRoot then
-					local distance = (rootPart.Position - enemyRoot.Position).Magnitude
-					if distance <= ATTACK_RANGE and object.Health > 0 then
-						object:TakeDamage(finalDamage)
-						ShowDamage:FireAllClients(enemyRoot, finalDamage)
+			if targetRoot and targetHum.Health > 0 then
+				local distance = (rootPart.Position - targetRoot.Position).Magnitude
+
+				if distance <= 8 then
+					local finalDamage = baseDamage
+					local isCrit = false
+
+					-- 1. Kritikus ütés ellenőrzése
+					if math.random(1, 100) <= stats.CritChance.Value then
+						finalDamage = finalDamage * 2
+						isCrit = true
 					end
+
+					-- 2. Szörny / Metinkő / Ember elleni erő
+					if obj.Name == "MetinStone" then
+						finalDamage = finalDamage * (1 + (stats.StrongVsMetin.Value / 100))
+					elseif obj:FindFirstChild("IsPlayer") then
+						finalDamage = finalDamage * (1 + (stats.StrongVsPlayer.Value / 100))
+					else
+						finalDamage = finalDamage * (1 + (stats.StrongVsMonster.Value / 100))
+					end
+
+					finalDamage = math.floor(finalDamage)
+
+					-- 3. Életvarázs (Life Steal)
+					if stats.LifeSteal.Value > 0 then
+						local healAmt = finalDamage * (stats.LifeSteal.Value / 100)
+						character.Humanoid.Health = math.min(character.Humanoid.MaxHealth, character.Humanoid.Health + healAmt)
+					end
+
+					-- Sebzés kiosztása és kliens értesítése (ÚJ: isCrit paraméter!)
+					targetHum:TakeDamage(finalDamage)
+					ShowDamage:FireAllClients(finalDamage, targetRoot.Position, isCrit, false)
 				end
 			end
 		end
 	end
-end)
-
-game.Players.PlayerRemoving:Connect(function(player)
-	playerAttackTimes[player.UserId] = nil
 end)

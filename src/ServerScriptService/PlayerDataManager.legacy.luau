@@ -31,6 +31,14 @@ local function setupPlayer(player)
 	local mana = Instance.new("IntValue", stats) mana.Name = "Mana" mana.Value = 100
 	local maxMana = Instance.new("IntValue", stats) maxMana.Name = "MaxMana" maxMana.Value = 100
 
+	-- ÚJ: BÓNUSZ STATISZTIKÁK (Ezeket a StatHandler fogja folyamatosan frissíteni)
+	local bonusStats = {"Defense", "StrongVsMetin", "StrongVsMonster", "StrongVsPlayer", "LifeSteal", "CritChance", "DoubleDrop", "DoubleGold", "AttackSpeed", "MovementSpeed", "DodgeChance"}
+	for _, bStat in pairs(bonusStats) do
+		local val = Instance.new("IntValue", stats)
+		val.Name = bStat
+		val.Value = 0
+	end
+
 	-- ÚJ: TÁSKA LÉTREHOZÁSA DARABSZÁMMAL
 	local inv = Instance.new("Folder", player)
 	inv.Name = "Inventory"

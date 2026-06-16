@@ -103,7 +103,14 @@ end)
 -- A JÁTÉK FŐ CIKLUSA (60x fut le másodpercenként)
 -- ==========================================
 RunService.Heartbeat:Connect(function()
-	local currentCooldown = BASE_ATTACK_COOLDOWN 
+	-- ÚJ: Attack Speed beolvasása a statokból
+	local atkSpeedBonus = 0
+	if player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("AttackSpeed") then
+		atkSpeedBonus = player.PlayerStats.AttackSpeed.Value
+	end
+
+	-- Az alap 0.8 másodpercet osztjuk a bónusszal (pl. +50% sebesség = 1.5 -> 0.53 mp cooldown)
+	local currentCooldown = BASE_ATTACK_COOLDOWN / (1 + (atkSpeedBonus / 100))
 
 	-- 1. KÉZI ÜTÉS (SPACE NYOMVA TARTÁSA)
 	if isHoldingSpace then

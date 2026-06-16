@@ -130,11 +130,11 @@ gridLayout.Parent = scrollFrame
 local SHOPS = {
 	["Fegyverkereskedo"] = {
 		Title = "FEGYVERKERESKEDŐ",
-		Items = {"Kezdőkard", "Hosszúkard", "Szabi farka"}
+		Items = {"Kezdőkard", "Hosszúkard", "Vámpír Kard"}
 	},
 	["Pancelkereskedo"] = {
 		Title = "PÁNCÉLKERESKEDŐ",
-		Items = {"Vadfarkas Páncél", "Vas Páncél"}
+		Items = {"Vadfarkas Páncél", "Vas Páncél","Arany nyaklánc","Réz Nyaklánc","Bőrcipő","Jézus Páncél"}
 	},
 	["Vegyesbolt"] = {
 		Title = "VEGYESBOLT",

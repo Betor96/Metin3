@@ -12,15 +12,15 @@ screenGui.DisplayOrder = 2
 screenGui.Parent = playerGui
 
 local menuContainer = Instance.new("Frame")
-menuContainer.AnchorPoint = Vector2.new(1, 1) -- FIX: Jobb alsó horgony
-menuContainer.Position = UDim2.new(1, -20, 1, -20) -- FIX: A Hotbar és HP sáv vonalában
+menuContainer.AnchorPoint = Vector2.new(0, 1) -- FIX: Bal alsó horgony (hogy a Hotbarhoz tapadjon)
+menuContainer.Position = UDim2.new(0.5, 230, 1, -20) -- FIX: Pontosan a képernyő közepe plusz 230 pixel
 menuContainer.Size = UDim2.new(0, 300, 0, 35) 
 menuContainer.BackgroundTransparency = 1
 menuContainer.Parent = screenGui
 
 local layout = Instance.new("UIListLayout")
 layout.FillDirection = Enum.FillDirection.Horizontal 
-layout.HorizontalAlignment = Enum.HorizontalAlignment.Right 
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Left -- FIX: Balra igazít, hogy egyből a Hotbar mellett kezdődjön a gomb
 layout.VerticalAlignment = Enum.VerticalAlignment.Center
 layout.Padding = UDim.new(0, 10)
 layout.Parent = menuContainer

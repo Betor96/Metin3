@@ -6,15 +6,19 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 local MoveItem = Events:WaitForChild("MoveItem")
 local DropItem = Events:WaitForChild("DropItem")
 
--- BEKÖTJÜK A KÖZPONTI ADATBÁZIST! (Itt dől el, hogy mi micsoda)
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
--- Magyar típusnevekből szerveres slot nevek
 local typeToSlot = {
 	["Fegyver"] = "Fegyver",
-	["Páncél"] = "Pancel"
-	-- Ide jöhet majd a "Cipő", "Sisak" stb.
+	["Páncél"] = "Pancel",
+	["Cipő"] = "Cipo",
+	["Nyaklánc"] = "Nyaklanc",
+	["Sapka"] = "Sapka",
+	["Fülbevaló"] = "Fulbevalo",
+	["Pajzs"] = "Pajzs",
+	["Karkötő"] = "Karkoto"
 }
+-- (A fájl többi része marad ahogy volt!)
 
 -- ==========================================
 -- TÁRGYAK MOZGATÁSA ÉS FELSZERELÉSE
@@ -26,46 +30,73 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 
 	local fromFolder = (fromFolderStr == "Inventory") and inv or eq
 	local toFolder = (toFolderStr == "Inventory") and inv or eq
+
 	local fromSlot = fromFolder:FindFirstChild(fromSlotName)
 	local toSlot = toFolder:FindFirstChild(toSlotName)
 
 	if fromSlot and toSlot and fromSlot.Value ~= "" then
 		local itemName = fromSlot.Value
 		local targetItemName = toSlot.Value
+
 		local itemData = ItemDatabase[itemName]
 		if not itemData then return end
 		local maxStack = itemData.MaxStack or 1
 
-		-- Felszerelés biztonsági ellenőrzések... (marad ahogy volt)
-		if toFolderStr == "Equipment" and typeToSlot[itemData.Type] ~= toSlotName then return end
-		if toFolderStr == "Inventory" and fromFolderStr == "Equipment" and targetItemName ~= "" then
-			local tData = ItemDatabase[targetItemName]
-			if not tData or typeToSlot[tData.Type] ~= fromSlotName then return end
+		-- HA A FELSZERELÉSBE HÚZZUK (Felvétel)
+		if toFolderStr == "Equipment" then
+			local expectedSlot = typeToSlot[itemData.Type]
+			if expectedSlot ~= toSlotName then return end 
 		end
 
-		-- ÚJ: STACKEK EGYESÍTÉSE TÁSKÁN BELÜL
+		-- HA CSERÉLÜNK (Táskából Felszerelésbe, és a felszerelésen is van valami)
+		if toFolderStr == "Inventory" and fromFolderStr == "Equipment" and targetItemName ~= "" then
+			local targetItemData = ItemDatabase[targetItemName]
+			if not targetItemData then return end
+			local expectedSlot = typeToSlot[targetItemData.Type]
+			if expectedSlot ~= fromSlotName then return end 
+		end
+
+		-- ==========================================
+		-- ÚJ: KÉZI STACKELÉS (Egymásra húzás táskán belül)
+		-- ==========================================
 		if fromFolderStr == "Inventory" and toFolderStr == "Inventory" and itemName == targetItemName and maxStack > 1 and fromSlot ~= toSlot then
-			local total = fromSlot.Amount.Value + toSlot.Amount.Value
+			local fromAmt = fromSlot:FindFirstChild("Amount") and fromSlot.Amount.Value or 1
+			local toAmt = toSlot:FindFirstChild("Amount") and toSlot.Amount.Value or 1
+
+			local total = fromAmt + toAmt
+
+			-- Ha belefér egy stackbe
 			if total <= maxStack then
 				toSlot.Amount.Value = total
 				fromSlot.Value = ""
 				fromSlot.Amount.Value = 0
 			else
+				-- Ha nem fér bele, feltöltjük a stacket maximumra, a maradékot visszahagyjuk
 				toSlot.Amount.Value = maxStack
 				fromSlot.Amount.Value = total - maxStack
 			end
-			return -- Egyesítettünk, nem cserélünk tovább
+			return -- Készen vagyunk a stackeléssel, megszakítjuk a további cserét!
 		end
 
-		-- SIMA CSERE (Név ÉS Darabszám)
+		-- ==========================================
+		-- BIZTONSÁGOS CSERE (Duplikáció elleni védelemmel!)
+		-- ==========================================
 		local tempVal = toSlot.Value
 		local tempAmt = (toSlot:FindFirstChild("Amount")) and toSlot.Amount.Value or 1
 
-		toSlot.Value = fromSlot.Value
-		if toSlot:FindFirstChild("Amount") then toSlot.Amount.Value = fromSlot.Amount.Value end
+		local fromAmt = (fromSlot:FindFirstChild("Amount")) and fromSlot.Amount.Value or 1
 
+		-- 1. Új hely feltöltése
+		toSlot.Value = fromSlot.Value
+		if toSlot:FindFirstChild("Amount") then 
+			toSlot.Amount.Value = fromAmt 
+		end
+
+		-- 2. Régi hely felülírása (vagy kiürítése)
 		fromSlot.Value = tempVal
-		if fromSlot:FindFirstChild("Amount") then fromSlot.Amount.Value = tempAmt end
+		if fromSlot:FindFirstChild("Amount") then 
+			fromSlot.Amount.Value = tempAmt 
+		end
 	end
 end)
 
@@ -80,7 +111,15 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 			local itemName = slot.Value
 			local itemData = ItemDatabase[itemName]
 
-			slot.Value = "" -- Töröljük a táskából
+			-- Ha táskában van és van Amount, akkor csak 1 darabot dobunk el!
+			if slot:FindFirstChild("Amount") then
+				slot.Amount.Value = slot.Amount.Value - 1
+				if slot.Amount.Value <= 0 then 
+					slot.Value = "" 
+				end
+			else
+				slot.Value = "" -- Ha felszerelésről dobja el, egyből törlődik
+			end
 
 			local character = player.Character
 			if character and character:FindFirstChild("HumanoidRootPart") then
@@ -93,9 +132,6 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName)
 				droppedItem.Size = Vector3.new(0.5, 0.2, 3) 
 				droppedItem.Position = rootPart.Position + (rootPart.CFrame.LookVector * 5) + Vector3.new(0, 3, 0)
 
-				-- ==========================================
-				-- DINAMIKUS SZÍNBEÁLLÍTÁS ADATBÁZISBÓL
-				-- ==========================================
 				local partColor = Color3.fromRGB(150, 150, 150)
 				local textColor = Color3.new(1, 1, 1)
 

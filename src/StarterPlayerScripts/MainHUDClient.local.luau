@@ -14,12 +14,12 @@ screenGui.DisplayOrder = 1
 screenGui.Parent = playerGui
 
 -- ==========================================
--- BAL ALSÓ SÁV (HP, MP, EXP)
+-- BAL ALSÓ SÁV (HP, MP, EXP) - KÖZÉPRE IGAZÍTVA!
 -- ==========================================
 local statusContainer = Instance.new("Frame")
 statusContainer.Size = UDim2.new(0, 300, 0, 80)
-statusContainer.AnchorPoint = Vector2.new(0, 1) -- FIX: Bal alsó sarok horgony
-statusContainer.Position = UDim2.new(0, 20, 1, -20) -- FIX: Fixen 20 pixelre a bal alsó saroktól
+statusContainer.AnchorPoint = Vector2.new(1, 1) -- FIX: Jobb alsó horgony (a Hotbarhoz tapad)
+statusContainer.Position = UDim2.new(0.5, -230, 1, -20) -- FIX: Pontosan a képernyő közepe mínusz 230 pixel
 statusContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
 statusContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
 statusContainer.BorderSizePixel = 2
@@ -112,16 +112,16 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- KÖZÉPSŐ GYORSGOMBOK (HOTBAR 1-8)
+-- KÖZÉPSŐ GYORSGOMBOK (HOTBAR 1-8) - KÖZÉPRE IGAZÍTVA!
 -- ==========================================
 local hotbarContainer = Instance.new("Frame")
 hotbarContainer.Size = UDim2.new(0, 440, 0, 60)
-hotbarContainer.AnchorPoint = Vector2.new(0.5, 1) 
-hotbarContainer.Position = UDim2.new(0.5, 0, 1, -20) 
+hotbarContainer.AnchorPoint = Vector2.new(0.5, 1) -- FIX: Közép alsó horgony
+hotbarContainer.Position = UDim2.new(0.5, 0, 1, -20) -- FIX: Pontosan a képernyő közepe
 hotbarContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
 hotbarContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
 hotbarContainer.BorderSizePixel = 2
-hotbarContainer.Active = true -- <----- EZ A SOR FOGJA FEL A KATTINTÁSOKAT!
+hotbarContainer.Active = true -- Kattintás védelem
 hotbarContainer.Parent = screenGui
 
 local uiList = Instance.new("UIListLayout", hotbarContainer)
@@ -145,7 +145,7 @@ for i = 1, 8 do
 	slotFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
 	slotFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
 	slotFrame.BorderSizePixel = 1
-	slotFrame.Active = true -- <----- ÉS EZ IS SEGÍT BLOKKOLNI A MOZGÁST!
+	slotFrame.Active = true 
 	slotFrame.Parent = hotbarContainer
 
 	local numLabel = Instance.new("TextLabel", slotFrame)
@@ -172,7 +172,6 @@ for i = 1, 8 do
 	itemIcon.ZIndex = 2
 end
 
--- Fájl helye: StarterPlayerScripts -> MainHUDClient (részlet!)
 local function renderHotbar()
 	local hotbarFolder = player:FindFirstChild("Hotbar")
 	local invFolder = player:FindFirstChild("Inventory")
@@ -185,12 +184,11 @@ local function renderHotbar()
 		if slotVal and uiSlot then
 			local icon = uiSlot:FindFirstChild("ItemIcon")
 			if icon then
-				for _, c in pairs(icon:GetChildren()) do c:Destroy() end -- Töröljük a régi számot
+				for _, c in pairs(icon:GetChildren()) do c:Destroy() end 
 
 				if slotVal.Value ~= "" then
 					icon.Text = slotVal.Value
 
-					-- Megkeressük, mennyi van a táskában összesen ebből a tárgyból!
 					local totalAmount = 0
 					for j = 1, 8 do
 						local invSlot = invFolder:FindFirstChild("Slot_" .. j)
@@ -201,12 +199,10 @@ local function renderHotbar()
 					end
 
 					if totalAmount > 0 then
-						-- VAN BELŐLE: Piros és aktív
 						icon.BackgroundTransparency = 0
 						icon.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
 						icon.TextTransparency = 0
 
-						-- Szám csak akkor, ha > 1
 						if totalAmount > 1 then
 							local amtLabel = Instance.new("TextLabel")
 							amtLabel.Size = UDim2.new(0, 15, 0, 15)
@@ -220,7 +216,6 @@ local function renderHotbar()
 							amtLabel.Parent = icon
 						end
 					else
-						-- ELFOGYOTT: Szürke, lebegő, szám nélküli
 						icon.BackgroundTransparency = 0
 						icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 						icon.TextTransparency = 0.6 
@@ -237,7 +232,6 @@ end
 player:WaitForChild("Hotbar").ChildAdded:Connect(renderHotbar)
 for _, child in pairs(player:WaitForChild("Hotbar"):GetChildren()) do child.Changed:Connect(renderHotbar) end
 
--- ÚJ: A táska változását is figyelnie kell a hotbarnak!
 task.spawn(function()
 	local inv = player:WaitForChild("Inventory")
 	for _, slot in pairs(inv:GetChildren()) do
@@ -246,9 +240,3 @@ task.spawn(function()
 		if amt then amt.Changed:Connect(renderHotbar) end
 	end
 end)
-
-player:WaitForChild("Hotbar").ChildAdded:Connect(renderHotbar)
-for _, child in pairs(player:WaitForChild("Hotbar"):GetChildren()) do
-	child.Changed:Connect(renderHotbar)
-end
-renderHotbar()
