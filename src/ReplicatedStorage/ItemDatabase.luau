@@ -54,7 +54,7 @@ local ItemDatabase = {
 	-- ÚJ: KIEGÉSZÍTŐK
 	["Bőrcipő"] = {
 		Type = "Cipő", Level = 1, Price = 100,
-		MovementSpeed = 15, -- +15% Mozgási sebesség
+		MovementSpeed = 100, -- +15% Mozgási sebesség
 		DodgeChance = 5,    -- 5% Kitérés
 		Description = "Könnyű cipő, gyorsabb futást biztosít."
 	},
