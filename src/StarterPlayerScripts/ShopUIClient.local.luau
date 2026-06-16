@@ -2,7 +2,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService") -- ÚJ: Folyamatos ellenőrzés
+local RunService = game:GetService("RunService") 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local BuyItem = Events:WaitForChild("BuyItem")
 
@@ -17,6 +17,7 @@ screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local shopFrame = Instance.new("Frame")
+shopFrame.Name = "ShopFrame" -- FONTOS AZ ELNEVEZÉS A DRAG & DROP MIATT!
 shopFrame.Size = UDim2.new(0, 250, 0, 350)
 shopFrame.AnchorPoint = Vector2.new(0, 0.5) 
 shopFrame.Position = UDim2.new(0.05, 0, 0.5, 0) 
@@ -63,9 +64,36 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- ÚJ: TÁVOLSÁG VÁLTOZÓK A BOLTNAK IS
 local currentShopNPC = nil
 local MAX_SHOP_DISTANCE = 15
+
+-- ==========================================
+-- ÚJ: ELADÁS MÓD KAPCSOLÓ
+-- ==========================================
+local sellMode = Instance.new("BoolValue")
+sellMode.Name = "SellMode"
+sellMode.Value = false
+sellMode.Parent = shopFrame
+
+local sellToggleBtn = Instance.new("TextButton")
+sellToggleBtn.Size = UDim2.new(1, -20, 0, 30)
+sellToggleBtn.Position = UDim2.new(0, 10, 1, -40)
+sellToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+sellToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+sellToggleBtn.Text = "Eladás Mód: KI"
+sellToggleBtn.Font = Enum.Font.GothamBold
+sellToggleBtn.Parent = shopFrame
+
+sellToggleBtn.MouseButton1Click:Connect(function()
+	sellMode.Value = not sellMode.Value
+	if sellMode.Value then
+		sellToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+		sellToggleBtn.Text = "Eladás Mód: BE (Jobb Klikk)"
+	else
+		sellToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		sellToggleBtn.Text = "Eladás Mód: KI"
+	end
+end)
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -76,13 +104,18 @@ closeBtn.Text = "X"
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.Parent = shopFrame
 
-closeBtn.MouseButton1Click:Connect(function()
+local function resetShop()
 	shopFrame.Visible = false
 	currentShopNPC = nil
-end)
+	sellMode.Value = false
+	sellToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	sellToggleBtn.Text = "Eladás Mód: KI"
+end
+
+closeBtn.MouseButton1Click:Connect(resetShop)
 
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -40)
+scrollFrame.Size = UDim2.new(1, -10, 1, -85) -- Kicsit kisebb, hogy beférjen az Eladás gomb
 scrollFrame.Position = UDim2.new(0, 5, 0, 35)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.ScrollBarThickness = 6
@@ -97,7 +130,7 @@ gridLayout.Parent = scrollFrame
 local SHOPS = {
 	["Fegyverkereskedo"] = {
 		Title = "FEGYVERKERESKEDŐ",
-		Items = {"Kezdőkard", "Hosszúkard"}
+		Items = {"Kezdőkard", "Hosszúkard", "Szabi farka"}
 	},
 	["Pancelkereskedo"] = {
 		Title = "PÁNCÉLKERESKEDŐ",
@@ -164,7 +197,6 @@ local function setupNPCs()
 			local clickDetector = npc:FindFirstChildOfClass("ClickDetector")
 			if clickDetector then
 				clickDetector.MouseClick:Connect(function()
-					-- ÚJ: Közelség ellenőrzés
 					local char = player.Character
 					if char and char:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("HumanoidRootPart") then
 						local dist = (char.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
@@ -179,21 +211,16 @@ local function setupNPCs()
 	end
 end
 
--- ==========================================
--- ÚJ: FOLYAMATOS TÁVOLSÁG ELLENŐRZÉS (Bolt bezárása)
--- ==========================================
 RunService.Heartbeat:Connect(function()
 	if shopFrame.Visible and currentShopNPC then
 		local char = player.Character
 		if char and char:FindFirstChild("HumanoidRootPart") and currentShopNPC:FindFirstChild("HumanoidRootPart") then
 			local dist = (char.HumanoidRootPart.Position - currentShopNPC.HumanoidRootPart.Position).Magnitude
 			if dist > MAX_SHOP_DISTANCE then
-				shopFrame.Visible = false
-				currentShopNPC = nil
+				resetShop()
 			end
 		else
-			shopFrame.Visible = false
-			currentShopNPC = nil
+			resetShop()
 		end
 	end
 end)
