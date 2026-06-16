@@ -34,14 +34,37 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		["Varosor"] = true
 	}
 
-	for _, obj in pairs(workspace:GetChildren()) do
+	-- Az NPC-k védelme
+	local protectedNPCs = {
+		["Fegyverkereskedo"] = true, 
+		["Pancelkereskedo"] = true, 
+		["Vegyesbolt"] = true, 
+		["Kovacs"] = true, 
+		["Faluose"] = true,
+		["Varosor"] = true
+	}
+
+	-- ==========================================
+	-- ÚJ: Célpontok kigyűjtése (A pálya ÉS a Metin mappa egybevéve)
+	-- ==========================================
+	local possibleTargets = workspace:GetChildren()
+	local mFolder = workspace:FindFirstChild("MetinStones")
+	if mFolder then
+		for _, stone in pairs(mFolder:GetChildren()) do
+			table.insert(possibleTargets, stone) -- Hozzáadjuk a köveket is a célpontokhoz!
+		end
+	end
+
+	-- Itt cseréld le a 'workspace:GetChildren()'-t 'possibleTargets'-ra!
+	for _, obj in pairs(possibleTargets) do
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
 			local targetHum = obj.Humanoid
 
-			-- ÚJ: Hozzáadtuk a 'not protectedNPCs[obj.Name]' feltételt!
 			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
+
+				-- (Innen folytatódik a régi kód a sebzés kiosztásával...)
 
 				if distance <= 8 then
 					local finalDamage = baseDamage
