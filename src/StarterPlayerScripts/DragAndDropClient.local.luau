@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GuiService = game:GetService("GuiService")
+local Camera = workspace.CurrentCamera 
 
 local Events = ReplicatedStorage:WaitForChild("Events")
 local MoveItem = Events:WaitForChild("MoveItem")
@@ -12,7 +13,6 @@ local DropItem = Events:WaitForChild("DropItem")
 local ProcessUpgrade = Events:WaitForChild("ProcessUpgrade")
 local UpgradeResult = Events:WaitForChild("UpgradeResult")
 
--- BEKÖTJÜK AZ ÚJ KÖZPONTI ADATBÁZIST A RÉGI HELYETT
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
 local player = Players.LocalPlayer
@@ -111,15 +111,14 @@ end)
 
 
 -- ==========================================
--- ÚJ RENDER ÉS TOOLTIP RENDSZER (ADATBÁZISBÓL)
+-- TOOLTIP RENDSZER
 -- ==========================================
-
 local tooltip = Instance.new("Frame")
 tooltip.Size = UDim2.new(0, 200, 0, 100)
 tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
 tooltip.BorderSizePixel = 2
-tooltip.ZIndex = 100
+tooltip.ZIndex = 999 
 tooltip.Visible = false
 tooltip.Parent = playerGui:WaitForChild("InventoryHUD")
 
@@ -128,7 +127,7 @@ tooltipTitle.Size = UDim2.new(1, 0, 0, 25)
 tooltipTitle.BackgroundTransparency = 1
 tooltipTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
 tooltipTitle.Font = Enum.Font.GothamBold
-tooltipTitle.ZIndex = 101
+tooltipTitle.ZIndex = 1000
 tooltipTitle.Parent = tooltip
 
 local tooltipDesc = Instance.new("TextLabel")
@@ -140,16 +139,32 @@ tooltipDesc.Font = Enum.Font.Gotham
 tooltipDesc.TextSize = 12
 tooltipDesc.TextWrapped = true
 tooltipDesc.TextYAlignment = Enum.TextYAlignment.Top
-tooltipDesc.ZIndex = 101
+tooltipDesc.ZIndex = 1000
 tooltipDesc.Parent = tooltip
 
-RunService.RenderStepped:Connect(function()
-	if tooltip.Visible then
-		local pos = UserInputService:GetMouseLocation()
-		local inset = GuiService:GetGuiInset()
-		tooltip.Position = UDim2.new(0, pos.X + 15, 0, pos.Y - inset.Y + 15)
+local function updateTooltipPosition()
+	if not tooltip.Visible then return end
+
+	local mousePos = UserInputService:GetMouseLocation()
+	local viewportSize = Camera.ViewportSize
+	local inset = GuiService:GetGuiInset()
+
+	local tipWidth = 200 
+	local tipHeight = 100 
+
+	local xPos = mousePos.X + 15
+	local yPos = mousePos.Y - inset.Y + 15
+
+	if xPos + tipWidth > viewportSize.X then
+		xPos = mousePos.X - tipWidth - 15 
 	end
-end)
+	if yPos + tipHeight > viewportSize.Y then
+		yPos = mousePos.Y - inset.Y - tipHeight - 15 
+	end
+
+	tooltip.Position = UDim2.new(0, xPos, 0, yPos)
+end
+RunService.RenderStepped:Connect(updateTooltipPosition)
 
 local function getTooltipText(itemName)
 	local data = ItemDatabase[itemName]
@@ -166,9 +181,7 @@ local function getTooltipText(itemName)
 	return text
 end
 
--- Fájl helye: StarterPlayerScripts -> DragAndDropClient (részlet!)
 local function renderItems()
-	-- 1. TÁSKA KIRAJZOLÁSA (A stackelés is itt van)
 	for i = 1, 8 do
 		local slotVal = invFolder:FindFirstChild("Slot_" .. i)
 		local uiSlot = invHud:FindFirstChild("InvSlot_" .. i, true)
@@ -186,15 +199,14 @@ local function renderItems()
 				itemIcon.Font = Enum.Font.GothamBold
 				itemIcon.Parent = uiSlot
 
-				-- DARABSZÁM KIJELZÉSE, HA TÖBB MINT 1
 				local amtVal = slotVal:FindFirstChild("Amount")
 				if amtVal and amtVal.Value > 1 then
 					local amtLabel = Instance.new("TextLabel")
 					amtLabel.Size = UDim2.new(0, 15, 0, 15)
-					amtLabel.Position = UDim2.new(1, -15, 1, -15) -- Jobb alsó sarok
+					amtLabel.Position = UDim2.new(1, -15, 1, -15) 
 					amtLabel.BackgroundTransparency = 1
 					amtLabel.TextColor3 = Color3.new(1, 1, 1)
-					amtLabel.TextStrokeTransparency = 0 -- Fekete körvonal
+					amtLabel.TextStrokeTransparency = 0 
 					amtLabel.Text = tostring(amtVal.Value)
 					amtLabel.Font = Enum.Font.GothamBold
 					amtLabel.TextSize = 12
@@ -211,7 +223,6 @@ local function renderItems()
 		end
 	end
 
-	-- 2. FELSZERELÉS KIRAJZOLÁSA (Ez hiányzott!)
 	for uiName, serverName in pairs(eqNameToServer) do
 		local slotVal = eqFolder:FindFirstChild(serverName)
 		local uiSlot = eqHud:FindFirstChild(uiName, true)
@@ -243,7 +254,6 @@ local function renderItems()
 	end
 end
 
--- ÚJ FRISSÍTÉS EVENT (Mert a darabszám is változhat!)
 local function bindInvEvents()
 	for _, child in pairs(invFolder:GetChildren()) do
 		child.Changed:Connect(renderItems)
@@ -260,35 +270,7 @@ for _, child in pairs(eqFolder:GetChildren()) do child.Changed:Connect(renderIte
 renderItems()
 
 -- ==========================================
--- DRAG AND DROP ÉS RÁHÚZÁS A KOVÁCSRA
--- ==========================================
--- ==========================================
--- DRAG AND DROP ÉS RÁHÚZÁS A KOVÁCSRA / BOLTRA
--- ==========================================
-local dragging = false
-local dragClone = nil
-local originSlotUI = nil
-local dragConnection = nil
-
-local function getSlotData(guiObject)
-	if guiObject.Name:match("InvSlot_") then
-		local num = guiObject.Name:match("%d+")
-		return "Inventory", "Slot_" .. num, invFolder:FindFirstChild("Slot_" .. num)
-	elseif eqNameToServer[guiObject.Name] then
-		local serverName = eqNameToServer[guiObject.Name]
-		return "Equipment", serverName, eqFolder:FindFirstChild(serverName)
-	elseif guiObject.Name:match("HotbarSlotUI_") then
-		local num = guiObject.Name:match("%d+")
-		local hotbarFolder = player:FindFirstChild("Hotbar")
-		if hotbarFolder then
-			return "Hotbar", "Hotbar_" .. num, hotbarFolder:FindFirstChild("Hotbar_" .. num)
-		end
-	end
-	return nil, nil, nil
-end
-
--- ==========================================
--- ÚJ: ELADÁS MEGERŐSÍTŐ ABLAK LÉTREHOZÁSA
+-- ELADÁS ABLAK LÉTREHOZÁSA
 -- ==========================================
 local sellFrame = Instance.new("Frame")
 sellFrame.Size = UDim2.new(0, 250, 0, 150)
@@ -380,14 +362,40 @@ local function promptSell(slotName, itemName)
 	sellFrame.Visible = true
 end
 
+-- ==========================================
+-- EGÉR KATTINTÁSOK (DRAG, ELADÁS, DUPLA KLIKK)
+-- ==========================================
+local dragging = false
+local dragClone = nil
+local originSlotUI = nil
+local dragConnection = nil
+
+local lastClickTime = 0
+local lastClickedSlot = nil
+
+local function getSlotData(guiObject)
+	if guiObject.Name:match("InvSlot_") then
+		local num = guiObject.Name:match("%d+")
+		return "Inventory", "Slot_" .. num, invFolder:FindFirstChild("Slot_" .. num)
+	elseif eqNameToServer[guiObject.Name] then
+		local serverName = eqNameToServer[guiObject.Name]
+		return "Equipment", serverName, eqFolder:FindFirstChild(serverName)
+	elseif guiObject.Name:match("HotbarSlotUI_") then
+		local num = guiObject.Name:match("%d+")
+		local hotbarFolder = player:FindFirstChild("Hotbar")
+		if hotbarFolder then
+			return "Hotbar", "Hotbar_" .. num, hotbarFolder:FindFirstChild("Hotbar_" .. num)
+		end
+	end
+	return nil, nil, nil
+end
+
 UserInputService.InputBegan:Connect(function(input)
 	local pos = UserInputService:GetMouseLocation()
 	local inset = GuiService:GetGuiInset()
 	local guisAtPosition = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y - inset.Y)
 
-	-- ==========================================
-	-- JOBB KLIKK: ELADÁS MÓD
-	-- ==========================================
+	-- 1. JOBB KLIKK: ELADÁS MÓD
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		local shopHUD = playerGui:FindFirstChild("ShopHUD")
 		local shopFrame = shopHUD and shopHUD:FindFirstChild("ShopFrame")
@@ -405,14 +413,55 @@ UserInputService.InputBegan:Connect(function(input)
 		return
 	end
 
-	-- ==========================================
-	-- BAL KLIKK: DRAG AND DROP
-	-- ==========================================
+	-- 2. BAL KLIKK: DUPLA KLIKK ÉS DRAG AND DROP
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		for _, gui in pairs(guisAtPosition) do
 			local folderStr, slotName, slotVal = getSlotData(gui)
 
 			if folderStr and slotVal and slotVal.Value ~= "" then
+
+				-- ÚJ: DUPLA KLIKK VIZSGÁLAT
+				local currentTime = tick()
+				if lastClickedSlot == gui and (currentTime - lastClickTime) < 0.4 then
+					-- DUPLA KLIKK TÖRTÉNT!
+					lastClickedSlot = nil 
+
+					local itemName = slotVal.Value
+					local itemData = ItemDatabase[itemName]
+
+					if itemData then
+						if itemData.Type == "Fogyóeszköz" then
+							-- Poti megivása
+							local UseItem = Events:FindFirstChild("UseItem")
+							if UseItem then UseItem:FireServer(itemName) end
+						elseif eqNameToServer[itemData.Type] then
+							-- Felszerelés fel/levétele
+							if folderStr == "Inventory" then
+								-- Felvétel (Táskából Karakterre)
+								MoveItem:FireServer("Inventory", slotName, "Equipment", eqNameToServer[itemData.Type])
+							elseif folderStr == "Equipment" then
+								-- Levétel (Karakterről Táskába) - Keresünk egy üres helyet
+								local freeSlot = nil
+								for i = 1, 8 do
+									local s = invFolder:FindFirstChild("Slot_" .. i)
+									if s and s.Value == "" then
+										freeSlot = "Slot_" .. i
+										break
+									end
+								end
+								if freeSlot then
+									MoveItem:FireServer("Equipment", slotName, "Inventory", freeSlot)
+								end
+							end
+						end
+					end
+					return -- Megszakítjuk a műveletet, nem indul el a Drag & Drop
+				end
+
+				-- Ha nem dupla klikk, akkor szimpla (indulhat a húzás)
+				lastClickTime = currentTime
+				lastClickedSlot = gui
+
 				dragging = true
 				originSlotUI = gui
 				tooltip.Visible = false
@@ -489,14 +538,12 @@ UserInputService.InputEnded:Connect(function(input)
 				end
 			end
 		else
-			-- HA NINCS UI CÉLPONT:
 			if fromFolderStr == "Hotbar" then
 				local hbFolder = player:FindFirstChild("Hotbar")
 				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then
 					hbFolder[fromSlotName].Value = ""
 				end
 			else
-				-- ÚJ: RÁHÚZTUK EGYENESEN A BOLTRA?
 				local droppedOnShop = false
 				for _, gui in pairs(guisAtPosition) do
 					if gui.Name == "ShopFrame" or gui:FindFirstAncestor("ShopFrame") then
@@ -508,7 +555,6 @@ UserInputService.InputEnded:Connect(function(input)
 				if droppedOnShop and fromFolderStr == "Inventory" then
 					promptSell(fromSlotName, itemName)
 				else
-					-- KOVÁCS VIZSGÁLAT ÉS TÉNYLEGES ELDOBÁS
 					local target3D = mouse.Target
 					if target3D and (target3D.Name == "Kovacs" or target3D:FindFirstAncestor("Kovacs")) then
 						local info = ItemDatabase[itemName]
