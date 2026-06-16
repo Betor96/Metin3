@@ -17,7 +17,6 @@ humanoid.MaxHealth = myData.MaxHealth
 humanoid.Health = myData.MaxHealth
 humanoid.WalkSpeed = 0 
 
--- 1. LÁTHATÓ HP SÁV
 local billboard = Instance.new("BillboardGui")
 billboard.Name = "StoneHPBar"
 billboard.Size = UDim2.new(0, 150, 0, 20)
@@ -45,14 +44,10 @@ hpText.Font = Enum.Font.GothamBold
 hpText.TextScaled = true
 hpText.Parent = bgFrame
 
--- ==========================================
--- BEÁLLÍTÁSOK
--- ==========================================
-local spawnRate = stone:GetAttribute("SpawnRate") or 3 -- Spawnolás gyakorisága (másodperc)
+local spawnRate = stone:GetAttribute("SpawnRate") or 3 
 local lastHitTime = 0
-local isActive = false -- Fut-e épp az időzítő?
+local isActive = false 
 
--- Függvény a szörnyek idézésére
 local function spawnMonsters()
 	local spawnCount = math.random(myData.SpawnCountMin, myData.SpawnCountMax)
 	for i = 1, spawnCount do
@@ -65,42 +60,55 @@ local function spawnMonsters()
 	end
 end
 
--- ==========================================
--- HARCI ÁLLAPOT FIGYELÉSE
--- ==========================================
 humanoid.HealthChanged:Connect(function(currentHp)
-	-- HP Sáv frissítése
 	if currentHp < 0 then currentHp = 0 end
 	local percent = currentHp / myData.MaxHealth
 	hpBar.Size = UDim2.new(percent, 0, 1, 0)
 	hpText.Text = math.floor(currentHp) .. " / " .. myData.MaxHealth
 
-	-- Ha épp ütötték, frissítjük az utolsó ütés idejét
 	lastHitTime = tick() 
 
-	-- Ha a ciklus még nem fut, elindítjuk
 	if not isActive then
 		isActive = true
 		task.spawn(function()
-			-- Addig fut, amíg a kő él ÉS az utolsó ütés óta nem telt el 5 másodperc
 			while stone and stone.Parent and (tick() - lastHitTime < 5) do
 				task.wait(spawnRate)
 				spawnMonsters()
 			end
-			isActive = false -- Leállt a harc, ciklus vége
+			isActive = false 
 		end)
 	end
 end)
 
--- 3. HALÁL ÉS LOOT
 humanoid.Died:Connect(function()
 	billboard:Destroy()
 
-	-- Loot szóró
+	-- 1. GYILKOS KERESÉSE ELŐRE (A bónuszok miatt)
+	local killer = nil
+	local shortestDist = 50
+
+	for _, player in pairs(game.Players:GetPlayers()) do
+		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+			if dist < shortestDist then shortestDist = dist killer = player end
+		end
+	end
+
+	-- 2. BÓNUSZOK (DUPLA TÁRGY)
+	local dropMultiplier = 1
+	if killer and killer:FindFirstChild("PlayerStats") then
+		local dd = killer.PlayerStats:FindFirstChild("DoubleDrop")
+		if dd and math.random(1, 100) <= dd.Value then
+			dropMultiplier = 2
+		end
+	end
+
+	-- 3. LOOT SZÓRÓ
 	local droppedFolder = workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", workspace)
 	droppedFolder.Name = "DroppedItems"
 
-	local dropCount = math.random(myData.MinDrops, myData.MaxDrops) 
+	-- A Kőnél felszorozzuk a maximum dobható darabszámot a bónusszal!
+	local dropCount = math.random(myData.MinDrops, myData.MaxDrops) * dropMultiplier 
 
 	for i = 1, dropCount do
 		local itemName = myData.LootPool[math.random(1, #myData.LootPool)]
@@ -146,17 +154,7 @@ humanoid.Died:Connect(function()
 		droppedItem.Parent = droppedFolder
 	end
 
-	-- Jutalmazás
-	local killer = nil
-	local shortestDist = 50
-
-	for _, player in pairs(game.Players:GetPlayers()) do
-		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			local dist = (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-			if dist < shortestDist then shortestDist = dist killer = player end
-		end
-	end
-
+	-- 4. JUTALMAZÁS
 	if killer then
 		local stats = killer:FindFirstChild("PlayerStats")
 		if stats and stats:FindFirstChild("Experience") then

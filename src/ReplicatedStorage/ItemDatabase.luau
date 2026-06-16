@@ -32,21 +32,21 @@ local ItemDatabase = {
 		Price = 1, -- Teszt tárgy, nem kerül pénzbe
 
 		-- ALAP STATOK
-		Defense = 0,       -- +10 Páncélzat
-		MaxHealth = 0,     -- +10 Életerő
-		MaxMana = 0,       -- +10 Mana
+		Defense = 1000,       -- +10 Páncélzat
+		MaxHealth = 100,     -- +10 Életerő
+		MaxMana = 100,       -- +10 Mana
 
 		-- BÓNUSZ STATOK
-		StrongVsMetin = 0,   -- +10% Metinkövek ellen
-		StrongVsMonster = 0, -- +10% Szörnyek ellen
+		StrongVsMetin = 100,   -- +10% Metinkövek ellen
+		StrongVsMonster = 100, -- +10% Szörnyek ellen
 		StrongVsPlayer = 0,  -- +10% Ember ellen
 		LifeSteal = 0,       -- 10% Életvarázs
 		CritChance = 0,      -- 10% Kritikus találat
-		DoubleDrop = 0,      -- 10% Dupla Tárgy
-		DoubleGold = 0,      -- 10% Dupla Pénz
+		DoubleDrop = 100,      -- 10% Dupla Tárgy
+		DoubleGold = 100,      -- 10% Dupla Pénz
 		AttackSpeed = 0,     -- +10% Támadási sebesség
 		MovementSpeed = 0,   -- +10% Mozgási sebesség
-		DodgeChance = 100,     -- 10% Kitérés esély
+		DodgeChance = 0,     -- 10% Kitérés esély
 
 		Description = "Egy isteni teszt páncél, ami minden létező statisztikát növel!"
 	},

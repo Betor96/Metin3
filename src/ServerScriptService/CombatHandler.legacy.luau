@@ -42,8 +42,10 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 						isCrit = true
 					end
 
-					-- 2. Szörny / Metinkő / Ember elleni erő
-					if obj.Name == "MetinStone" then
+					-- 2. Szörny / Metinkő / Ember elleni erő JAVÍTÁSA
+					local isMetin = obj:FindFirstChild("MetinStoneLogic") ~= nil
+
+					if isMetin then
 						finalDamage = finalDamage * (1 + (stats.StrongVsMetin.Value / 100))
 					elseif obj:FindFirstChild("IsPlayer") then
 						finalDamage = finalDamage * (1 + (stats.StrongVsPlayer.Value / 100))
@@ -59,7 +61,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 						character.Humanoid.Health = math.min(character.Humanoid.MaxHealth, character.Humanoid.Health + healAmt)
 					end
 
-					-- Sebzés kiosztása és kliens értesítése (ÚJ: isCrit paraméter!)
+					-- Sebzés kiosztása és kliens értesítése
 					targetHum:TakeDamage(finalDamage)
 					ShowDamage:FireAllClients(finalDamage, targetRoot.Position, isCrit, false)
 				end
