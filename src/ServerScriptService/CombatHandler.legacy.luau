@@ -24,12 +24,23 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	-- Erő (STR) bónusz
 	local baseDamage = math.random(minDmg, maxDmg) + (stats.STR.Value * 2)
 
+	-- Ezt a listát tedd be a baseDamage kiszámolása alá!
+	local protectedNPCs = {
+		["Fegyverkereskedo"] = true, 
+		["Pancelkereskedo"] = true, 
+		["Vegyesbolt"] = true, 
+		["Kovacs"] = true, 
+		["Faluose"] = true,
+		["Varosor"] = true
+	}
+
 	for _, obj in pairs(workspace:GetChildren()) do
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
 			local targetHum = obj.Humanoid
 
-			if targetRoot and targetHum.Health > 0 then
+			-- ÚJ: Hozzáadtuk a 'not protectedNPCs[obj.Name]' feltételt!
+			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
 
 				if distance <= 8 then

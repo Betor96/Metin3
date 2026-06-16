@@ -83,35 +83,53 @@ end)
 humanoid.Died:Connect(function()
 	billboard:Destroy()
 
-	-- 1. GYILKOS KERESÉSE ELŐRE (A bónuszok miatt)
 	local killer = nil
 	local shortestDist = 50
 
-	for _, player in pairs(game.Players:GetPlayers()) do
-		if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-			local dist = (rootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-			if dist < shortestDist then shortestDist = dist killer = player end
+	for _, plr in pairs(game.Players:GetPlayers()) do
+		if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+			if dist < shortestDist then shortestDist = dist killer = plr end
 		end
 	end
 
-	-- 2. BÓNUSZOK (DUPLA TÁRGY)
-	local dropMultiplier = 1
+	local doubleDropActive = false
 	if killer and killer:FindFirstChild("PlayerStats") then
 		local dd = killer.PlayerStats:FindFirstChild("DoubleDrop")
-		if dd and math.random(1, 100) <= dd.Value then
-			dropMultiplier = 2
-		end
+		if dd and math.random(1, 100) <= dd.Value then doubleDropActive = true end
 	end
 
-	-- 3. LOOT SZÓRÓ
-	local droppedFolder = workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", workspace)
-	droppedFolder.Name = "DroppedItems"
-
-	-- A Kőnél felszorozzuk a maximum dobható darabszámot a bónusszal!
-	local dropCount = math.random(myData.MinDrops, myData.MaxDrops) * dropMultiplier 
+	-- 1. NORMÁL DROPOK KIGYŰJTÉSE
+	local dropCount = math.random(myData.MinDrops, myData.MaxDrops) 
+	local dropsToSpawn = {}
 
 	for i = 1, dropCount do
 		local itemName = myData.LootPool[math.random(1, #myData.LootPool)]
+		table.insert(dropsToSpawn, itemName)
+	end
+
+	-- 2. DUPLA DROP LOGIKA (Csak 1 db plusz, és csak alapanyag/poti)
+	if doubleDropActive and #dropsToSpawn > 0 then
+		local validForDouble = {}
+		for _, itemName in ipairs(dropsToSpawn) do
+			local itemData = ItemDatabase[itemName]
+			-- Fegyver/Páncél tilos!
+			if itemData and (itemData.Type == "Alapanyag" or itemData.Type == "Fogyóeszköz") then
+				table.insert(validForDouble, itemName)
+			end
+		end
+
+		if #validForDouble > 0 then
+			local randomItemToDouble = validForDouble[math.random(1, #validForDouble)]
+			table.insert(dropsToSpawn, randomItemToDouble) 
+		end
+	end
+
+	-- 3. TÁRGYAK LEDOBÁSA A FÖLDRE
+	local droppedFolder = workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", workspace)
+	droppedFolder.Name = "DroppedItems"
+
+	for _, itemName in ipairs(dropsToSpawn) do
 		local itemData = ItemDatabase[itemName]
 
 		local droppedItem = Instance.new("Part")

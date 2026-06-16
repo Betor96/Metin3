@@ -1,7 +1,7 @@
 -- Fájl helye: StarterPlayer -> StarterPlayerScripts -> EquipmentUIClient
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService") -- EZ HIÁNYZOTT!
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
 local screenGui = Instance.new("ScreenGui")
@@ -11,13 +11,12 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local eqFrame = Instance.new("Frame")
 eqFrame.Size = UDim2.new(0, 260, 0, 360)
--- KÖZÉPRE IGAZÍTÁS BEÁLLÍTÁSAI:
 eqFrame.AnchorPoint = Vector2.new(0.5, 0.5) 
 eqFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 eqFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
 eqFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
 eqFrame.BorderSizePixel = 3
-eqFrame.Active = true -- Felfogja az egérkattintásokat
+eqFrame.Active = true 
 eqFrame.Visible = false
 eqFrame.Parent = screenGui
 
@@ -28,12 +27,10 @@ eqTitle.TextColor3 = Color3.new(1, 1, 1)
 eqTitle.Text = "FELSZERELÉS (E)"
 eqTitle.Font = Enum.Font.GothamBold
 eqTitle.TextSize = 14
-eqTitle.Active = true -- FONTOS
+eqTitle.Active = true 
 eqTitle.Parent = eqFrame
 
--- ==========================================
--- ABLAK MOZGATÁSA CSAK A CÍMSORRÓL
--- ==========================================
+-- Ablak mozgatása
 local draggingEq, dragInputEq, mousePosEq, framePosEq
 
 eqTitle.InputBegan:Connect(function(input)
@@ -99,13 +96,14 @@ createSlot(eqFrame, "Pajzs", 185, 145)
 createSlot(eqFrame, "Karkötő", 185, 195)
 
 -- ==========================================
--- ABLAK ELŐTÉRBE HOZÁSA KATTINTÁSKOR
+-- JAVÍTOTT Z-INDEX KEZELÉS
 -- ==========================================
 eqFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local highest = 0
 		for _, gui in pairs(player.PlayerGui:GetChildren()) do
-			if gui:IsA("ScreenGui") and gui ~= screenGui then
+			-- BIZTONSÁG: A TooltipHUD kivétele a versenyből!
+			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" then
 				if gui.DisplayOrder > highest then
 					highest = gui.DisplayOrder
 				end
@@ -115,9 +113,7 @@ eqFrame.InputBegan:Connect(function(input)
 	end
 end)
 
--- ==========================================
--- BEZÁRÓ "X" GOMB LÉTREHOZÁSA
--- ==========================================
+-- Bezáró gomb
 local eqCloseBtn = Instance.new("TextButton")
 eqCloseBtn.Size = UDim2.new(0, 30, 0, 30)
 eqCloseBtn.Position = UDim2.new(1, -5, 0, 5)
@@ -129,7 +125,7 @@ eqCloseBtn.Text = "X"
 eqCloseBtn.TextColor3 = Color3.new(1, 1, 1)
 eqCloseBtn.Font = Enum.Font.GothamBold
 eqCloseBtn.TextSize = 14
-eqCloseBtn.Parent = eqFrame -- A felszerelés ablakhoz csatoljuk
+eqCloseBtn.Parent = eqFrame 
 
 eqCloseBtn.MouseButton1Click:Connect(function()
 	eqFrame.Visible = false

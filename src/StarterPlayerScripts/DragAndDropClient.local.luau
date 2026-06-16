@@ -180,15 +180,23 @@ local function promptSell(slotName, itemName)
 end
 
 -- ==========================================
--- TOOLTIP RENDSZER
+-- TOOLTIP RENDSZER (KÜLÖN RÉTEGEN)
 -- ==========================================
-local tooltip = Instance.new("Frame", invHud)
+-- 1. Különálló, mindent felülíró réteg létrehozása
+local tooltipGui = Instance.new("ScreenGui")
+tooltipGui.Name = "TooltipHUD"
+tooltipGui.DisplayOrder = 99999 -- Extrém magas érték, soha nem mehet semmi mögé!
+tooltipGui.ResetOnSpawn = false
+tooltipGui.Parent = player:WaitForChild("PlayerGui")
+
+-- 2. A Tooltip ablak
+local tooltip = Instance.new("Frame")
 tooltip.Size = UDim2.new(0, 200, 0, 100)
 tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
 tooltip.BorderSizePixel = 2
-tooltip.ZIndex = 999 
 tooltip.Visible = false
+tooltip.Parent = tooltipGui -- FIX: Ide rakjuk, nem az invHud-ba!
 
 local tooltipTitle = Instance.new("TextLabel", tooltip)
 tooltipTitle.Size = UDim2.new(1, 0, 0, 25)
@@ -206,7 +214,6 @@ tooltipDesc.Font = Enum.Font.Gotham
 tooltipDesc.TextSize = 12
 tooltipDesc.TextWrapped = true
 tooltipDesc.TextYAlignment = Enum.TextYAlignment.Top
-tooltipDesc.ZIndex = 1000
 
 local function updateTooltipPosition()
 	if not tooltip.Visible then return end
@@ -219,6 +226,16 @@ local function updateTooltipPosition()
 	if xPos + tipWidth > viewportSize.X then xPos = mousePos.X - tipWidth - 15 end
 	if yPos + tipHeight > viewportSize.Y then yPos = mousePos.Y - inset.Y - tipHeight - 15 end
 	tooltip.Position = UDim2.new(0, xPos, 0, yPos)
+end
+RunService.RenderStepped:Connect(updateTooltipPosition)
+
+local function getTooltipText(itemName)
+	local data = ItemDatabase[itemName]
+	if not data then return "Nincs információ erről a tárgyról." end
+	local text = ""
+	if data.Type == "Fegyver" then text = "Szint: " .. (data.Level or 1) .. "\nSebzés: " .. (data.MinDmg or 0) .. " - " .. (data.MaxDmg or 0) .. "\n\n"
+	elseif data.Type == "Páncél" then text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n" end
+	return text .. (data.Description or "")
 end
 RunService.RenderStepped:Connect(updateTooltipPosition)
 

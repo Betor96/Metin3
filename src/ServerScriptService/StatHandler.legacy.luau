@@ -47,9 +47,9 @@ local function recalculateStats(player)
 	stats.StrongVsMonster.Value = bMonst
 	stats.StrongVsPlayer.Value = bHum
 	stats.LifeSteal.Value = bLs
-
-	-- DEX adja a kritikus esélyt (Minden 5 DEX = +1% Crit)
-	stats.CritChance.Value = math.clamp(math.floor(dex / 5) + bCrit, 0, 100) 
+	
+	-- DEX adja a kritikus esélyt (Minden 10 DEX = +1% Crit, azaz 0.1/pont)
+	stats.CritChance.Value = math.clamp(math.floor(dex / 10) + bCrit, 0, 100)
 
 	stats.DoubleDrop.Value = bDD
 	stats.DoubleGold.Value = bDG

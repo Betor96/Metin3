@@ -12,6 +12,7 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 local MeleeAttack = Events:WaitForChild("MeleeAttack")
 
 local currentTarget = nil
+local walkToNPC = nil
 local ATTACK_RANGE = 6
 
 -- ==========================================
@@ -62,12 +63,27 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			if model and model:FindFirstChild("Humanoid") and model ~= player.Character then
 				if protectedNPCs[model.Name] then
 					currentTarget = nil
-					player.Character.Humanoid:MoveTo(hitPos)
+					-- ÚJ LOGIKA: Ha NPC-re kattintunk
+					local myRoot = player.Character:FindFirstChild("HumanoidRootPart")
+					if myRoot then
+						local dist = (myRoot.Position - model:GetPivot().Position).Magnitude
+						if dist > 12 then
+							-- Ha messze vagyunk, elindulunk felé
+							walkToNPC = model
+							player.Character.Humanoid:MoveTo(model:GetPivot().Position)
+						else
+							-- Ha elég közel vagyunk, AZONNAL MEGÁLLUNK!
+							walkToNPC = nil
+							player.Character.Humanoid:MoveTo(myRoot.Position)
+						end
+					end
 				else
 					currentTarget = model
+					walkToNPC = nil
 				end
 			else
 				currentTarget = nil
+				walkToNPC = nil
 				if player.Character and player.Character:FindFirstChild("Humanoid") then
 					player.Character.Humanoid:MoveTo(hitPos)
 				end
@@ -77,25 +93,24 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ==========================================
--- GOMB Elengedése
+-- GOMB Elengedése és Alt-Tab javítás
 -- ==========================================
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
-	-- Ha ELENGEDJÜK a Space-t
 	if input.KeyCode == Enum.KeyCode.Space then
 		isHoldingSpace = false
-
-		-- Mozgás visszaadása (Visszaállítjuk 16-ra)
 		if player.Character and player.Character:FindFirstChild("Humanoid") then
-			player.Character.Humanoid.WalkSpeed = originalWalkSpeed
+			-- ÚJ: Kiszámoljuk az aktuális bónuszos sebességet!
+			local msBonus = player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("MovementSpeed") and player.PlayerStats.MovementSpeed.Value or 0
+			player.Character.Humanoid.WalkSpeed = 16 * (1 + (msBonus / 100))
 		end
 	end
 end)
 
--- BIZTONSÁG: Ha lenyomva tartod a Space-t, de közben lekattintasz a játékról (Alt-Tab)
 UserInputService.WindowFocusReleased:Connect(function()
 	isHoldingSpace = false
 	if player.Character and player.Character:FindFirstChild("Humanoid") then
-		player.Character.Humanoid.WalkSpeed = originalWalkSpeed
+		local msBonus = player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("MovementSpeed") and player.PlayerStats.MovementSpeed.Value or 0
+		player.Character.Humanoid.WalkSpeed = 16 * (1 + (msBonus / 100))
 	end
 end)
 
@@ -104,6 +119,22 @@ end)
 -- ==========================================
 RunService.Heartbeat:Connect(function()
 	-- ÚJ: Attack Speed beolvasása a statokból
+	
+	-- ÚJ: NPC-hez sétálás megállítása, ha elértük a távolságot!
+	if walkToNPC and walkToNPC.Parent then
+		local character = player.Character
+		if character and character:FindFirstChild("HumanoidRootPart") then
+			local myRoot = character.HumanoidRootPart
+			local dist = (myRoot.Position - walkToNPC:GetPivot().Position).Magnitude
+
+			if dist <= 12 then
+				-- Elértük az NPC-t, satufék!
+				character.Humanoid:MoveTo(myRoot.Position)
+				walkToNPC = nil
+			end
+		end
+	end
+	
 	local atkSpeedBonus = 0
 	if player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("AttackSpeed") then
 		atkSpeedBonus = player.PlayerStats.AttackSpeed.Value

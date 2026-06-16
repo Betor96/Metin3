@@ -50,9 +50,9 @@ local MonsterDatabase = {
 		SpawnCountMin = 2,
 		SpawnCountMax = 4,
 		-- Milyen tárgyakat szórjon szét, ha megsemmisül?
-		LootPool = {"Kezdőkard", "Vadfarkas Páncél"},
+		LootPool = {"Kezdőkard"},
 		MinDrops = 1,
-		MaxDrops = 3
+		MaxDrops = 1
 	},
 
 	["Fekete Metin Kő"] = {

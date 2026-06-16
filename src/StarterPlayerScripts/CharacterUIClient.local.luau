@@ -28,7 +28,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 40)
 titleLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
-titleLabel.Text = "KARAKTER"
+titleLabel.Text = "KARAKTER (C)"
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
 titleLabel.Active = true 
@@ -67,6 +67,21 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 -- ==========================================
+-- JAVÍTOTT Z-INDEX KEZELÉS (ÚJ IDE IS!)
+-- ==========================================
+mainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		local highest = 0
+		for _, gui in pairs(player.PlayerGui:GetChildren()) do
+			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" then
+				if gui.DisplayOrder > highest then highest = gui.DisplayOrder end
+			end
+		end
+		screenGui.DisplayOrder = highest + 1
+	end
+end)
+
+-- ==========================================
 -- OLDALAK (PAGES) LÉTREHOZÁSA
 -- ==========================================
 local page1 = Instance.new("Frame", mainFrame)
@@ -94,9 +109,7 @@ togglePageBtn.MouseButton1Click:Connect(function()
 	togglePageBtn.Text = page1.Visible and "Bónuszok mutatása >>>" or "<<< Vissza az Alapokhoz"
 end)
 
--- ==========================================
 -- 1. OLDAL (ALAP STATOK)
--- ==========================================
 local pointsLabel = Instance.new("TextLabel", page1)
 pointsLabel.Size = UDim2.new(1, 0, 0, 30)
 pointsLabel.BackgroundTransparency = 1
@@ -143,15 +156,12 @@ local intValue = createBaseStatRow("INT", "INT (Mágia):", 80)
 local strValue = createBaseStatRow("STR", "STR (Erő):", 120)
 local dexValue = createBaseStatRow("DEX", "DEX (Ügyesség):", 160)
 
--- ==========================================
 -- 2. OLDAL (BÓNUSZOK)
--- ==========================================
 local layout2 = Instance.new("UIListLayout", page2)
 layout2.Padding = UDim.new(0, 5)
 layout2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local bonusLabels = {}
-
 local function createBonusRow(statName, displayName, suffix)
 	local row = Instance.new("Frame", page2)
 	row.Size = UDim2.new(1, -20, 0, 20)
@@ -191,9 +201,7 @@ createBonusRow("DodgeChance", "Kitérési esély:", "%")
 createBonusRow("DoubleDrop", "Dupla tárgydobás esélye:", "%")
 createBonusRow("DoubleGold", "Dupla pénz esélye:", "%")
 
--- ==========================================
 -- FRISSÍTÉS
--- ==========================================
 local function updateUI()
 	if not stats then return end
 	pointsLabel.Text = "Elosztható pontok: " .. (stats:FindFirstChild("StatPoints") and stats.StatPoints.Value or 0)

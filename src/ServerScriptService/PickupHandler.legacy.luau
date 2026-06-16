@@ -2,11 +2,9 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local PickupItems = ReplicatedStorage.Events:WaitForChild("PickupItems")
-
--- ÚJ: BEKÖTJÜK AZ ADATBÁZIST A STACKELÉSHEZ (Darabszámok miatt)
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
-local PICKUP_RADIUS = 15 -- Milyen messziről szívja be a tárgyakat
+local PICKUP_RADIUS = 15 
 
 PickupItems.OnServerEvent:Connect(function(player)
 	local character = player.Character
@@ -15,76 +13,66 @@ PickupItems.OnServerEvent:Connect(function(player)
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
 	local inv = player:FindFirstChild("Inventory")
 	local droppedFolder = workspace:FindFirstChild("DroppedItems")
+	local stats = player:FindFirstChild("PlayerStats")
 
-	if not rootPart or not inv or not droppedFolder then return end
+	if not rootPart or not inv or not droppedFolder or not stats then return end
 
-	-- Végigmegyünk a földön lévő összes tárgyon
+	-- ÚJ: Kiszámoljuk hány hely van feloldva (pl. 2. oldal = 64 hely)
+	local maxUnlockedSlots = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+
 	for _, itemPart in pairs(droppedFolder:GetChildren()) do
 		local dist = (itemPart.Position - rootPart.Position).Magnitude
 
-		-- Ha a sugarunkon belül van
 		if dist <= PICKUP_RADIUS then
 			local itemTag = itemPart:FindFirstChild("ItemName")
 			if itemTag then
-				local added = false
 				local itemName = itemTag.Value
-
-				-- Lekérjük, hogy max mennyi lehet belőle egy kupacban (ha nincs megadva, akkor csak 1)
 				local itemData = ItemDatabase[itemName]
 				local maxStack = (itemData and itemData.MaxStack) or 1
 
-				-- A maxStack ellenőrzés után így nézzen ki:
-				local stats = player:FindFirstChild("PlayerStats")
-				local maxUnlockedSlots = (stats and stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+				-- ÚJ: Kiolvassuk, hogy a földön lévő kupacban mennyi tárgy van!
+				local amtTag = itemPart:FindFirstChild("ItemAmount")
+				local dropAmount = amtTag and amtTag.Value or 1
 
-				-- 1. ELŐSZÖR PRÓBÁLJUK MEGLÉVŐ STACK-HEZ ADNI
+				-- 1. STACKELÉS (Létező kupacba rakás)
 				if maxStack > 1 then
 					for i = 1, maxUnlockedSlots do
 						local slot = inv:FindFirstChild("Slot_" .. i)
-						-- [...] (A többi része marad ugyanaz)
 						if slot and slot.Value == itemName then
 							local amt = slot:FindFirstChild("Amount")
-							-- Ha van már ilyen tárgy, és még fér a stackbe
 							if amt and amt.Value < maxStack then
-								amt.Value = amt.Value + 1
-								added = true
-								itemPart:Destroy()
-								-- print(player.Name .. " felvett +1 darabot ebből: " .. itemName)
-								break
+								-- Kiszámoljuk mennyi fér még be
+								local spaceLeft = maxStack - amt.Value
+								local transfer = math.min(dropAmount, spaceLeft)
+
+								amt.Value = amt.Value + transfer
+								dropAmount = dropAmount - transfer
+
+								if dropAmount <= 0 then
+									itemPart:Destroy()
+									break
+								end
 							end
 						end
 					end
 				end
 
-				-- ==========================================
-				-- 2. HA NINCS STACK, VAGY TELE VAN, KERESÜNK ÜRES HELYET
-				-- ==========================================
-				if not added then
-					for i = 1, 8 do
+				-- 2. ÜRES HELY KERESÉSE (Ha még maradt a kupacból)
+				if dropAmount > 0 then
+					for i = 1, maxUnlockedSlots do
 						local slot = inv:FindFirstChild("Slot_" .. i)
 						if slot and slot.Value == "" then
 							slot.Value = itemName
-
 							local amt = slot:FindFirstChild("Amount")
 							if amt then
-								amt.Value = 1
+								amt.Value = dropAmount
 							end
 
-							added = true
+							dropAmount = 0
 							itemPart:Destroy()
-							-- print(player.Name .. " felvette: " .. itemName)
-							break -- Megvan a hely, jöhet a következő tárgy a földről!
+							break 
 						end
 					end
-				end
-
-				-- ==========================================
-				-- 3. HA EGYÁLTALÁN NEM FÉRT BE SEHOVA
-				-- ==========================================
-				if not added then
-					-- Nem adunk "break"-et, mert lehet, hogy a következő tárgy a földön 
-					-- egy stackelhető Poti lesz, amiből van helyünk!
-					-- print(player.Name .. " táskájába nem fért be: " .. itemName)
 				end
 			end
 		end

@@ -1,35 +1,76 @@
--- Fájl helye: StarterPlayer -> StarterPlayerScripts -> DialogueClient
+-- Fájl helye: StarterPlayerScripts -> DialogueClient
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService") -- ÚJ: Folyamatos távolságméréshez
-local Events = ReplicatedStorage:WaitForChild("Events")
-local AcceptQuest = Events:WaitForChild("AcceptQuest")
-local TurnInQuest = Events:WaitForChild("TurnInQuest")
-
-local QuestDatabase = require(ReplicatedStorage:WaitForChild("QuestDatabase"))
-local NPCDatabase = require(ReplicatedStorage:WaitForChild("NPCDatabase"))
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local mouse = player:GetMouse()
+local Events = ReplicatedStorage:WaitForChild("Events")
+local AcceptQuest = Events:WaitForChild("AcceptQuest")
+local CompleteQuest = Events:WaitForChild("CompleteQuest")
+local QuestDatabase = require(ReplicatedStorage:WaitForChild("QuestDatabase"))
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DialogueHUD"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
+-- GUI Létrehozása
+local gui = Instance.new("ScreenGui")
+gui.Name = "DialogueHUD"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local dialogFrame = Instance.new("Frame")
+-- ==========================================
+-- 1. ABLAK: KÜLDETÉS LISTA (Középen)
+-- ==========================================
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Size = UDim2.new(0, 350, 0, 450)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
+mainFrame.BorderSizePixel = 3
+mainFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
+mainFrame.Visible = false
+mainFrame.Active = true
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -5, 0, 5)
+closeBtn.AnchorPoint = Vector2.new(1, 0)
+closeBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Text = "X"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+
+local scroll = Instance.new("ScrollingFrame", mainFrame)
+scroll.Size = UDim2.new(1, -20, 1, -60)
+scroll.Position = UDim2.new(0, 10, 0, 50)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 6
+local layout = Instance.new("UIListLayout", scroll)
+layout.Padding = UDim.new(0, 10)
+
+-- ==========================================
+-- 2. ABLAK: PÁRBESZÉD ABLAK (Képernyő alján)
+-- ==========================================
+local dialogFrame = Instance.new("Frame", gui)
 dialogFrame.Size = UDim2.new(0, 600, 0, 150)
 dialogFrame.AnchorPoint = Vector2.new(0.5, 1) 
-dialogFrame.Position = UDim2.new(0.5, 0, 1, -100) 
+dialogFrame.Position = UDim2.new(0.5, 0, 1, -50) 
 dialogFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 dialogFrame.BackgroundTransparency = 0.1
 dialogFrame.BorderColor3 = Color3.fromRGB(180, 150, 80)
 dialogFrame.BorderSizePixel = 3
 dialogFrame.Visible = false
-dialogFrame.Parent = screenGui
+dialogFrame.Active = true
 
-local npcNameText = Instance.new("TextLabel")
+local npcNameText = Instance.new("TextLabel", dialogFrame)
 npcNameText.Size = UDim2.new(1, -20, 0, 30)
 npcNameText.Position = UDim2.new(0, 10, 0, 5)
 npcNameText.BackgroundTransparency = 1
@@ -37,9 +78,8 @@ npcNameText.TextColor3 = Color3.fromRGB(255, 215, 0)
 npcNameText.Font = Enum.Font.GothamBlack
 npcNameText.TextSize = 18
 npcNameText.TextXAlignment = Enum.TextXAlignment.Left
-npcNameText.Parent = dialogFrame
 
-local dialogText = Instance.new("TextLabel")
+local dialogText = Instance.new("TextLabel", dialogFrame)
 dialogText.Size = UDim2.new(1, -40, 1, -80)
 dialogText.Position = UDim2.new(0, 20, 0, 40)
 dialogText.BackgroundTransparency = 1
@@ -49,184 +89,243 @@ dialogText.TextSize = 16
 dialogText.TextWrapped = true
 dialogText.TextXAlignment = Enum.TextXAlignment.Left
 dialogText.TextYAlignment = Enum.TextYAlignment.Top
-dialogText.Parent = dialogFrame
 
-local buttonContainer = Instance.new("Frame")
+local buttonContainer = Instance.new("Frame", dialogFrame)
 buttonContainer.Size = UDim2.new(1, -20, 0, 40)
 buttonContainer.Position = UDim2.new(0, 10, 1, -45)
 buttonContainer.BackgroundTransparency = 1
-buttonContainer.Parent = dialogFrame
 
-local uiListLayout = Instance.new("UIListLayout")
+local uiListLayout = Instance.new("UIListLayout", buttonContainer)
 uiListLayout.FillDirection = Enum.FillDirection.Horizontal
 uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 uiListLayout.Padding = UDim.new(0, 10)
-uiListLayout.Parent = buttonContainer
 
-local questTracker = Instance.new("Frame")
-questTracker.Size = UDim2.new(0, 250, 0, 80)
-questTracker.AnchorPoint = Vector2.new(0, 0) 
-questTracker.Position = UDim2.new(0, 20, 0, 20) 
-questTracker.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-questTracker.BackgroundTransparency = 0.3
-questTracker.BorderColor3 = Color3.fromRGB(100, 80, 40)
-questTracker.BorderSizePixel = 2
-questTracker.Visible = false
-questTracker.Parent = screenGui
-
-local trackerTitle = Instance.new("TextLabel")
-trackerTitle.Size = UDim2.new(1, 0, 0, 25)
-trackerTitle.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
-trackerTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
-trackerTitle.Text = " Küldetés"
-trackerTitle.Font = Enum.Font.GothamBold
-trackerTitle.TextSize = 14
-trackerTitle.TextXAlignment = Enum.TextXAlignment.Left
-trackerTitle.Parent = questTracker
-
-local trackerInfo = Instance.new("TextLabel")
-trackerInfo.Size = UDim2.new(1, -10, 1, -30)
-trackerInfo.Position = UDim2.new(0, 5, 0, 30)
-trackerInfo.BackgroundTransparency = 1
-trackerInfo.TextColor3 = Color3.new(1, 1, 1)
-trackerInfo.Font = Enum.Font.Gotham
-trackerInfo.TextSize = 13
-trackerInfo.TextWrapped = true
-trackerInfo.TextXAlignment = Enum.TextXAlignment.Left
-trackerInfo.TextYAlignment = Enum.TextYAlignment.Top
-trackerInfo.Parent = questTracker
 
 -- ==========================================
--- ÚJ: TÁVOLSÁGMÉRÉS VÁLTOZÓI
+-- LOGIKA
 -- ==========================================
+-- Védett NPC-k listája (CSAK A KÜLDETÉS NPC-K MARADTAK!)
+local protectedNPCs = {
+	["Kovacs"] = true, 
+	["Faluose"] = true,
+	["Varosor"] = true
+}
+
 local currentInteractNPC = nil
-local MAX_INTERACT_DISTANCE = 15
 
-local function updateQuestTracker()
-	local quests = player:WaitForChild("Quests")
-	local activeQuestFound = false
+-- Megmutatja az alsó beszélgető ablakot
+local function showConversation(npcName, text, options)
+	mainFrame.Visible = false -- Eltüntetjük a listát
+	dialogFrame.Visible = true -- Hozzuk az alsó ablakot
 
-	for _, qVal in pairs(quests:GetChildren()) do
-		local qData = QuestDatabase[qVal.Name]
-		if qData and qVal.Value >= 0 and qVal.Value <= qData.Count then
-			activeQuestFound = true
-			questTracker.Visible = true
-
-			if qVal.Value < qData.Count then
-				trackerInfo.Text = qData.Title .. "\nÖlj meg " .. qData.Count .. " " .. qData.Target .. "-t!\nÁllapot: " .. qVal.Value .. " / " .. qData.Count
-				trackerInfo.TextColor3 = Color3.new(1, 1, 1)
-			else
-				trackerInfo.Text = qData.Title .. "\nÁllapot: KÉSZ!\nBeszélj az NPC-vel."
-				trackerInfo.TextColor3 = Color3.fromRGB(100, 255, 100)
-			end
-			break
-		end
-	end
-
-	if not activeQuestFound then questTracker.Visible = false end
-end
-
-local function showDialogue(name, text, options)
-	npcNameText.Text = name
+	npcNameText.Text = npcName
 	dialogText.Text = text
 
+	-- Töröljük a régi válasz gombokat
 	for _, child in pairs(buttonContainer:GetChildren()) do
 		if child:IsA("TextButton") then child:Destroy() end
 	end
 
+	-- Létrehozzuk az új válaszokat (Elfogad / Lead)
 	for _, opt in ipairs(options) do
-		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(0, 120, 1, 0)
+		local btn = Instance.new("TextButton", buttonContainer)
+		btn.Size = UDim2.new(0, 150, 1, 0)
 		btn.BackgroundColor3 = Color3.fromRGB(40, 50, 60)
 		btn.TextColor3 = Color3.new(1, 1, 1)
 		btn.Font = Enum.Font.GothamBold
 		btn.TextSize = 14
 		btn.Text = opt.Text
-		btn.Parent = buttonContainer
 
 		btn.MouseButton1Click:Connect(function()
 			if opt.Action then opt.Action() end
 			dialogFrame.Visible = false
-			currentInteractNPC = nil -- Töröljük a fókuszt
 		end)
 	end
-	dialogFrame.Visible = true
 end
 
-local function setupNPCs()
-	for npcPartName, npcData in pairs(NPCDatabase) do
-		local npc = workspace:FindFirstChild(npcPartName)
-		if npc and npc:FindFirstChildOfClass("ClickDetector") then
+-- Megmutatja a középső Küldetés Listát
+local function openDialogueList(npcName)
+	title.Text = npcName
+	dialogFrame.Visible = false
 
-			npc.ClickDetector.MouseClick:Connect(function()
-				-- ÚJ: Csak akkor nyitja meg, ha elég közel vagyunk!
-				local char = player.Character
-				if char and char:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("HumanoidRootPart") then
-					local dist = (char.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
-					if dist > MAX_INTERACT_DISTANCE then return end -- Túl messze van!
-				end
-
-				currentInteractNPC = npc -- Eltároljuk, kivel beszélünk épp
-
-				if npcData.Type == "Regular" then
-					local lines = npcData.Dialogues
-					local randomLine = lines[math.random(1, #lines)] 
-					showDialogue(npcData.Name, randomLine, {{Text = "Bezár", Action = function() end}})
-
-				elseif npcData.Type == "QuestGiver" then
-					local questName = npcData.QuestName
-					local qVal = player.Quests:FindFirstChild(questName)
-					local qData = QuestDatabase[questName]
-
-					if qVal and qData then
-						if qVal.Value == -1 then
-							local rewardText = string.format("\n\nJutalom: %d EXP, %d Pénz", qData.Rewards.Exp, qData.Rewards.Gold)
-							if qData.Rewards.Item then rewardText = rewardText .. ", " .. qData.Rewards.Item end
-
-							showDialogue(npcData.Name, npcData.Dialogues.NotStarted .. rewardText, {
-								{Text = "Elfogadom", Action = function() AcceptQuest:FireServer(questName) task.wait(0.2) updateQuestTracker() end},
-								{Text = "Mégse", Action = function() end}
-							})
-						elseif qVal.Value >= 0 and qVal.Value < qData.Count then
-							showDialogue(npcData.Name, npcData.Dialogues.InProgress, {{Text = "Rendben", Action = function() end}})
-						elseif qVal.Value == qData.Count then
-							showDialogue(npcData.Name, npcData.Dialogues.ReadyToTurnIn, {
-								{Text = "Jutalom átvétele", Action = function() TurnInQuest:FireServer(questName) task.wait(0.2) updateQuestTracker() end}
-							})
-						elseif qVal.Value == 9999 then
-							showDialogue(npcData.Name, npcData.Dialogues.Completed, {{Text = "Viszlát", Action = function() end}})
-						end
-					end
-				end
-			end)
+	-- JAVÍTÁS: Törlünk MINDENT (Frame-eket és Szövegeket is), kivéve a beállító Layout-ot!
+	for _, c in pairs(scroll:GetChildren()) do
+		if not c:IsA("UIListLayout") then 
+			c:Destroy() 
 		end
 	end
+
+	local pLevel = 1
+	if player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("Level") then
+		pLevel = player.PlayerStats.Level.Value
+	end
+
+	local activeQuests = player:FindFirstChild("Quests")
+	local completedQuests = player:FindFirstChild("CompletedQuests")
+	local hasAny = false
+
+	for qName, qData in pairs(QuestDatabase) do
+		local minLvl = qData.MinLevel or 1
+		local maxLvl = minLvl + 10 
+
+		local isCompleted = completedQuests and completedQuests:FindFirstChild(qName)
+		local isActive = activeQuests and activeQuests:FindFirstChild(qName)
+
+		if isCompleted and not qData.IsRepeatable then continue end
+		if not isActive and (pLevel < minLvl or pLevel > maxLvl) then continue end
+
+		local showQuest = false
+		local buttonText = ""
+		local btnColor = Color3.fromRGB(120, 90, 30)
+		local isCompleteAction = false
+		local isAcceptAction = false
+		local isClickable = true
+
+		if qData.GiverNPC == npcName then
+			if not isActive then
+				showQuest = true
+				isAcceptAction = true
+				buttonText = "KÜLDETÉS FELVÉTELE"
+				btnColor = Color3.fromRGB(120, 90, 30)
+			else
+				if qData.Type == "Talk" then
+					showQuest = true
+					isClickable = false
+					buttonText = "FOLYAMATBAN (Irány: " .. qData.TargetNPC .. ")"
+					btnColor = Color3.fromRGB(80, 80, 80)
+				else
+					showQuest = true
+					isCompleteAction = true
+					buttonText = "KÜLDETÉS LEADÁSA"
+					btnColor = Color3.fromRGB(40, 120, 40)
+				end
+			end
+
+		elseif qData.TargetNPC == npcName and isActive and qData.Type == "Talk" then
+			showQuest = true
+			isCompleteAction = true
+			buttonText = "KÜLDETÉS TELJESÍTÉSE"
+			btnColor = Color3.fromRGB(40, 120, 40)
+		end
+
+		if showQuest then
+			hasAny = true
+
+			local qFrame = Instance.new("Frame", scroll)
+			qFrame.Size = UDim2.new(1, -10, 0, 110)
+			qFrame.BackgroundColor3 = Color3.fromRGB(35, 30, 30)
+			qFrame.BorderSizePixel = 1
+			qFrame.BorderColor3 = Color3.fromRGB(100, 80, 50)
+
+			local qTitle = Instance.new("TextLabel", qFrame)
+			qTitle.Size = UDim2.new(1, -10, 0, 20)
+			qTitle.Position = UDim2.new(0, 5, 0, 5)
+			qTitle.BackgroundTransparency = 1
+			qTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
+			qTitle.Font = Enum.Font.GothamBold
+			qTitle.Text = qName .. " (Szint: " .. minLvl .. "-" .. maxLvl .. ")"
+			qTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+			local qDesc = Instance.new("TextLabel", qFrame)
+			qDesc.Size = UDim2.new(1, -10, 0, 40)
+			qDesc.Position = UDim2.new(0, 5, 0, 30)
+			qDesc.BackgroundTransparency = 1
+			qDesc.TextColor3 = Color3.new(1, 1, 1)
+			qDesc.Font = Enum.Font.Gotham
+			qDesc.TextSize = 12
+			qDesc.TextWrapped = true
+			qDesc.TextXAlignment = Enum.TextXAlignment.Left
+			qDesc.TextYAlignment = Enum.TextYAlignment.Top
+			qDesc.Text = qData.Description
+
+			local qBtn = Instance.new("TextButton", qFrame)
+			qBtn.Size = UDim2.new(1, -10, 0, 30)
+			qBtn.Position = UDim2.new(0, 5, 0, 75)
+			qBtn.Font = Enum.Font.GothamBold
+			qBtn.BackgroundColor3 = btnColor
+			qBtn.TextColor3 = Color3.new(1, 1, 1)
+			qBtn.Text = buttonText
+			qBtn.Active = isClickable
+
+			if isClickable then
+				qBtn.MouseButton1Click:Connect(function()
+					-- HA FELVESZI: Alsó ablak megnyitása
+					if isAcceptAction then
+						local text = qData.AcceptText or qData.Description
+						showConversation(npcName, text, {
+							{Text = "Elfogadom", Action = function() AcceptQuest:FireServer(qName) end},
+							{Text = "Mégse", Action = function() dialogFrame.Visible = false mainFrame.Visible = true end}
+						})
+
+						-- HA LEADJA: Alsó ablak megnyitása
+					elseif isCompleteAction then
+						local text = qData.CompleteText or "Köszönöm a segítséged! Itt a jutalmad."
+						showConversation(npcName, text, {
+							{Text = "Jutalom átvétele", Action = function() CompleteQuest:FireServer(qName) end}
+						})
+					end
+				end)
+			end
+		end
+	end
+
+	if not hasAny then
+		local msg = Instance.new("TextLabel", scroll)
+		msg.Size = UDim2.new(1, 0, 0, 50)
+		msg.BackgroundTransparency = 1
+		msg.TextColor3 = Color3.new(1, 1, 1)
+		msg.Font = Enum.Font.Gotham
+		msg.Text = "Nincs számodra elérhető küldetés."
+	end
+
+	scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+	mainFrame.Visible = true
+
+	local highest = 0
+	for _, g in pairs(player.PlayerGui:GetChildren()) do
+		if g:IsA("ScreenGui") and g ~= gui and g.Name ~= "TooltipHUD" then
+			if g.DisplayOrder > highest then highest = g.DisplayOrder end
+		end
+	end
+	gui.DisplayOrder = highest + 1
 end
 
--- ==========================================
--- ÚJ: FOLYAMATOS TÁVOLSÁG ELLENŐRZÉS (Párbeszéd bezárása)
--- ==========================================
+-- Kattintás érzékelése a 3D világban
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		local target = mouse.Target
+		if target then
+			local model = target:FindFirstAncestorOfClass("Model")
+			if model and protectedNPCs[model.Name] then
+				local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+				if myRoot then
+					local dist = (myRoot.Position - model:GetPivot().Position).Magnitude
+					if dist <= 12 then
+						currentInteractNPC = model
+						openDialogueList(model.Name)
+					end
+				end
+			end
+		end
+	end
+end)
+
+-- Ha elsétál az NPC-től, zárjon be minden ablakot!
 RunService.Heartbeat:Connect(function()
-	if dialogFrame.Visible and currentInteractNPC then
+	if (mainFrame.Visible or dialogFrame.Visible) and currentInteractNPC then
 		local char = player.Character
 		if char and char:FindFirstChild("HumanoidRootPart") and currentInteractNPC:FindFirstChild("HumanoidRootPart") then
 			local dist = (char.HumanoidRootPart.Position - currentInteractNPC.HumanoidRootPart.Position).Magnitude
-			if dist > MAX_INTERACT_DISTANCE then
-				dialogFrame.Visible = false -- Ha túl messze mész, rácsapja az ablakot!
+			if dist > 15 then
+				mainFrame.Visible = false
+				dialogFrame.Visible = false
 				currentInteractNPC = nil
 			end
 		else
+			mainFrame.Visible = false
 			dialogFrame.Visible = false
 			currentInteractNPC = nil
 		end
 	end
 end)
-
-player:WaitForChild("Quests")
-for _, qVal in pairs(player.Quests:GetChildren()) do qVal.Changed:Connect(updateQuestTracker) end
-updateQuestTracker()
-
-workspace.ChildAdded:Connect(function(child)
-	if NPCDatabase[child.Name] then task.wait(0.5) setupNPCs() end
-end)
-setupNPCs()

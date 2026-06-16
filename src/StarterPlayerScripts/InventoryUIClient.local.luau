@@ -11,7 +11,6 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local invFrame = Instance.new("Frame")
 invFrame.Name = "MainFrame" 
--- FIX: 520 pixel magas, hogy minden (Rekeszek, Lapozó, Pénz) tökéletesen elférjen egymás alatt!
 invFrame.Size = UDim2.new(0, 220, 0, 520) 
 invFrame.AnchorPoint = Vector2.new(1, 0.5)
 invFrame.Position = UDim2.new(0.95, 0, 0.5, 0)
@@ -56,7 +55,7 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Pénz kijelző (A legalsó sorban: Y = 480)
+-- Pénz kijelző
 local goldContainer = Instance.new("Frame")
 goldContainer.Name = "GoldContainer"
 goldContainer.Size = UDim2.new(1, -20, 0, 30)
@@ -86,12 +85,15 @@ end
 goldStat.Changed:Connect(updateGold)
 updateGold() 
 
--- Z-Index kezelés (Kattintásra előtérbe jön)
+-- ==========================================
+-- JAVÍTOTT Z-INDEX KEZELÉS (Kattintásra előtérbe jön)
+-- ==========================================
 invFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local highest = 0
 		for _, gui in pairs(player.PlayerGui:GetChildren()) do
-			if gui:IsA("ScreenGui") and gui ~= screenGui then
+			-- BIZTONSÁG: A TooltipHUD-ot szigorúan figyelmen kívül hagyjuk!
+			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" then
 				if gui.DisplayOrder > highest then highest = gui.DisplayOrder end
 			end
 		end
