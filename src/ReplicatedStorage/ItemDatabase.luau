@@ -82,6 +82,22 @@ local ItemDatabase = {
 	-- ITALOK ÉS ALAPANYAGOK (Ezek maradnak ahogy voltak)
 	["Életerő Ital"] = { Type = "Fogyóeszköz", HealAmount = 50, Price = 20, MaxStack = 200 },
 	["Mana Ital"] = { Type = "Fogyóeszköz", HealAmount = 50, Price = 20, MaxStack = 200 },
-	["Kutya Fog"] = { Type = "Alapanyag", Price = 5, MaxStack = 50 }
+	["Kutya Fog"] = { Type = "Alapanyag", Price = 5, MaxStack = 50 },
+	["Zöld Ital"] = { 
+		Type = "Fogyóeszköz", 
+		Price = 100, 
+		MaxStack = 50,
+		Effect = "MovementSpeed", -- Ezt fogja megnövelni
+		Value = 50,               -- +50 Sebesség
+		Duration = 10             -- 10 másodperc (direkt rövidre állítva a teszthez!)
+	},
+	["Ügyesség itala"] = { 
+		Type = "Fogyóeszköz", 
+		Price = 100, 
+		MaxStack = 50,
+		Effect = "AttackSpeed", -- Ezt fogja megnövelni
+		Value = 50,               -- +50 Sebesség
+		Duration = 10             -- 10 másodperc (direkt rövidre állítva a teszthez!)
+	}
 }
 return ItemDatabase

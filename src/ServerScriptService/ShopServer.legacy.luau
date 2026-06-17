@@ -30,7 +30,18 @@ BuyItem.OnServerEvent:Connect(function(player, itemName)
 		local maxStack = itemData.MaxStack or 1
 
 		-- Keresünk nem teli stacket (az 1, 8 helyett maxUnlockedSlots legyen!)
+		-- Keresés az összes elérhető slotban
 		local maxUnlockedSlots = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+
+		if not targetSlot then
+			for i = 1, maxUnlockedSlots do -- A 8 helyett a maxUnlockedSlots változót használjuk
+				local slot = inv:FindFirstChild("Slot_" .. i)
+				if slot and slot.Value == "" then
+					targetSlot = slot
+					break
+				end
+			end
+		end
 
 		if maxStack > 1 then
 			for i = 1, maxUnlockedSlots do
