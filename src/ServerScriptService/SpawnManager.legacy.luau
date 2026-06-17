@@ -43,15 +43,20 @@ local function getRandomGroundPosition(zonePart)
 	end
 end
 
+local HttpService = game:GetService("HttpService")
+
 local function spawnPack(zoneName, zoneData, zonePart)
 	local centerPos = getRandomGroundPosition(zonePart)
 	local aliveCount = #zoneData.Pack
 	local spawnedEntities = {}
 
+	local packID = HttpService:GenerateGUID(false)
+
 	for i, entityName in ipairs(zoneData.Pack) do
 		local template = ReplicatedStorage:FindFirstChild(entityName)
 		if template then
 			local newEntity = template:Clone()
+			newEntity:SetAttribute("PackID", packID)
 
 			local angle = (i / aliveCount) * math.pi * 2
 			local offset = Vector3.new(math.cos(angle) * 4, 3, math.sin(angle) * 4)

@@ -13,9 +13,32 @@ Players.PlayerAdded:Connect(function(player)
 		local cmd = args[1]:lower()
 
 		-- 1. SZINT ADÁS / ELVÉTEL: /level 50
+		-- 1. SZINT ADÁS / ELVÉTEL: /level 50
 		if cmd == "/level" then
 			local amount = tonumber(args[2])
-			if amount then player.PlayerStats.Level.Value = amount end
+			if amount then 
+				amount = math.clamp(amount, 1, 50) -- 50 a maximum
+				local stats = player:FindFirstChild("PlayerStats")
+				if stats then
+					stats.Level.Value = amount
+					-- Alaphelyzetbe állítjuk a statokat
+					stats.STR.Value = 1
+					stats.VIT.Value = 1
+					stats.INT.Value = 1
+					stats.DEX.Value = 1
+					-- Kiszámoljuk az elkölthető pontokat (Szint-1 * 3)
+					stats.StatPoints.Value = (amount - 1) * 3
+					stats.Experience.Value = 0
+
+					-- HP és Mana frissítése azonnal
+					if player.Character and player.Character:FindFirstChild("Humanoid") then
+						local hum = player.Character.Humanoid
+						local maxHp = 200 + (amount * 30) + (stats.VIT.Value * 40)
+						hum.MaxHealth = maxHp
+						hum.Health = maxHp
+					end
+				end
+			end
 
 			-- 2. ARANY ADÁS / ELVÉTEL: /gold 10000
 		elseif cmd == "/gold" then

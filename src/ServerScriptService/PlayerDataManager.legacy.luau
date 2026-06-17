@@ -77,6 +77,20 @@ local function setupPlayer(player)
 	-- ADATOK BETÖLTÉSE
 	local success, data = pcall(function() return playerDataStore:GetAsync("Player_" .. player.UserId) end)
 
+	-- KÉSZ KÜLDETÉSEK VISSZATÖLTÉSE
+	if data.CompletedQuests then
+		local completedFolder = player:FindFirstChild("CompletedQuests")
+		if not completedFolder then
+			completedFolder = Instance.new("Folder", player)
+			completedFolder.Name = "CompletedQuests"
+		end
+		for _, qName in ipairs(data.CompletedQuests) do
+			local doneMark = Instance.new("StringValue")
+			doneMark.Name = qName
+			doneMark.Parent = completedFolder
+		end
+	end
+
 	if success and data then
 		if data.Stats then
 			for statName, statValue in pairs(data.Stats) do
@@ -136,7 +150,14 @@ local function savePlayerData(player)
 	if player:FindFirstChild("Equipment") then
 		for _, slot in pairs(player.Equipment:GetChildren()) do data.Equipment[slot.Name] = slot.Value end
 	end
-
+	-- KÉSZ KÜLDETÉSEK MENTÉSE
+	data.CompletedQuests = {}
+	if player:FindFirstChild("CompletedQuests") then
+		for _, q in pairs(player.CompletedQuests:GetChildren()) do
+			table.insert(data.CompletedQuests, q.Name)
+		end
+	end
+	
 	local success, errorMessage = pcall(function() playerDataStore:SetAsync("Player_" .. player.UserId, data) end)
 	if success then print(player.Name .. " adatai elmentve!") else warn("Nem sikerült menteni! " .. tostring(errorMessage)) end
 	savingPlayers[player.UserId] = nil

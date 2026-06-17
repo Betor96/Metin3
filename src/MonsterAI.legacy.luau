@@ -110,6 +110,29 @@ local function attack(target)
 end
 
 -- ==========================================
+-- ÚJ: FALKA AGGRO (Ha megütnek, szólok a többieknek)
+-- ==========================================
+humanoid.HealthChanged:Connect(function(currentHp)
+	if currentHp < humanoid.MaxHealth and currentState == "IDLE" and not isDead then
+		local target = getNearestTarget()
+		if target then
+			currentState = "CHASE"
+			currentTarget = target
+
+			-- Szólunk a falka többi tagjának!
+			local packID = npc:GetAttribute("PackID")
+			if packID then
+				for _, otherNpc in pairs(workspace.Monsters:GetChildren()) do
+					if otherNpc ~= npc and otherNpc:GetAttribute("PackID") == packID then
+						otherNpc:SetAttribute("Alerted", true)
+					end
+				end
+			end
+		end
+	end
+end)
+
+-- ==========================================
 -- A MESTERSÉGES INTELLIGENCIA CIKLUSA
 -- ==========================================
 task.spawn(function()
@@ -117,6 +140,13 @@ task.spawn(function()
 
 		-- 1. ÁLLAPOT: SÉTÁLGATÁS / VÁRAKOZÁS
 		if currentState == "IDLE" then
+			
+			if npc:GetAttribute("Alerted") then
+				npc:SetAttribute("Alerted", false)
+				currentTarget = getNearestTarget()
+				if currentTarget then currentState = "CHASE" end
+			end
+			
 			currentTarget = getNearestTarget()
 			if currentTarget then
 				currentState = "CHASE"
@@ -179,6 +209,13 @@ humanoid.Died:Connect(function()
 	isDead = true
 
 	humanoid.WalkSpeed = 0 
+	
+	if npc:GetAttribute("NoDrop") then
+		task.wait(0.5) -- Pici animációs várakozás, hogy látszódjon, ahogy összeesik
+		npc:Destroy()
+		return
+	end
+	
 	local deathPosition = npc:GetPivot().Position
 
 	local killer = nil

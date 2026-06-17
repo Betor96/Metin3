@@ -2,25 +2,24 @@
 
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players") -- JAVÍTVA: Hozzáadva a Players szolgáltatás!
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService") -- ÚJ: ID Generátor a kőnek
+
 local MonsterDatabase = require(ReplicatedStorage:WaitForChild("MonsterDatabase"))
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
--- A ledobott tárgyak mappája a Workspace-ben
-local droppedFolder = Workspace:FindFirstChild("DroppedItems")
-if not droppedFolder then
-	droppedFolder = Instance.new("Folder")
-	droppedFolder.Name = "DroppedItems"
-	droppedFolder.Parent = Workspace
-end
+-- ==========================================
+-- MAPPÁK BEÁLLÍTÁSA (JAVÍTVA)
+-- ==========================================
+local droppedFolder = Workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", Workspace)
+droppedFolder.Name = "DroppedItems"
 
--- A Metinkövek mappája a Workspace-ben
-local metinFolder = Workspace:FindFirstChild("MetinStones")
-if not metinFolder then
-	metinFolder = Instance.new("Folder")
-	metinFolder.Name = "MetinStones"
-	metinFolder.Parent = Workspace
-end
+local metinFolder = Workspace:FindFirstChild("MetinStones") or Instance.new("Folder", Workspace)
+metinFolder.Name = "MetinStones"
+
+-- JAVÍTÁS: Ez a mappa hiányzott, ezért fagyott le a script a 105. sorban!
+local monstersFolder = Workspace:FindFirstChild("Monsters") or Instance.new("Folder", Workspace)
+monstersFolder.Name = "Monsters"
 
 -- ==========================================
 -- KŐ ÉLETRE KELTÉSE
@@ -34,15 +33,16 @@ local function setupMetinStone(stone)
 	local myData = MonsterDatabase[stone.Name]
 	if not myData then return end
 
-	local monsterTemplate = ReplicatedStorage:FindFirstChild(myData.SpawnMonster)
-	if not monsterTemplate then
-		warn("Nem található a szörny: " .. tostring(myData.SpawnMonster))
-		return
+	local monsterTemplate = nil
+	if myData.SpawnMonster then
+		monsterTemplate = ReplicatedStorage:FindFirstChild(myData.SpawnMonster)
 	end
 
+	local stoneID = HttpService:GenerateGUID(false) -- Egyedi ID a kőnek!
+
 	rootPart.Anchored = true
-	humanoid.MaxHealth = myData.MaxHealth
-	humanoid.Health = myData.MaxHealth
+	humanoid.MaxHealth = myData.MaxHealth or 100
+	humanoid.Health = humanoid.MaxHealth
 	humanoid.WalkSpeed = 0 
 
 	-- UI Készítése
@@ -67,39 +67,50 @@ local function setupMetinStone(stone)
 	local hpText = Instance.new("TextLabel")
 	hpText.Size = UDim2.new(1, 0, 1, 0)
 	hpText.BackgroundTransparency = 1
-	hpText.Text = myData.MaxHealth .. " / " .. myData.MaxHealth
+	hpText.Text = humanoid.MaxHealth .. " / " .. humanoid.MaxHealth
 	hpText.TextColor3 = Color3.new(1, 1, 1)
 	hpText.Font = Enum.Font.GothamBold
 	hpText.TextScaled = true
 	hpText.Parent = bgFrame
 
-	local spawnRate = stone:GetAttribute("SpawnRate") or 3 
+	local spawnRate = stone:GetAttribute("SpawnRate") or 5 
 	local lastHitTime = 0
 	local isActive = false 
 	local isDead = false
 
 	local function spawnMonsters()
-		local spawnCount = math.random(myData.SpawnCountMin, myData.SpawnCountMax)
+		if not monsterTemplate then return end
+		local spawnCount = math.random(myData.SpawnCountMin or 1, myData.SpawnCountMax or 2)
 		for i = 1, spawnCount do
-			if monsterTemplate then
-				local newMonster = monsterTemplate:Clone()
-				local spawnPosition = rootPart.CFrame * CFrame.new(math.random(-15, 15), 0, math.random(-15, 15))
-				if newMonster:FindFirstChild("HumanoidRootPart") then
-					newMonster.HumanoidRootPart.CFrame = spawnPosition
-				end
-				newMonster.Parent = Workspace
+			local newMonster = monsterTemplate:Clone()
+			local spawnPosition = rootPart.CFrame * CFrame.new(math.random(-15, 15), 0, math.random(-15, 15))
+			if newMonster:FindFirstChild("HumanoidRootPart") then
+				newMonster.HumanoidRootPart.CFrame = spawnPosition
 			end
+
+			-- ÚJ: Összekötjük a szörnyet a kővel, és betesszük a jó mappába!
+			newMonster:SetAttribute("StoneID", stoneID)
+			newMonster.Parent = monstersFolder 
 		end
 	end
 
-	-- JAVÍTÁS: Saját halál funkció, amit azonnal meghívunk, ha 0 a HP
 	local function onStoneDestroyed()
 		if isDead then return end
 		isDead = true
 		isActive = false
 		billboard:Destroy()
 
-		-- Ki volt a legközelebb? (Visszatettem a te eredeti, jól működő módszeredet)
+		-- ==========================================
+		-- ÚJ: MARADÉK SZÖRNYEK MEGÖLÉSE LOOT NÉLKÜL
+		-- ==========================================
+		for _, monster in pairs(monstersFolder:GetChildren()) do
+			if monster:GetAttribute("StoneID") == stoneID then
+				monster:SetAttribute("NoDrop", true) -- Szólunk az AI-nak, hogy ne droppoljon semmit
+				local mHum = monster:FindFirstChild("Humanoid")
+				if mHum then mHum.Health = 0 end
+			end
+		end
+
 		local killer = nil
 		local shortestDist = 50
 
@@ -119,16 +130,16 @@ local function setupMetinStone(stone)
 			if dd and math.random(1, 100) <= dd.Value then doubleDropActive = true end
 		end
 
-		-- 1. NORMÁL DROPOK KIGYŰJTÉSE
-		local dropCount = math.random(myData.MinDrops, myData.MaxDrops) 
+		local dropCount = math.random(myData.MinDrops or 1, myData.MaxDrops or 2) 
 		local dropsToSpawn = {}
 
-		for i = 1, dropCount do
-			local itemName = myData.LootPool[math.random(1, #myData.LootPool)]
-			table.insert(dropsToSpawn, itemName)
+		if myData.LootPool and #myData.LootPool > 0 then
+			for i = 1, dropCount do
+				local itemName = myData.LootPool[math.random(1, #myData.LootPool)]
+				table.insert(dropsToSpawn, itemName)
+			end
 		end
 
-		-- 2. DUPLA DROP LOGIKA
 		if doubleDropActive and #dropsToSpawn > 0 then
 			local validForDouble = {}
 			for _, itemName in ipairs(dropsToSpawn) do
@@ -144,10 +155,8 @@ local function setupMetinStone(stone)
 			end
 		end
 
-		-- 3. TÁRGYAK LEDOBÁSA
 		for _, itemName in ipairs(dropsToSpawn) do
 			local itemData = ItemDatabase[itemName]
-
 			local droppedItem = Instance.new("Part")
 			droppedItem.Name = "LootPart"
 			droppedItem.Size = Vector3.new(0.5, 0.2, 2)
@@ -162,7 +171,6 @@ local function setupMetinStone(stone)
 			end
 
 			droppedItem.Color = itemColor
-
 			local itemTag = Instance.new("StringValue")
 			itemTag.Name = "ItemName"
 			itemTag.Value = itemName
@@ -182,17 +190,15 @@ local function setupMetinStone(stone)
 			nameLabel.TextScaled = true
 			nameLabel.TextStrokeTransparency = 0 
 			nameLabel.TextColor3 = textColor
-
 			nameLabel.Parent = textBillboard
 			textBillboard.Parent = droppedItem
 			droppedItem.Parent = droppedFolder
 		end
 
-		-- 4. JUTALMAZÁS
 		if killer then
 			local stats = killer:FindFirstChild("PlayerStats")
 			if stats and stats:FindFirstChild("Experience") then
-				stats.Experience.Value += myData.ExpReward
+				stats.Experience.Value += (myData.ExpReward or 0)
 			end
 		end
 
@@ -200,26 +206,20 @@ local function setupMetinStone(stone)
 		stone:Destroy()
 	end
 
-	-- ==========================================
-	-- SEBZŐDÉS (ÉS HALÁL) FIGYELÉSE
-	-- ==========================================
 	humanoid.HealthChanged:Connect(function(currentHp)
 		if isDead then return end
 
-		-- HA ELÉRTE A 0-T, AZONNAL INDÍTJUK A HALÁLT!
 		if currentHp <= 0 then
 			hpBar.Size = UDim2.new(0, 0, 1, 0)
-			hpText.Text = "0 / " .. myData.MaxHealth
+			hpText.Text = "0 / " .. humanoid.MaxHealth
 			onStoneDestroyed()
 			return
 		end
 
-		-- HP Bar Frissítés
-		local percent = currentHp / myData.MaxHealth
+		local percent = currentHp / humanoid.MaxHealth
 		hpBar.Size = UDim2.new(percent, 0, 1, 0)
-		hpText.Text = math.floor(currentHp) .. " / " .. myData.MaxHealth
+		hpText.Text = math.floor(currentHp) .. " / " .. humanoid.MaxHealth
 
-		-- Szörnyek idézése
 		lastHitTime = tick() 
 		if not isActive then
 			isActive = true
@@ -234,9 +234,6 @@ local function setupMetinStone(stone)
 	end)
 end
 
--- ==========================================
--- MAPPA FIGYELÉSE
--- ==========================================
 for _, child in pairs(metinFolder:GetChildren()) do
 	if child:IsA("Model") then
 		setupMetinStone(child)

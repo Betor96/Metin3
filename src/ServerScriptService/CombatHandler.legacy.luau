@@ -68,8 +68,13 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
 
-				-- JAVÍTÁS: Távolság növelve 12-re a Metinkövek nagy mérete miatt!
-				if distance <= 12 then
+				-- ÚJ: Irányított (Frontális) sebzés számítása
+				local directionToTarget = (targetRoot.Position - rootPart.Position).Unit
+				local facingDirection = rootPart.CFrame.LookVector
+				local dotProduct = facingDirection:Dot(directionToTarget)
+
+				-- distance <= 12 (Távolság) ÉS dotProduct > 0.3 (Karakter előtt van, kb 120 fokos szögben)
+				if distance <= 12 and dotProduct > 0.3 then
 					local finalDamage = baseDamage
 					local isCrit = false
 
