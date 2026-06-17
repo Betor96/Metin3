@@ -121,7 +121,7 @@ oldPwdInput.Size = UDim2.new(1, -20, 0, 30)
 oldPwdInput.Position = UDim2.new(0, 10, 0, 40)
 oldPwdInput.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 oldPwdInput.TextColor3 = Color3.new(1,1,1)
-oldPwdInput.PlaceholderText = "Régi Jelszó (6 szám)"
+oldPwdInput.PlaceholderText = "Régi Jelszó"
 oldPwdInput.Text = ""
 
 local newPwdInput = Instance.new("TextBox", changeFrame)
@@ -129,7 +129,7 @@ newPwdInput.Size = UDim2.new(1, -20, 0, 30)
 newPwdInput.Position = UDim2.new(0, 10, 0, 80)
 newPwdInput.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 newPwdInput.TextColor3 = Color3.new(1,1,1)
-newPwdInput.PlaceholderText = "Új Jelszó (6 szám)"
+newPwdInput.PlaceholderText = "Új Jelszó"
 newPwdInput.Text = ""
 
 local newPwdInput2 = Instance.new("TextBox", changeFrame)
@@ -159,15 +159,10 @@ chgCancel.Text = "Mégse"
 -- ==========================================
 local function restrictTo6Digits(box)
 	box:GetPropertyChangedSignal("Text"):Connect(function()
-		-- 1. Töröljünk minden betűt, szóközt és speciális karaktert (csak a számok maradnak)
 		local filtered = box.Text:gsub("%D", "") 
-
-		-- 2. Ha több mint 6 szám lenne, levágjuk a végét
 		if #filtered > 6 then
 			filtered = filtered:sub(1, 6)
 		end
-
-		-- 3. Ha változott a szöveg a szűrés miatt, kicseréljük
 		if box.Text ~= filtered then
 			box.Text = filtered
 		end
@@ -178,7 +173,6 @@ restrictTo6Digits(pwdInput)
 restrictTo6Digits(oldPwdInput)
 restrictTo6Digits(newPwdInput)
 restrictTo6Digits(newPwdInput2)
-
 
 -- ==========================================
 -- BANK (RAKTÁR) UI FELÜLET
@@ -291,7 +285,7 @@ buyRobuxBtn.Font = Enum.Font.GothamBold
 buyRobuxBtn.ZIndex = 21
 
 -- ==========================================
--- LOGIKA ÉS GOMBOK
+-- LOGIKA ÉS GOMBOK (JAVÍTVA)
 -- ==========================================
 local bankCurrentPage = 1
 
@@ -309,13 +303,21 @@ local function renderBankItems()
 		lockOverlay.Visible = false
 	end
 
+	-- JAVÍTÁS: Mivel a neveket megváltoztatjuk, LayoutOrder alapján keressük meg a UI dobozokat!
+	local uiSlots = {}
+	for _, child in pairs(slotContainer:GetChildren()) do
+		if child:IsA("Frame") then
+			uiSlots[child.LayoutOrder] = child
+		end
+	end
+
 	for i = 1, 32 do
 		local serverSlotNum = ((bankCurrentPage - 1) * 32) + i
-		local uiSlot = slotContainer:FindFirstChild("BankSlotUI_" .. i)
+		local uiSlot = uiSlots[i]
 		local slotVal = bankFolder:FindFirstChild("Slot_" .. serverSlotNum)
 
 		if uiSlot then
-			uiSlot.Name = "BankSlot_" .. serverSlotNum -- JAVÍTÁS: Pontos név beállítása a Drag&Drop-hoz!
+			uiSlot.Name = "BankSlot_" .. serverSlotNum -- Ezt olvassa ki a DragAndDrop!
 			uiSlot:ClearAllChildren()
 			if slotVal and slotVal.Value ~= "" then
 				local itemIcon = Instance.new("TextLabel", uiSlot)
@@ -357,11 +359,24 @@ bankCloseBtn.MouseButton1Click:Connect(function() bankMainFrame.Visible = false 
 
 task.spawn(function()
 	local bankFolder = player:WaitForChild("Bank")
+
+	-- ==========================================
+	-- JAVÍTÁS: Ráakaszkodunk az összes létező rekeszre, hogy azonnal reagáljon!
+	-- ==========================================
+	for _, slot in pairs(bankFolder:GetChildren()) do
+		slot.Changed:Connect(renderBankItems)
+		local amt = slot:WaitForChild("Amount", 2)
+		if amt then
+			amt.Changed:Connect(renderBankItems)
+		end
+	end
+
 	bankFolder.DescendantAdded:Connect(function(descendant)
 		if descendant:IsA("ValueBase") then descendant.Changed:Connect(renderBankItems) end
 		renderBankItems()
 	end)
 	bankFolder.DescendantRemoving:Connect(renderBankItems)
+
 	local stats = player:WaitForChild("PlayerStats")
 	if stats:WaitForChild("BankUnlockedPages") then
 		stats.BankUnlockedPages.Changed:Connect(renderBankItems)
