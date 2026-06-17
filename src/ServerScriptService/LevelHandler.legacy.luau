@@ -2,6 +2,11 @@
 
 local Players = game:GetService("Players")
 
+-- ==========================================
+-- BEÁLLÍTÁSOK
+-- ==========================================
+local MAX_LEVEL = 50 -- IDE ÍRHATOD MAJD A JÖVŐBEN AZ ÚJ SZINTKORLÁTOT!
+
 -- Tapasztalat pont szükséglet kiszámítása (Matematikai görbe)
 local function getNextLevelXP(level)
 	return (level ^ 2) * 100 + (level * 500)
@@ -77,9 +82,25 @@ Players.PlayerAdded:Connect(function(player)
 		updateCharacterStats(player)
 	end
 
-	-- SZINTLÉPÉS LOGIKA
+	-- ==========================================
+	-- SZINTLÉPÉS LOGIKA (SZINTKORLÁTTAL)
+	-- ==========================================
 	exp.Changed:Connect(function()
+		-- Ha már elérte a maximum szintet, ne tudjon tovább fejlődni!
+		if level.Value >= MAX_LEVEL then
+			if exp.Value > maxExp.Value then
+				exp.Value = maxExp.Value -- A sáv tele marad, de nem lép szintet
+			end
+			return
+		end
+
 		while exp.Value >= maxExp.Value do
+			-- Dupla ellenőrzés a ciklusban is, nehogy véletlenül átcsússzon 51-re
+			if level.Value >= MAX_LEVEL then
+				exp.Value = maxExp.Value
+				break
+			end
+
 			exp.Value = exp.Value - maxExp.Value
 			level.Value = level.Value + 1
 			leaderLevel.Value = level.Value -- Jobb felső sarok frissítése
