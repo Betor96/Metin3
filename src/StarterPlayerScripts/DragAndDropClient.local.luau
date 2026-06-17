@@ -182,21 +182,19 @@ end
 -- ==========================================
 -- TOOLTIP RENDSZER (KÜLÖN RÉTEGEN)
 -- ==========================================
--- 1. Különálló, mindent felülíró réteg létrehozása
 local tooltipGui = Instance.new("ScreenGui")
 tooltipGui.Name = "TooltipHUD"
-tooltipGui.DisplayOrder = 99999 -- Extrém magas érték, soha nem mehet semmi mögé!
+tooltipGui.DisplayOrder = 99999
 tooltipGui.ResetOnSpawn = false
 tooltipGui.Parent = player:WaitForChild("PlayerGui")
 
--- 2. A Tooltip ablak
 local tooltip = Instance.new("Frame")
 tooltip.Size = UDim2.new(0, 200, 0, 100)
 tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
 tooltip.BorderSizePixel = 2
 tooltip.Visible = false
-tooltip.Parent = tooltipGui -- FIX: Ide rakjuk, nem az invHud-ba!
+tooltip.Parent = tooltipGui
 
 local tooltipTitle = Instance.new("TextLabel", tooltip)
 tooltipTitle.Size = UDim2.new(1, 0, 0, 25)
@@ -237,26 +235,15 @@ local function getTooltipText(itemName)
 	elseif data.Type == "Páncél" then text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n" end
 	return text .. (data.Description or "")
 end
-RunService.RenderStepped:Connect(updateTooltipPosition)
-
-local function getTooltipText(itemName)
-	local data = ItemDatabase[itemName]
-	if not data then return "Nincs információ erről a tárgyról." end
-	local text = ""
-	if data.Type == "Fegyver" then text = "Szint: " .. (data.Level or 1) .. "\nSebzés: " .. (data.MinDmg or 0) .. " - " .. (data.MaxDmg or 0) .. "\n\n"
-	elseif data.Type == "Páncél" then text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n" end
-	return text .. (data.Description or "")
-end
 
 -- ==========================================
--- TAKARÍTÁS ÉS UI GENERÁLÁS (Hibajavítás!)
+-- TAKARÍTÁS ÉS UI GENERÁLÁS
 -- ==========================================
 local currentPage = 1
 local maxPages = 4
 
 local invMainFrame = invHud:WaitForChild("MainFrame")
 
--- 1. BIZTONSÁGI TAKARÍTÁS: Törlünk mindent, ami a régi kódból maradt!
 if invMainFrame:FindFirstChild("SlotContainer") then invMainFrame.SlotContainer:Destroy() end
 if invMainFrame:FindFirstChild("PageNav") then invMainFrame.PageNav:Destroy() end
 if invMainFrame:FindFirstChild("LockOverlay") then invMainFrame.LockOverlay:Destroy() end
@@ -265,7 +252,6 @@ for _, child in pairs(invMainFrame:GetChildren()) do
 	if child.Name:match("InvSlot_") then child:Destroy() end
 end
 
--- 2. Tiszta tartály létrehozása a rekeszeknek (Y = 40)
 local slotContainer = Instance.new("Frame", invMainFrame)
 slotContainer.Name = "SlotContainer"
 slotContainer.Size = UDim2.new(0, 195, 0, 395)
@@ -286,7 +272,6 @@ for i = 1, 32 do
 	uiSlot.LayoutOrder = i 
 end
 
--- 3. Lapozó gombok (Y = 440)
 local pageNav = Instance.new("Frame", invMainFrame)
 pageNav.Name = "PageNav"
 pageNav.Size = UDim2.new(1, -20, 0, 30)
@@ -319,7 +304,6 @@ pageLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
 pageLabel.Text = "Oldal: 1 / 4"
 pageLabel.Font = Enum.Font.GothamBold
 
--- 4. Zárolt Képernyő (Szépen elrendezve)
 local lockOverlay = Instance.new("Frame", invMainFrame)
 lockOverlay.Name = "LockOverlay"
 lockOverlay.Size = UDim2.new(1, -10, 0, 395)
@@ -478,9 +462,11 @@ end)
 -- ==========================================
 local dragging = false
 local dragClone = nil
-local originSlotUI = nil
+local dragOriginFolder = nil -- JAVÍTÁS: Pontos eredet tárolása
+local dragOriginSlot = nil   -- JAVÍTÁS: Mivel lapozhatunk menet közben, nem elég az UI-t megjegyezni!
 local dragConnection = nil
 local dragSplitAmount = nil
+local canPageSwitchHover = true -- ÚJ JAVÍTÁS: A lapozást blokkoló kapcsoló
 
 local lastClickTime = 0
 local lastClickedSlot = nil
@@ -553,6 +539,9 @@ UserInputService.InputBegan:Connect(function(input)
 								end
 								if freeSlot then MoveItem:FireServer("Equipment", slotName, "Inventory", freeSlot) end
 							end
+						elseif itemData.MaxStack and itemData.MaxStack > 1 then
+							local AutoStack = Events:FindFirstChild("AutoStack")
+							if AutoStack then AutoStack:FireServer(slotName) end
 						end
 					end
 					return 
@@ -561,7 +550,10 @@ UserInputService.InputBegan:Connect(function(input)
 				lastClickTime = currentTime
 				lastClickedSlot = gui
 				dragging = true
-				originSlotUI = gui
+
+				-- JAVÍTÁS: Eltároljuk pontosan honnan indult a húzás
+				dragOriginFolder = folderStr
+				dragOriginSlot = slotName
 				tooltip.Visible = false
 
 				local isShiftDown = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
@@ -598,6 +590,39 @@ UserInputService.InputBegan:Connect(function(input)
 				dragConnection = RunService.RenderStepped:Connect(function()
 					local mousePos = UserInputService:GetMouseLocation()
 					dragClone.Position = UDim2.new(0, mousePos.X - 20, 0, mousePos.Y - inset.Y - 20)
+
+					-- ==========================================
+					-- ÚJ JAVÍTÁS: LAPOZÁS DRAG & DROP KÖZBEN
+					-- ==========================================
+					local guisAtHover = playerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y - inset.Y)
+					local hoveredNext = false
+					local hoveredPrev = false
+
+					for _, hoverGui in pairs(guisAtHover) do
+						if hoverGui == nextBtn then hoveredNext = true end
+						if hoverGui == prevBtn then hoveredPrev = true end
+					end
+
+					if hoveredNext then
+						if canPageSwitchHover then
+							canPageSwitchHover = false -- Letiltjuk az azonnali dupla ugrást
+							if currentPage < maxPages then 
+								currentPage += 1 
+								renderItems() 
+							end
+						end
+					elseif hoveredPrev then
+						if canPageSwitchHover then
+							canPageSwitchHover = false -- Letiltjuk az azonnali dupla ugrást
+							if currentPage > 1 then 
+								currentPage -= 1 
+								renderItems() 
+							end
+						end
+					else
+						-- Amint lehúzzuk az egeret a gombról, újra engedélyezzük a lapozást!
+						canPageSwitchHover = true
+					end
 				end)
 				break
 			end
@@ -620,7 +645,8 @@ UserInputService.InputEnded:Connect(function(input)
 			if getSlotData(gui) then targetSlotUI = gui break end
 		end
 
-		local fromFolderStr, fromSlotName = getSlotData(originSlotUI)
+		-- JAVÍTÁS: A célponthoz betöltjük a biztosan eltárolt kezdő helyet!
+		local fromFolderStr, fromSlotName = dragOriginFolder, dragOriginSlot
 		local itemName = nil
 
 		if fromFolderStr == "Inventory" then 
@@ -682,7 +708,9 @@ UserInputService.InputEnded:Connect(function(input)
 				end
 			end
 		end
-		originSlotUI = nil
+
+		dragOriginFolder = nil
+		dragOriginSlot = nil
 		dragSplitAmount = nil
 	end
 end)

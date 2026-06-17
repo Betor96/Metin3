@@ -185,6 +185,13 @@ RunService.Heartbeat:Connect(function()
 				else
 					character.Humanoid:MoveTo(myRoot.Position)
 
+					-- ==========================================
+					-- ÚJ JAVÍTÁS: Forgatás a célpont felé!
+					-- Ezzel biztosítjuk, hogy a 120 fokos ütés mindig betaláljon!
+					-- ==========================================
+					local lookPos = Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z)
+					myRoot.CFrame = CFrame.lookAt(myRoot.Position, lookPos)
+
 					if tick() - lastAttackTime >= currentCooldown then
 						lastAttackTime = tick()
 						MeleeAttack:FireServer()

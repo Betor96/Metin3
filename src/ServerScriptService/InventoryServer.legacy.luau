@@ -6,6 +6,9 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local MoveItem = Events:WaitForChild("MoveItem")
 local DropItem = Events:WaitForChild("DropItem")
+-- ÚJ: AutoStack RemoteEvent
+local AutoStack = Events:FindFirstChild("AutoStack") or Instance.new("RemoteEvent", Events)
+AutoStack.Name = "AutoStack"
 
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
@@ -261,6 +264,51 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 				nameLabel.Parent = billboard
 				billboard.Parent = droppedItem
 				droppedItem.Parent = droppedFolder
+			end
+		end
+	end
+end)
+
+-- ==========================================
+-- ÚJ JAVÍTÁS: TÁRGYAK AUTOMATIKUS ÖSSZEVONÁSA (DUPLA KLIKK)
+-- ==========================================
+AutoStack.OnServerEvent:Connect(function(player, targetSlotName)
+	local inv = player:FindFirstChild("Inventory")
+	if not inv then return end
+
+	local targetSlot = inv:FindFirstChild(targetSlotName)
+	if not targetSlot or targetSlot.Value == "" then return end
+
+	local itemName = targetSlot.Value
+	local itemData = ItemDatabase[itemName]
+
+	-- Ha nem halmozható, vagy nincs értelme (MaxStack <= 1), kilépünk
+	if not itemData or not itemData.MaxStack or itemData.MaxStack <= 1 then return end
+
+	local targetAmtObj = targetSlot:FindFirstChild("Amount")
+	if not targetAmtObj then return end
+
+	-- Végignézzük az összes rekeszt a táskában
+	for _, slot in pairs(inv:GetChildren()) do
+		-- Ha találunk egy MÁSIK rekeszt, amiben UGYANAZ a tárgy van...
+		if slot ~= targetSlot and slot.Value == itemName then
+			local amtObj = slot:FindFirstChild("Amount")
+			if amtObj and amtObj.Value > 0 then
+
+				-- Kiszámoljuk, mennyi fér még be abba a rekeszbe, amire a játékos kattintott
+				local spaceLeft = itemData.MaxStack - targetAmtObj.Value
+
+				if spaceLeft > 0 then
+					-- Átteszünk annyit, amennyi befér (vagy az egészet, ha elfér)
+					local transferAmt = math.min(amtObj.Value, spaceLeft)
+					targetAmtObj.Value = targetAmtObj.Value + transferAmt
+					amtObj.Value = amtObj.Value - transferAmt
+
+					-- Ha a másik rekesz teljesen kiürült, töröljük a tárgyat onnan
+					if amtObj.Value <= 0 then
+						slot.Value = ""
+					end
+				end
 			end
 		end
 	end

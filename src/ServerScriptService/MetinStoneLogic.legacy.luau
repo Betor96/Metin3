@@ -3,27 +3,20 @@
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService") -- ÚJ: ID Generátor a kőnek
+local HttpService = game:GetService("HttpService")
 
 local MonsterDatabase = require(ReplicatedStorage:WaitForChild("MonsterDatabase"))
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
--- ==========================================
--- MAPPÁK BEÁLLÍTÁSA (JAVÍTVA)
--- ==========================================
 local droppedFolder = Workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", Workspace)
 droppedFolder.Name = "DroppedItems"
 
 local metinFolder = Workspace:FindFirstChild("MetinStones") or Instance.new("Folder", Workspace)
 metinFolder.Name = "MetinStones"
 
--- JAVÍTÁS: Ez a mappa hiányzott, ezért fagyott le a script a 105. sorban!
 local monstersFolder = Workspace:FindFirstChild("Monsters") or Instance.new("Folder", Workspace)
 monstersFolder.Name = "Monsters"
 
--- ==========================================
--- KŐ ÉLETRE KELTÉSE
--- ==========================================
 local function setupMetinStone(stone)
 	local humanoid = stone:FindFirstChild("Humanoid")
 	local rootPart = stone:FindFirstChild("HumanoidRootPart")
@@ -38,14 +31,13 @@ local function setupMetinStone(stone)
 		monsterTemplate = ReplicatedStorage:FindFirstChild(myData.SpawnMonster)
 	end
 
-	local stoneID = HttpService:GenerateGUID(false) -- Egyedi ID a kőnek!
+	local stoneID = HttpService:GenerateGUID(false)
 
 	rootPart.Anchored = true
 	humanoid.MaxHealth = myData.MaxHealth or 100
 	humanoid.Health = humanoid.MaxHealth
 	humanoid.WalkSpeed = 0 
 
-	-- UI Készítése
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "StoneHPBar"
 	billboard.Size = UDim2.new(0, 150, 0, 20)
@@ -79,7 +71,10 @@ local function setupMetinStone(stone)
 	local isDead = false
 
 	local function spawnMonsters()
+		-- JAVÍTÁS 1: Ha időközben elpusztult a kő, kilépünk, és NEM idézünk!
+		if isDead then return end 
 		if not monsterTemplate then return end
+
 		local spawnCount = math.random(myData.SpawnCountMin or 1, myData.SpawnCountMax or 2)
 		for i = 1, spawnCount do
 			local newMonster = monsterTemplate:Clone()
@@ -88,7 +83,6 @@ local function setupMetinStone(stone)
 				newMonster.HumanoidRootPart.CFrame = spawnPosition
 			end
 
-			-- ÚJ: Összekötjük a szörnyet a kővel, és betesszük a jó mappába!
 			newMonster:SetAttribute("StoneID", stoneID)
 			newMonster.Parent = monstersFolder 
 		end
@@ -100,12 +94,9 @@ local function setupMetinStone(stone)
 		isActive = false
 		billboard:Destroy()
 
-		-- ==========================================
-		-- ÚJ: MARADÉK SZÖRNYEK MEGÖLÉSE LOOT NÉLKÜL
-		-- ==========================================
 		for _, monster in pairs(monstersFolder:GetChildren()) do
 			if monster:GetAttribute("StoneID") == stoneID then
-				monster:SetAttribute("NoDrop", true) -- Szólunk az AI-nak, hogy ne droppoljon semmit
+				monster:SetAttribute("NoDrop", true)
 				local mHum = monster:FindFirstChild("Humanoid")
 				if mHum then mHum.Health = 0 end
 			end
@@ -226,6 +217,8 @@ local function setupMetinStone(stone)
 			task.spawn(function()
 				while stone and stone.Parent and not isDead and (tick() - lastHitTime < 5) do
 					task.wait(spawnRate)
+					-- JAVÍTÁS 2: Miután letelt a várakozás, még egyszer ellenőrizzük! Ha meghalt közben, leállítjuk a ciklust!
+					if isDead then break end 
 					spawnMonsters()
 				end
 				isActive = false 
