@@ -24,16 +24,6 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	-- Erő (STR) bónusz
 	local baseDamage = math.random(minDmg, maxDmg) + (stats.STR.Value * 2)
 
-	-- Ezt a listát tedd be a baseDamage kiszámolása alá!
-	local protectedNPCs = {
-		["Fegyverkereskedo"] = true, 
-		["Pancelkereskedo"] = true, 
-		["Vegyesbolt"] = true, 
-		["Kovacs"] = true, 
-		["Faluose"] = true,
-		["Varosor"] = true
-	}
-
 	-- Az NPC-k védelme
 	local protectedNPCs = {
 		["Fegyverkereskedo"] = true, 
@@ -45,17 +35,31 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	}
 
 	-- ==========================================
-	-- ÚJ: Célpontok kigyűjtése (A pálya ÉS a Metin mappa egybevéve)
+	-- JAVÍTÁS: Célpontok kigyűjtése MINDEN mappából!
 	-- ==========================================
-	local possibleTargets = workspace:GetChildren()
+	local possibleTargets = {}
+
+	-- 1. Sima Workspace elemek (Játékosok, NPC-k)
+	for _, obj in pairs(workspace:GetChildren()) do
+		table.insert(possibleTargets, obj)
+	end
+
+	-- 2. Metinkövek
 	local mFolder = workspace:FindFirstChild("MetinStones")
 	if mFolder then
 		for _, stone in pairs(mFolder:GetChildren()) do
-			table.insert(possibleTargets, stone) -- Hozzáadjuk a köveket is a célpontokhoz!
+			table.insert(possibleTargets, stone)
 		end
 	end
 
-	-- Itt cseréld le a 'workspace:GetChildren()'-t 'possibleTargets'-ra!
+	-- 3. SZÖRNYEK (Ez hiányzott, emiatt nem sebezte a farkast!)
+	local monFolder = workspace:FindFirstChild("Monsters")
+	if monFolder then
+		for _, monster in pairs(monFolder:GetChildren()) do
+			table.insert(possibleTargets, monster)
+		end
+	end
+
 	for _, obj in pairs(possibleTargets) do
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
@@ -64,9 +68,8 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
 
-				-- (Innen folytatódik a régi kód a sebzés kiosztásával...)
-
-				if distance <= 8 then
+				-- JAVÍTÁS: Távolság növelve 12-re a Metinkövek nagy mérete miatt!
+				if distance <= 12 then
 					local finalDamage = baseDamage
 					local isCrit = false
 
@@ -77,7 +80,8 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 					end
 
 					-- 2. Szörny / Metinkő / Ember elleni erő JAVÍTÁSA
-					local isMetin = obj:FindFirstChild("MetinStoneLogic") ~= nil
+					-- Mivel letöröltük a MetinStoneLogic scriptet a kövekről, a mappájuk alapján azonosítjuk őket!
+					local isMetin = (obj.Parent and obj.Parent.Name == "MetinStones")
 
 					if isMetin then
 						finalDamage = finalDamage * (1 + (stats.StrongVsMetin.Value / 100))
