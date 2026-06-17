@@ -476,6 +476,13 @@ local function getSlotData(guiObject)
 		local num = tonumber(guiObject.Name:match("%d+"))
 		local serverSlotNum = ((currentPage - 1) * 32) + num
 		return "Inventory", "Slot_" .. serverSlotNum, invFolder:FindFirstChild("Slot_" .. serverSlotNum)
+
+		-- ÚJ: BANK REKESZEK FELISMERÉSE
+	elseif guiObject.Name:match("BankSlot_") then
+		local num = tonumber(guiObject.Name:match("%d+"))
+		local bankFolder = player:FindFirstChild("Bank")
+		return "Bank", "Slot_" .. num, bankFolder and bankFolder:FindFirstChild("Slot_" .. num)
+
 	elseif eqNameToServer[guiObject.Name] then
 		local serverName = eqNameToServer[guiObject.Name]
 		return "Equipment", serverName, eqFolder:FindFirstChild(serverName)
@@ -541,7 +548,11 @@ UserInputService.InputBegan:Connect(function(input)
 							end
 						elseif itemData.MaxStack and itemData.MaxStack > 1 then
 							local AutoStack = Events:FindFirstChild("AutoStack")
-							if AutoStack then AutoStack:FireServer(slotName) end
+							if AutoStack then 
+								-- Szólunk, hogy Bankban vagy Táskában vonjuk össze
+								local isBank = (folderStr == "Bank")
+								AutoStack:FireServer(slotName, isBank) 
+							end
 						end
 					end
 					return 
@@ -653,6 +664,9 @@ UserInputService.InputEnded:Connect(function(input)
 			itemName = invFolder:FindFirstChild(fromSlotName).Value 
 		elseif fromFolderStr == "Equipment" then 
 			itemName = eqFolder:FindFirstChild(fromSlotName).Value 
+		elseif fromFolderStr == "Bank" then -- ÚJ: Kiveszünk tárgyat a Bankból
+			local bFolder = player:FindFirstChild("Bank")
+			if bFolder and bFolder:FindFirstChild(fromSlotName) then itemName = bFolder[fromSlotName].Value end
 		elseif fromFolderStr == "Hotbar" then 
 			local hbFolder = player:FindFirstChild("Hotbar")
 			if hbFolder and hbFolder:FindFirstChild(fromSlotName) then itemName = hbFolder[fromSlotName].Value end

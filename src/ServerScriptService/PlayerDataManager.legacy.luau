@@ -64,6 +64,33 @@ local function setupPlayer(player)
 		amt.Name = "Amount"
 		amt.Value = 0
 	end
+	
+	-- ==========================================
+	-- ÚJ: BANK (RAKTÁR) LÉTREHOZÁSA ÉS BETÖLTÉSE
+	-- ==========================================
+	local bank = Instance.new("Folder", player)
+	bank.Name = "Bank"
+	for i = 1, 128 do
+		local slot = Instance.new("StringValue", bank)
+		slot.Name = "Slot_" .. i
+		slot.Value = ""
+		local amt = Instance.new("IntValue", slot)
+		amt.Name = "Amount"
+		amt.Value = 0
+
+		if data.Bank and data.Bank[tostring(i)] then
+			slot.Value = data.Bank[tostring(i)].Item
+			amt.Value = data.Bank[tostring(i)].Amount
+		end
+	end
+
+	local bankPwd = Instance.new("StringValue", stats)
+	bankPwd.Name = "BankPassword"
+	bankPwd.Value = data.BankPassword or "000000" -- Alapértelmezett jelszó
+
+	local bankPages = Instance.new("IntValue", stats)
+	bankPages.Name = "BankUnlockedPages"
+	bankPages.Value = data.BankUnlockedPages or 1
 
 	local eq = Instance.new("Folder", player)
 	eq.Name = "Equipment"
@@ -146,6 +173,20 @@ local function savePlayerData(player)
 			data.Inventory[slot.Name] = {Name = slot.Value, Amount = slot.Amount.Value}
 		end
 	end
+	
+	-- ÚJ: BANK MENTÉSE
+	data.BankPassword = player.PlayerStats.BankPassword.Value
+	data.BankUnlockedPages = player.PlayerStats.BankUnlockedPages.Value
+	data.Bank = {}
+	if player:FindFirstChild("Bank") then
+		for i = 1, 128 do
+			local slot = player.Bank:FindFirstChild("Slot_" .. i)
+			if slot and slot.Value ~= "" then
+				data.Bank[tostring(i)] = {Item = slot.Value, Amount = slot.Amount.Value}
+			end
+		end
+	end
+	
 
 	if player:FindFirstChild("Equipment") then
 		for _, slot in pairs(player.Equipment:GetChildren()) do data.Equipment[slot.Name] = slot.Value end

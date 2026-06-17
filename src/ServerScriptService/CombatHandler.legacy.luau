@@ -31,7 +31,8 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		["Vegyesbolt"] = true, 
 		["Kovacs"] = true, 
 		["Faluose"] = true,
-		["Varosor"] = true
+		["Varosor"] = true,
+		["Raktaros"] = true
 	}
 
 	-- ==========================================
