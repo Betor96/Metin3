@@ -15,16 +15,14 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
 	local weaponName = equipment:FindFirstChild("Fegyver") and equipment.Fegyver.Value or ""
 
-	local minDmg, maxDmg = 1, 5 -- Alap ökölsebzés
+	local minDmg, maxDmg = 1, 5 
 	if weaponName ~= "" and ItemDatabase[weaponName] then
 		minDmg = ItemDatabase[weaponName].MinDmg or 1
 		maxDmg = ItemDatabase[weaponName].MaxDmg or 5
 	end
 
-	-- Erő (STR) bónusz
 	local baseDamage = math.random(minDmg, maxDmg) + (stats.STR.Value * 2)
 
-	-- Az NPC-k védelme
 	local protectedNPCs = {
 		["Fegyverkereskedo"] = true, 
 		["Pancelkereskedo"] = true, 
@@ -35,17 +33,12 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		["Raktaros"] = true
 	}
 
-	-- ==========================================
-	-- JAVÍTÁS: Célpontok kigyűjtése MINDEN mappából!
-	-- ==========================================
 	local possibleTargets = {}
 
-	-- 1. Sima Workspace elemek (Játékosok, NPC-k)
 	for _, obj in pairs(workspace:GetChildren()) do
 		table.insert(possibleTargets, obj)
 	end
 
-	-- 2. Metinkövek
 	local mFolder = workspace:FindFirstChild("MetinStones")
 	if mFolder then
 		for _, stone in pairs(mFolder:GetChildren()) do
@@ -53,11 +46,18 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		end
 	end
 
-	-- 3. SZÖRNYEK (Ez hiányzott, emiatt nem sebezte a farkast!)
 	local monFolder = workspace:FindFirstChild("Monsters")
 	if monFolder then
 		for _, monster in pairs(monFolder:GetChildren()) do
 			table.insert(possibleTargets, monster)
+		end
+	end
+
+	-- ÚJ: ÉRCEK BEOLVASÁSA
+	local oFolder = workspace:FindFirstChild("Ores")
+	if oFolder then
+		for _, ore in pairs(oFolder:GetChildren()) do
+			table.insert(possibleTargets, ore)
 		end
 	end
 
@@ -68,41 +68,57 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 
 			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
-
-				-- ÚJ: Irányított (Frontális) sebzés számítása
 				local directionToTarget = (targetRoot.Position - rootPart.Position).Unit
 				local facingDirection = rootPart.CFrame.LookVector
 				local dotProduct = facingDirection:Dot(directionToTarget)
 
-				-- distance <= 12 (Távolság) ÉS dotProduct > 0.3 (Karakter előtt van, kb 120 fokos szögben)
 				if distance <= 12 and dotProduct > 0.3 then
-					local finalDamage = baseDamage
+					local finalDamage = 0
 					local isCrit = false
 
-					-- 1. Kritikus ütés ellenőrzése
-					if math.random(1, 100) <= stats.CritChance.Value then
-						finalDamage = finalDamage * 2
-						isCrit = true
-					end
+					-- ==========================================
+					-- ÚJ: BÁNYÁSZAT (ÉRC) ELLENŐRZÉSE
+					-- ==========================================
+					local isOre = obj:GetAttribute("IsOre")
 
-					-- 2. Szörny / Metinkő / Ember elleni erő JAVÍTÁSA
-					-- Mivel letöröltük a MetinStoneLogic scriptet a kövekről, a mappájuk alapján azonosítjuk őket!
-					local isMetin = (obj.Parent and obj.Parent.Name == "MetinStones")
+					if isOre then
+						-- Van-e csákány a kezében?
+						local isPickaxe = false
+						if weaponName ~= "" and ItemDatabase[weaponName] and ItemDatabase[weaponName].IsPickaxe then
+							isPickaxe = true
+						end
 
-					if isMetin then
-						finalDamage = finalDamage * (1 + (stats.StrongVsMetin.Value / 100))
-					elseif obj:FindFirstChild("IsPlayer") then
-						finalDamage = finalDamage * (1 + (stats.StrongVsPlayer.Value / 100))
+						-- Ha nincs csákány, megszakítjuk az ütést (nem sebez!)
+						if not isPickaxe then return end 
+
+						-- A csákány mindig 1-et sebez az ércbe
+						finalDamage = 1 
 					else
-						finalDamage = finalDamage * (1 + (stats.StrongVsMonster.Value / 100))
-					end
+						-- NORMÁL SZÖRNY / JÁTÉKOS SEBZÉS
+						local defense = 0 
+						finalDamage = math.max(1, baseDamage - defense)
 
-					finalDamage = math.floor(finalDamage)
+						if math.random(1, 100) <= stats.CritChance.Value then
+							finalDamage = finalDamage * 2
+							isCrit = true
+						end
 
-					-- 3. Életvarázs (Life Steal)
-					if stats.LifeSteal.Value > 0 then
-						local healAmt = finalDamage * (stats.LifeSteal.Value / 100)
-						character.Humanoid.Health = math.min(character.Humanoid.MaxHealth, character.Humanoid.Health + healAmt)
+						local isMetin = (obj.Parent and obj.Parent.Name == "MetinStones")
+
+						if isMetin then
+							finalDamage = finalDamage * (1 + (stats.StrongVsMetin.Value / 100))
+						elseif obj:FindFirstChild("IsPlayer") then
+							finalDamage = finalDamage * (1 + (stats.StrongVsPlayer.Value / 100))
+						else
+							finalDamage = finalDamage * (1 + (stats.StrongVsMonster.Value / 100))
+						end
+
+						finalDamage = math.floor(finalDamage)
+
+						if stats.LifeSteal.Value > 0 then
+							local healAmt = finalDamage * (stats.LifeSteal.Value / 100)
+							character.Humanoid.Health = math.min(character.Humanoid.MaxHealth, character.Humanoid.Health + healAmt)
+						end
 					end
 
 					-- Sebzés kiosztása és kliens értesítése

@@ -138,7 +138,7 @@ local SHOPS = {
 	},
 	["Vegyesbolt"] = {
 		Title = "VEGYESBOLT",
-		Items = {"Életerő Ital", "Mana Ital","Zöld Ital","Ügyesség itala"}
+		Items = {"Életerő Ital", "Mana Ital","Zöld Ital","Ügyesség itala","Csákány+0"}
 	}
 }
 

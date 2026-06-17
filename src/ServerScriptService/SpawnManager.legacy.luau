@@ -6,7 +6,6 @@ local SpawnDatabase = require(ReplicatedStorage:WaitForChild("SpawnDatabase"))
 
 local spawnZonesFolder = Workspace:WaitForChild("SpawnZones")
 
--- JAVÍTÁS: Mappa biztonságos lekérése!
 local function getFolder(folderName)
 	local folder = Workspace:FindFirstChild(folderName)
 	if not folder then
@@ -17,11 +16,10 @@ local function getFolder(folderName)
 	return folder
 end
 
--- VÁRUNK EGY KICSIT! 
--- Ezzel megvárjuk, hogy a MetinStoneLogic is felébredjen, és ugyanazt a mappát használják!
 task.wait(1) 
 local monstersFolder = getFolder("Monsters")
 local metinFolder = getFolder("MetinStones")
+local oresFolder = getFolder("Ores") -- ÚJ: Ércek mappája
 
 local function getRandomGroundPosition(zonePart)
 	local rx = zonePart.Position.X + (math.random() - 0.5) * zonePart.Size.X
@@ -33,7 +31,8 @@ local function getRandomGroundPosition(zonePart)
 
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	rayParams.FilterDescendantsInstances = {spawnZonesFolder, monstersFolder, metinFolder}
+	-- ÚJ: Az Ores mappát is kihagyjuk a Raycastból
+	rayParams.FilterDescendantsInstances = {spawnZonesFolder, monstersFolder, metinFolder, oresFolder}
 
 	local result = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
 	if result then
@@ -51,6 +50,7 @@ local function spawnPack(zoneName, zoneData, zonePart)
 	local spawnedEntities = {}
 
 	local packID = HttpService:GenerateGUID(false)
+	local MonsterDatabase = require(ReplicatedStorage:WaitForChild("MonsterDatabase"))
 
 	for i, entityName in ipairs(zoneData.Pack) do
 		local template = ReplicatedStorage:FindFirstChild(entityName)
@@ -67,16 +67,24 @@ local function spawnPack(zoneName, zoneData, zonePart)
 				newEntity:PivotTo(CFrame.new(centerPos + offset))
 			end
 
-			-- JAVÍTÁS: Helyes Mappa ÉS Horgonyzás beállítása
-			if zoneData.Type == "MetinStone" then
+			-- ==========================================
+			-- ÚJ: ÉRCEK KÜLÖNVÁLASZTÁSA ÉS HORGONYZÁSA
+			-- ==========================================
+			local dbData = MonsterDatabase[entityName]
+
+			if dbData and dbData.Type == "Ore" then
+				newEntity:SetAttribute("IsOre", true)
+				newEntity.Parent = oresFolder
+				if newEntity:FindFirstChild("HumanoidRootPart") then
+					newEntity.HumanoidRootPart.Anchored = true 
+				end
+			elseif zoneData.Type == "MetinStone" then
 				newEntity.Parent = metinFolder
-				-- A Köveket FIXEN a földhöz ragasztjuk
 				if newEntity:FindFirstChild("HumanoidRootPart") then
 					newEntity.HumanoidRootPart.Anchored = true 
 				end
 			else
 				newEntity.Parent = monstersFolder
-				-- A Szörnyeket kilazítjuk, hogy tudjanak futni feléd
 				if newEntity:FindFirstChild("HumanoidRootPart") then
 					newEntity.HumanoidRootPart.Anchored = false 
 				end
@@ -111,7 +119,10 @@ task.spawn(function()
 	for zoneName, zoneData in pairs(SpawnDatabase) do
 		local zonePart = spawnZonesFolder:FindFirstChild(zoneName)
 		if zonePart then
-			for i = 1, zoneData.MaxPacks do
+			-- BIZTONSÁGI JAVÍTÁS: Ha a MaxPacks nil, akkor alapból 1-et használunk, hogy ne fagyjon le!
+			local maxPacks = zoneData.MaxPacks or 1 
+
+			for i = 1, maxPacks do
 				task.wait(0.2) 
 				spawnPack(zoneName, zoneData, zonePart)
 			end

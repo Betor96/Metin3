@@ -93,6 +93,16 @@ local MonsterDatabase = {
 		MinDrops = 2,
 		MaxDrops = 4
 	},
+	
+	-- ÉRCEK (10 HP azt jelenti, hogy pontosan 10-szer kell megütni a csákánnyal)
+	["Gyémánt Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Gyémánt Érc"},
+	["Arany Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Arany Érc"},
+	["Vas Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Vas Érc"},
+	["Kristály Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Kristály Érc"},
+	["Ruby Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Ruby Érc"},
+	["Smaragd Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Smaragd Érc"},
+	["Jáde Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Jáde Érc"},
+	["Ametiszt Érc"] = {Type = "Ore", MaxHealth = 10, DropItem = "Ametiszt Érc"},
 }
 
 return MonsterDatabase

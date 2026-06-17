@@ -17,8 +17,16 @@ local SpawnDatabase = {
 		Pack = {"Harci Metin"}, -- Csak a kő neve (a kő egy 1 fős "csoport")
 		MaxPacks = 3,       -- Maximum 3 kő lehet a zónában
 		RespawnTime = 120   -- Ha egy követ betörnek, 2 perc (120 mp) múlva esik le egy új
-	}
+	},
 
+	-- PÉLDA EGY ÉRC ZÓNÁRA A PÁLYÁN:
+	["Vas_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Vas Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
 	-- IDE ÍRHATSZ BÁRMENNYI ZÓNÁT KÉSŐBB!
 }
 
