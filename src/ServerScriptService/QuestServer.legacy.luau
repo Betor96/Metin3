@@ -42,8 +42,11 @@ AcceptQuest.OnServerEvent:Connect(function(player, questName)
 
 	if questsFolder:FindFirstChild(questName) then return end -- Már felvette
 
+	-- ==========================================
+	-- JAVÍTÁS: Végleges tiltás szerver oldalon, ha már kész van!
+	-- ==========================================
 	local completedFolder = player:FindFirstChild("CompletedQuests")
-	if not questData.IsRepeatable and completedFolder and completedFolder:FindFirstChild(questName) then return end
+	if completedFolder and completedFolder:FindFirstChild(questName) then return end 
 
 	-- SZINT ELLENŐRZÉS (+10 SZABÁLY)
 	local playerLevel = 1
@@ -149,13 +152,16 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 
 		qVal:Destroy()
 
-		if not questData.IsRepeatable then
-			local completedFolder = player:FindFirstChild("CompletedQuests")
-			if completedFolder then
-				local doneMark = Instance.new("StringValue")
-				doneMark.Name = questName
-				doneMark.Parent = completedFolder
-			end
+		qVal:Destroy()
+
+		-- ==========================================
+		-- JAVÍTÁS: Küldetés mentése a befejezettek közé (Minden küldetés csak 1x csinálható)
+		-- ==========================================
+		local completedFolder = player:FindFirstChild("CompletedQuests")
+		if completedFolder and not completedFolder:FindFirstChild(questName) then
+			local doneMark = Instance.new("StringValue")
+			doneMark.Name = questName
+			doneMark.Parent = completedFolder
 		end
 	end
 end)

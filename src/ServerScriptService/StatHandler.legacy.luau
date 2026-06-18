@@ -96,8 +96,17 @@ local function setupPlayer(player)
 		slot.Changed:Connect(function() recalculateStats(player) end)
 	end
 
-	player.CharacterAdded:Connect(function()
+	player.CharacterAdded:Connect(function(newChar)
+		-- JAVÍTÁS 1: Megvárjuk, amíg a karakter fizikailag biztosan létrejön!
+		newChar:WaitForChild("Humanoid", 5)
 		task.wait(0.5)
+		recalculateStats(player)
+	end)
+
+	-- JAVÍTÁS 2: Biztonsági frissítés! Amikor belépsz, adunk 2 másodpercet az adatbázisnak,
+	-- hogy mindent betöltsön, majd erőszakkal újraszámoljuk a statisztikákat.
+	task.spawn(function()
+		task.wait(2)
 		recalculateStats(player)
 	end)
 end

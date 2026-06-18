@@ -272,7 +272,26 @@ humanoid.Died:Connect(function()
 		local droppedItem = Instance.new("Part")
 		droppedItem.Name = "LootPart"
 		droppedItem.Size = Vector3.new(0.4, 0.4, 0.4) 
-		droppedItem.Position = deathPosition + Vector3.new(math.random(-3,3), 2, math.random(-3,3))
+
+		-- ==========================================
+		-- JAVÍTÁS: RAYCAST A FÖLDHÖZ ÉS HITBOX LEVÉTELE
+		-- ==========================================
+		local dropPos = deathPosition + Vector3.new(math.random(-3,3), 3, math.random(-3,3))
+
+		local rayParams = RaycastParams.new()
+		rayParams.FilterType = Enum.RaycastFilterType.Exclude
+		-- A lézer menjen át magán a szörnyön, az eddigi tárgyakon és a játékosokon
+		rayParams.FilterDescendantsInstances = {npc, droppedFolder, Players:GetPlayers()}
+
+		local ray = workspace:Raycast(dropPos, Vector3.new(0, -50, 0), rayParams)
+		if ray then
+			droppedItem.Position = ray.Position + Vector3.new(0, 0.2, 0)
+		else
+			droppedItem.Position = dropPos
+		end
+
+		droppedItem.Anchored = true
+		droppedItem.CanCollide = false
 
 		local itemColor = Color3.fromRGB(200, 200, 200)
 		local textColor = Color3.new(1, 1, 1)
@@ -286,29 +305,57 @@ humanoid.Died:Connect(function()
 
 		droppedItem.Color = itemColor
 
-		local itemTag = Instance.new("StringValue")
+		local itemTag = Instance.new("StringValue", droppedItem)
 		itemTag.Name = "ItemName"
 		itemTag.Value = itemName
-		itemTag.Parent = droppedItem
+
+		-- ==========================================
+		-- ÚJ: TULAJDONJOG, NÉV ÉS IDŐZÍTŐ
+		-- ==========================================
+		local killerName = killer and killer.Name or ""
+		local ownerTag = Instance.new("StringValue", droppedItem)
+		ownerTag.Name = "Owner"
+		ownerTag.Value = killerName
 
 		local textBillboard = Instance.new("BillboardGui")
-		textBillboard.Size = UDim2.new(0, 120, 0, 25)
+		textBillboard.Size = UDim2.new(0, 150, 0, 40)
 		textBillboard.StudsOffset = Vector3.new(0, 1.2, 0)
 		textBillboard.AlwaysOnTop = true
 		textBillboard.Adornee = droppedItem
-
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Size = UDim2.new(1, 0, 1, 0)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.Text = itemName
-		nameLabel.Font = Enum.Font.GothamBold
-		nameLabel.TextScaled = true
-		nameLabel.TextStrokeTransparency = 0
-		nameLabel.TextColor3 = textColor
-		nameLabel.Parent = textBillboard
-
 		textBillboard.Parent = droppedItem
+
+		local dropNameLabel = Instance.new("TextLabel", textBillboard)
+		dropNameLabel.Size = UDim2.new(1, 0, 1, 0)
+		dropNameLabel.BackgroundTransparency = 1
+		dropNameLabel.RichText = true
+		dropNameLabel.Font = Enum.Font.GothamBold
+		dropNameLabel.TextScaled = true
+		dropNameLabel.TextStrokeTransparency = 0
+
+		-- Eredeti tárgy szín kinyerése a RichText-hez
+		local r, g, b = math.floor(textColor.R*255), math.floor(textColor.G*255), math.floor(textColor.B*255)
+		local baseColorStr = "rgb("..r..","..g..","..b..")"
+
+		if killerName ~= "" then
+			dropNameLabel.Text = '<font color="rgb(255, 255, 50)">' .. itemName .. '</font>\n<font color="rgb(200, 200, 200)">&lt;' .. killerName .. '&gt;</font>'
+		else
+			dropNameLabel.Text = '<font color="' .. baseColorStr .. '">' .. itemName .. '</font>'
+		end
+
 		droppedItem.Parent = droppedFolder
+
+		task.spawn(function()
+			task.wait(120) 
+			if droppedItem and droppedItem.Parent then
+				ownerTag.Value = ""
+				dropNameLabel.Text = '<font color="' .. baseColorStr .. '">' .. itemName .. '</font>' 
+			end
+
+			task.wait(180) 
+			if droppedItem and droppedItem.Parent then
+				droppedItem:Destroy()
+			end
+		end)
 	end
 
 	if killer then

@@ -17,31 +17,35 @@ PickupItems.OnServerEvent:Connect(function(player)
 
 	if not rootPart or not inv or not droppedFolder or not stats then return end
 
-	-- ÚJ: Kiszámoljuk hány hely van feloldva (pl. 2. oldal = 64 hely)
 	local maxUnlockedSlots = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
 
 	for _, itemPart in pairs(droppedFolder:GetChildren()) do
 		local dist = (itemPart.Position - rootPart.Position).Magnitude
 
 		if dist <= PICKUP_RADIUS then
+			-- ==========================================
+			-- ÚJ: TULAJDONJOG ELLENŐRZÉSE
+			-- ==========================================
+			local ownerTag = itemPart:FindFirstChild("Owner")
+			if ownerTag and ownerTag.Value ~= "" and ownerTag.Value ~= player.Name then
+				continue -- Ha van tulajdonosa, és az NEM a játékos, akkor nem veheti fel! (Ugrás a következőre)
+			end
+
 			local itemTag = itemPart:FindFirstChild("ItemName")
 			if itemTag then
 				local itemName = itemTag.Value
 				local itemData = ItemDatabase[itemName]
 				local maxStack = (itemData and itemData.MaxStack) or 1
 
-				-- ÚJ: Kiolvassuk, hogy a földön lévő kupacban mennyi tárgy van!
 				local amtTag = itemPart:FindFirstChild("ItemAmount")
 				local dropAmount = amtTag and amtTag.Value or 1
 
-				-- 1. STACKELÉS (Létező kupacba rakás)
 				if maxStack > 1 then
 					for i = 1, maxUnlockedSlots do
 						local slot = inv:FindFirstChild("Slot_" .. i)
 						if slot and slot.Value == itemName then
 							local amt = slot:FindFirstChild("Amount")
 							if amt and amt.Value < maxStack then
-								-- Kiszámoljuk mennyi fér még be
 								local spaceLeft = maxStack - amt.Value
 								local transfer = math.min(dropAmount, spaceLeft)
 
@@ -57,7 +61,6 @@ PickupItems.OnServerEvent:Connect(function(player)
 					end
 				end
 
-				-- 2. ÜRES HELY KERESÉSE (Ha még maradt a kupacból)
 				if dropAmount > 0 then
 					for i = 1, maxUnlockedSlots do
 						local slot = inv:FindFirstChild("Slot_" .. i)

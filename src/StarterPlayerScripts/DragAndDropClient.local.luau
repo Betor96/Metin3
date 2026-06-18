@@ -30,9 +30,6 @@ local eqNameToServer = {
 	["Pajzs"] = "Pajzs", ["Karkötő"] = "Karkoto"
 }
 
--- ==========================================
--- KOVÁCS ÉS ELADÁS ABLAKOK
--- ==========================================
 local bsFrame = Instance.new("Frame")
 bsFrame.Size = UDim2.new(0, 250, 0, 200)
 bsFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
@@ -178,6 +175,91 @@ local function promptSell(slotName, itemName)
 	currentSellSlot = slotName
 	sellFrame.Visible = true
 end
+
+-- ==========================================
+-- ÚJ: ELDOBÁS / MEGSEMMISÍTÉS ABLAK (PROMPT)
+-- ==========================================
+local discardFrame = Instance.new("Frame")
+discardFrame.Size = UDim2.new(0, 300, 0, 150)
+discardFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+discardFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
+discardFrame.BorderColor3 = Color3.fromRGB(150, 50, 50)
+discardFrame.BorderSizePixel = 3
+discardFrame.Active = true
+discardFrame.Visible = false
+discardFrame.ZIndex = 60
+discardFrame.Parent = invHud
+
+local discardTitle = Instance.new("TextLabel", discardFrame)
+discardTitle.Size = UDim2.new(1, 0, 0, 30)
+discardTitle.BackgroundColor3 = Color3.fromRGB(70, 30, 30)
+discardTitle.TextColor3 = Color3.new(1, 1, 1)
+discardTitle.Text = "TÁRGY KEZELÉSE"
+discardTitle.Font = Enum.Font.GothamBold
+discardTitle.ZIndex = 61
+
+local discardInfo = Instance.new("TextLabel", discardFrame)
+discardInfo.Size = UDim2.new(1, -20, 1, -80)
+discardInfo.Position = UDim2.new(0, 10, 0, 40)
+discardInfo.BackgroundTransparency = 1
+discardInfo.TextColor3 = Color3.new(1, 1, 1)
+discardInfo.Font = Enum.Font.Gotham
+discardInfo.TextSize = 14
+discardInfo.ZIndex = 61
+
+local btnDrop = Instance.new("TextButton", discardFrame)
+btnDrop.Size = UDim2.new(0, 85, 0, 30)
+btnDrop.Position = UDim2.new(0, 10, 1, -40)
+btnDrop.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+btnDrop.TextColor3 = Color3.new(1, 1, 1)
+btnDrop.Text = "Eldobás"
+btnDrop.Font = Enum.Font.GothamBold
+btnDrop.ZIndex = 61
+
+local btnDestroy = Instance.new("TextButton", discardFrame)
+btnDestroy.Size = UDim2.new(0, 100, 0, 30)
+btnDestroy.Position = UDim2.new(0, 100, 1, -40)
+btnDestroy.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+btnDestroy.TextColor3 = Color3.new(1, 1, 1)
+btnDestroy.Text = "Megsemmisítés"
+btnDestroy.Font = Enum.Font.GothamBold
+btnDestroy.ZIndex = 61
+
+local btnCancel = Instance.new("TextButton", discardFrame)
+btnCancel.Size = UDim2.new(0, 85, 0, 30)
+btnCancel.Position = UDim2.new(1, -95, 1, -40)
+btnCancel.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+btnCancel.TextColor3 = Color3.new(1, 1, 1)
+btnCancel.Text = "Mégse"
+btnCancel.Font = Enum.Font.GothamBold
+btnCancel.ZIndex = 61
+
+local pendingDrop = nil
+
+btnCancel.MouseButton1Click:Connect(function()
+	discardFrame.Visible = false
+	pendingDrop = nil
+end)
+
+btnDrop.MouseButton1Click:Connect(function()
+	if pendingDrop then
+		DropItem:FireServer(pendingDrop.Folder, pendingDrop.Slot, pendingDrop.Amount)
+		discardFrame.Visible = false
+		pendingDrop = nil
+	end
+end)
+
+btnDestroy.MouseButton1Click:Connect(function()
+	if pendingDrop then
+		local DestroyItem = Events:FindFirstChild("DestroyItem")
+		if DestroyItem then
+			DestroyItem:FireServer(pendingDrop.Folder, pendingDrop.Slot, pendingDrop.Amount)
+		end
+		discardFrame.Visible = false
+		pendingDrop = nil
+	end
+end)
+
 
 -- ==========================================
 -- TOOLTIP RENDSZER (KÜLÖN RÉTEGEN)
@@ -462,11 +544,11 @@ end)
 -- ==========================================
 local dragging = false
 local dragClone = nil
-local dragOriginFolder = nil -- JAVÍTÁS: Pontos eredet tárolása
-local dragOriginSlot = nil   -- JAVÍTÁS: Mivel lapozhatunk menet közben, nem elég az UI-t megjegyezni!
+local dragOriginFolder = nil 
+local dragOriginSlot = nil   
 local dragConnection = nil
 local dragSplitAmount = nil
-local canPageSwitchHover = true -- ÚJ JAVÍTÁS: A lapozást blokkoló kapcsoló
+local canPageSwitchHover = true 
 
 local lastClickTime = 0
 local lastClickedSlot = nil
@@ -476,13 +558,10 @@ local function getSlotData(guiObject)
 		local num = tonumber(guiObject.Name:match("%d+"))
 		local serverSlotNum = ((currentPage - 1) * 32) + num
 		return "Inventory", "Slot_" .. serverSlotNum, invFolder:FindFirstChild("Slot_" .. serverSlotNum)
-
-		-- ÚJ: BANK REKESZEK FELISMERÉSE
 	elseif guiObject.Name:match("BankSlot_") then
 		local num = tonumber(guiObject.Name:match("%d+"))
 		local bankFolder = player:FindFirstChild("Bank")
 		return "Bank", "Slot_" .. num, bankFolder and bankFolder:FindFirstChild("Slot_" .. num)
-
 	elseif eqNameToServer[guiObject.Name] then
 		local serverName = eqNameToServer[guiObject.Name]
 		return "Equipment", serverName, eqFolder:FindFirstChild(serverName)
@@ -549,7 +628,6 @@ UserInputService.InputBegan:Connect(function(input)
 						elseif itemData.MaxStack and itemData.MaxStack > 1 then
 							local AutoStack = Events:FindFirstChild("AutoStack")
 							if AutoStack then 
-								-- Szólunk, hogy Bankban vagy Táskában vonjuk össze
 								local isBank = (folderStr == "Bank")
 								AutoStack:FireServer(slotName, isBank) 
 							end
@@ -561,8 +639,6 @@ UserInputService.InputBegan:Connect(function(input)
 				lastClickTime = currentTime
 				lastClickedSlot = gui
 				dragging = true
-
-				-- JAVÍTÁS: Eltároljuk pontosan honnan indult a húzás
 				dragOriginFolder = folderStr
 				dragOriginSlot = slotName
 				tooltip.Visible = false
@@ -602,9 +678,6 @@ UserInputService.InputBegan:Connect(function(input)
 					local mousePos = UserInputService:GetMouseLocation()
 					dragClone.Position = UDim2.new(0, mousePos.X - 20, 0, mousePos.Y - inset.Y - 20)
 
-					-- ==========================================
-					-- ÚJ JAVÍTÁS: LAPOZÁS DRAG & DROP KÖZBEN
-					-- ==========================================
 					local guisAtHover = playerGui:GetGuiObjectsAtPosition(mousePos.X, mousePos.Y - inset.Y)
 					local hoveredNext = false
 					local hoveredPrev = false
@@ -616,7 +689,7 @@ UserInputService.InputBegan:Connect(function(input)
 
 					if hoveredNext then
 						if canPageSwitchHover then
-							canPageSwitchHover = false -- Letiltjuk az azonnali dupla ugrást
+							canPageSwitchHover = false 
 							if currentPage < maxPages then 
 								currentPage += 1 
 								renderItems() 
@@ -624,14 +697,13 @@ UserInputService.InputBegan:Connect(function(input)
 						end
 					elseif hoveredPrev then
 						if canPageSwitchHover then
-							canPageSwitchHover = false -- Letiltjuk az azonnali dupla ugrást
+							canPageSwitchHover = false 
 							if currentPage > 1 then 
 								currentPage -= 1 
 								renderItems() 
 							end
 						end
 					else
-						-- Amint lehúzzuk az egeret a gombról, újra engedélyezzük a lapozást!
 						canPageSwitchHover = true
 					end
 				end)
@@ -656,7 +728,6 @@ UserInputService.InputEnded:Connect(function(input)
 			if getSlotData(gui) then targetSlotUI = gui break end
 		end
 
-		-- JAVÍTÁS: A célponthoz betöltjük a biztosan eltárolt kezdő helyet!
 		local fromFolderStr, fromSlotName = dragOriginFolder, dragOriginSlot
 		local itemName = nil
 
@@ -664,7 +735,7 @@ UserInputService.InputEnded:Connect(function(input)
 			itemName = invFolder:FindFirstChild(fromSlotName).Value 
 		elseif fromFolderStr == "Equipment" then 
 			itemName = eqFolder:FindFirstChild(fromSlotName).Value 
-		elseif fromFolderStr == "Bank" then -- ÚJ: Kiveszünk tárgyat a Bankból
+		elseif fromFolderStr == "Bank" then 
 			local bFolder = player:FindFirstChild("Bank")
 			if bFolder and bFolder:FindFirstChild(fromSlotName) then itemName = bFolder[fromSlotName].Value end
 		elseif fromFolderStr == "Hotbar" then 
@@ -717,7 +788,14 @@ UserInputService.InputEnded:Connect(function(input)
 							bsFrame.Visible = true
 						end
 					else
-						DropItem:FireServer(fromFolderStr, fromSlotName, dragSplitAmount)
+						-- ==========================================
+						-- JAVÍTÁS: HA KINT VAN A LEVEGŐBEN, MEGJELENIK A PROMPT ABLAK
+						-- ==========================================
+						local amtText = ""
+						if dragSplitAmount then amtText = " (x" .. dragSplitAmount .. ")" end
+						discardInfo.Text = "Mit szeretnél tenni ezzel:\n" .. itemName .. amtText .. "?"
+						pendingDrop = {Folder = fromFolderStr, Slot = fromSlotName, Amount = dragSplitAmount}
+						discardFrame.Visible = true
 					end
 				end
 			end

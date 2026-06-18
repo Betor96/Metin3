@@ -14,9 +14,6 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 local CheckBankPwd = Events:WaitForChild("CheckBankPwd")
 local ChangeBankPwd = Events:WaitForChild("ChangeBankPwd")
 
--- ==========================================
--- NPC INTERAKCIÓS MENÜ
--- ==========================================
 local actionMenu = Instance.new("Frame", screenGui)
 actionMenu.Size = UDim2.new(0, 200, 0, 150)
 actionMenu.Position = UDim2.new(0.5, -100, 0.5, -75)
@@ -56,9 +53,6 @@ closeActionBtn.TextColor3 = Color3.new(1,1,1)
 closeActionBtn.Text = "Bezárás"
 closeActionBtn.Font = Enum.Font.GothamBold
 
--- ==========================================
--- JELSZÓ KÉRŐ ABLAK
--- ==========================================
 local pwdFrame = Instance.new("Frame", screenGui)
 pwdFrame.Size = UDim2.new(0, 200, 0, 120)
 pwdFrame.Position = UDim2.new(0.5, -100, 0.5, -60)
@@ -98,9 +92,6 @@ pwdCancel.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 pwdCancel.TextColor3 = Color3.new(1,1,1)
 pwdCancel.Text = "Mégse"
 
--- ==========================================
--- JELSZÓ MÓDOSÍTÓ ABLAK
--- ==========================================
 local changeFrame = Instance.new("Frame", screenGui)
 changeFrame.Size = UDim2.new(0, 200, 0, 200)
 changeFrame.Position = UDim2.new(0.5, -100, 0.5, -100)
@@ -154,9 +145,6 @@ chgCancel.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 chgCancel.TextColor3 = Color3.new(1,1,1)
 chgCancel.Text = "Mégse"
 
--- ==========================================
--- JELSZÓ MEZŐK SZIGORÍTÁSA (MAX 6 SZÁM, NINCS BETŰ)
--- ==========================================
 local function restrictTo6Digits(box)
 	box:GetPropertyChangedSignal("Text"):Connect(function()
 		local filtered = box.Text:gsub("%D", "") 
@@ -193,6 +181,36 @@ bankFrameTitle.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
 bankFrameTitle.TextColor3 = Color3.new(1,1,1)
 bankFrameTitle.Text = "RAKTÁR"
 bankFrameTitle.Font = Enum.Font.GothamBold
+bankFrameTitle.Active = true -- JAVÍTÁS: Szükséges a húzáshoz!
+
+-- ==========================================
+-- JAVÍTÁS: ABLAK MOZGATÁSA (DRAG) A CÍMSORON KERESZTÜL
+-- ==========================================
+local draggingBank, dragInputBank, mousePosBank, framePosBank
+bankFrameTitle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingBank = true
+		mousePosBank = input.Position
+		framePosBank = bankMainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then draggingBank = false end
+		end)
+	end
+end)
+
+bankFrameTitle.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then dragInputBank = input end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInputBank and draggingBank then
+		local delta = input.Position - mousePosBank
+		bankMainFrame.Position = UDim2.new(
+			framePosBank.X.Scale, framePosBank.X.Offset + delta.X, 
+			framePosBank.Y.Scale, framePosBank.Y.Offset + delta.Y
+		)
+	end
+end)
 
 local bankCloseBtn = Instance.new("TextButton", bankMainFrame)
 bankCloseBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -213,7 +231,6 @@ grid.CellSize = UDim2.new(0, 45, 0, 45)
 grid.CellPadding = UDim2.new(0, 5, 0, 5)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Bank Rekeszek létrehozása
 for i = 1, 32 do
 	local uiSlot = Instance.new("Frame", slotContainer)
 	uiSlot.Name = "BankSlotUI_" .. i
@@ -249,7 +266,6 @@ pageLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
 pageLabel.Text = "Oldal: 1 / 4"
 pageLabel.Font = Enum.Font.GothamBold
 
--- Zárolás Képernyő (Bank)
 local lockOverlay = Instance.new("Frame", bankMainFrame)
 lockOverlay.Size = UDim2.new(1, -10, 0, 395)
 lockOverlay.Position = UDim2.new(0, 5, 0, 40)
@@ -284,9 +300,6 @@ buyRobuxBtn.Text = "Feloldás: 100 Robux"
 buyRobuxBtn.Font = Enum.Font.GothamBold
 buyRobuxBtn.ZIndex = 21
 
--- ==========================================
--- LOGIKA ÉS GOMBOK (JAVÍTVA)
--- ==========================================
 local bankCurrentPage = 1
 
 local function renderBankItems()
@@ -303,7 +316,6 @@ local function renderBankItems()
 		lockOverlay.Visible = false
 	end
 
-	-- JAVÍTÁS: Mivel a neveket megváltoztatjuk, LayoutOrder alapján keressük meg a UI dobozokat!
 	local uiSlots = {}
 	for _, child in pairs(slotContainer:GetChildren()) do
 		if child:IsA("Frame") then
@@ -317,7 +329,7 @@ local function renderBankItems()
 		local slotVal = bankFolder:FindFirstChild("Slot_" .. serverSlotNum)
 
 		if uiSlot then
-			uiSlot.Name = "BankSlot_" .. serverSlotNum -- Ezt olvassa ki a DragAndDrop!
+			uiSlot.Name = "BankSlot_" .. serverSlotNum 
 			uiSlot:ClearAllChildren()
 			if slotVal and slotVal.Value ~= "" then
 				local itemIcon = Instance.new("TextLabel", uiSlot)
@@ -359,10 +371,6 @@ bankCloseBtn.MouseButton1Click:Connect(function() bankMainFrame.Visible = false 
 
 task.spawn(function()
 	local bankFolder = player:WaitForChild("Bank")
-
-	-- ==========================================
-	-- JAVÍTÁS: Ráakaszkodunk az összes létező rekeszre, hogy azonnal reagáljon!
-	-- ==========================================
 	for _, slot in pairs(bankFolder:GetChildren()) do
 		slot.Changed:Connect(renderBankItems)
 		local amt = slot:WaitForChild("Amount", 2)
@@ -370,22 +378,17 @@ task.spawn(function()
 			amt.Changed:Connect(renderBankItems)
 		end
 	end
-
 	bankFolder.DescendantAdded:Connect(function(descendant)
 		if descendant:IsA("ValueBase") then descendant.Changed:Connect(renderBankItems) end
 		renderBankItems()
 	end)
 	bankFolder.DescendantRemoving:Connect(renderBankItems)
-
 	local stats = player:WaitForChild("PlayerStats")
 	if stats:WaitForChild("BankUnlockedPages") then
 		stats.BankUnlockedPages.Changed:Connect(renderBankItems)
 	end
 end)
 
--- ==========================================
--- NPC KATTINTÁS FIGYELÉSE
--- ==========================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -403,13 +406,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 closeActionBtn.MouseButton1Click:Connect(function() actionMenu.Visible = false end)
-
 openBtn.MouseButton1Click:Connect(function()
 	actionMenu.Visible = false
 	pwdInput.Text = ""
 	pwdFrame.Visible = true
 end)
-
 changePwdBtn.MouseButton1Click:Connect(function()
 	actionMenu.Visible = false
 	oldPwdInput.Text = ""
@@ -417,18 +418,15 @@ changePwdBtn.MouseButton1Click:Connect(function()
 	newPwdInput2.Text = ""
 	changeFrame.Visible = true
 end)
-
 pwdCancel.MouseButton1Click:Connect(function() pwdFrame.Visible = false end)
 chgCancel.MouseButton1Click:Connect(function() changeFrame.Visible = false end)
 
--- Jelszó beküldése
 pwdSubmit.MouseButton1Click:Connect(function()
 	local success = CheckBankPwd:InvokeServer(pwdInput.Text)
 	if success then
 		pwdFrame.Visible = false
 		bankMainFrame.Visible = true
 		renderBankItems()
-		-- Kinyitjuk mellé a normál táskát is a pakoláshoz
 		local invHud = player.PlayerGui:FindFirstChild("InventoryHUD")
 		if invHud and invHud:FindFirstChild("MainFrame") then invHud.MainFrame.Visible = true end
 	else
@@ -437,7 +435,6 @@ pwdSubmit.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Jelszó csere beküldése
 chgSubmit.MouseButton1Click:Connect(function()
 	if newPwdInput.Text ~= newPwdInput2.Text then
 		newPwdInput.Text = ""
@@ -445,7 +442,6 @@ chgSubmit.MouseButton1Click:Connect(function()
 		newPwdInput.PlaceholderText = "Nem egyezik!"
 		return
 	end
-
 	local success, msg = ChangeBankPwd:InvokeServer(oldPwdInput.Text, newPwdInput.Text)
 	if success then
 		changeFrame.Visible = false

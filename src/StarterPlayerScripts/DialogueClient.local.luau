@@ -171,7 +171,10 @@ local function openDialogueList(npcName)
 		local isCompleted = completedQuests and completedQuests:FindFirstChild(qName)
 		local isActive = activeQuests and activeQuests:FindFirstChild(qName)
 
-		if isCompleted and not qData.IsRepeatable then continue end
+		-- ==========================================
+		-- JAVÍTÁS: SZIGORÚ ELLENŐRZÉS! Ha kész van, soha többé nem mutatjuk!
+		-- ==========================================
+		if isCompleted then continue end 
 		if not isActive and (pLevel < minLvl or pLevel > maxLvl) then continue end
 
 		local showQuest = false

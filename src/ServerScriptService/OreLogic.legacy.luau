@@ -26,21 +26,30 @@ local function setupOre(ore)
 	humanoid.Health = humanoid.MaxHealth
 	humanoid.WalkSpeed = 0 
 
-	-- Életcsík az érc fölé
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "OreHPBar"
-	billboard.Size = UDim2.new(0, 100, 0, 15)
+	billboard.Size = UDim2.new(0, 100, 0, 35) -- Megnövelve a név miatt
 	billboard.StudsOffset = Vector3.new(0, 4, 0) 
 	billboard.AlwaysOnTop = true
 	billboard.Parent = rootPart
 
+	-- ÚJ: NÉV KIÍRÁSA AZ ÉRC FÖLÉ
+	local nameText = Instance.new("TextLabel", billboard)
+	nameText.Size = UDim2.new(1, 0, 0, 15)
+	nameText.BackgroundTransparency = 1
+	nameText.Text = ore.Name
+	nameText.TextColor3 = Color3.fromRGB(150, 255, 150)
+	nameText.Font = Enum.Font.GothamBold
+	nameText.TextScaled = true
+
 	local bgFrame = Instance.new("Frame", billboard)
-	bgFrame.Size = UDim2.new(1, 0, 1, 0)
+	bgFrame.Size = UDim2.new(1, 0, 0, 15)
+	bgFrame.Position = UDim2.new(0, 0, 0, 20) -- HP csík lejjebb tolása
 	bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 
 	local hpBar = Instance.new("Frame", bgFrame)
 	hpBar.Size = UDim2.new(1, 0, 1, 0)
-	hpBar.BackgroundColor3 = Color3.fromRGB(200, 180, 50) -- Arany/Érc szín
+	hpBar.BackgroundColor3 = Color3.fromRGB(200, 180, 50)
 	hpBar.BorderSizePixel = 0
 
 	local hpText = Instance.new("TextLabel", bgFrame)
@@ -62,7 +71,6 @@ local function setupOre(ore)
 			hpText.Text = "0 / " .. humanoid.MaxHealth
 			billboard:Destroy()
 
-			-- Ki ütötte le az ércet utoljára?
 			local killer = nil
 			local shortestDist = 50
 			for _, plr in pairs(Players:GetPlayers()) do
@@ -75,17 +83,14 @@ local function setupOre(ore)
 				end
 			end
 
-			-- Alapból 1 vagy 2 érc esik
 			local dropCount = math.random(1, 2)
-
-			-- Bónusz esély ellenőrzése a Csákányból!
 			if killer and killer:FindFirstChild("Equipment") then
 				local wSlot = killer.Equipment:FindFirstChild("Fegyver")
 				if wSlot and wSlot.Value ~= "" then
 					local wData = ItemDatabase[wSlot.Value]
 					if wData and wData.IsPickaxe and wData.DoubleOreChance then
 						if math.random(1, 100) <= wData.DoubleOreChance then
-							dropCount = dropCount * 2 -- CSÁKÁNY DUPLÁZÁS SIKERES!
+							dropCount = dropCount * 2 
 						end
 					end
 				end
@@ -94,16 +99,26 @@ local function setupOre(ore)
 			local dropsToSpawn = {}
 			for i = 1, dropCount do table.insert(dropsToSpawn, myData.DropItem) end
 
-			-- 3.5% ESÉLY SZIVÁRVÁNY KRISTÁLYRA (1000-ből 35)
-			if math.random(1, 1000) <= 35 then
-				table.insert(dropsToSpawn, "Szivárvány Kristály")
-			end
-
+			if math.random(1, 1000) <= 35 then table.insert(dropsToSpawn, "Szivárvány Kristály") end
 			for _, itemName in ipairs(dropsToSpawn) do
 				local droppedItem = Instance.new("Part")
 				droppedItem.Name = "LootPart"
 				droppedItem.Size = Vector3.new(0.5, 0.5, 0.5)
-				droppedItem.Position = rootPart.Position + Vector3.new(math.random(-3, 3), 3, math.random(-3, 3))
+
+				local dropPos = rootPart.Position + Vector3.new(math.random(-3, 3), 3, math.random(-3, 3))
+				local rayParams = RaycastParams.new()
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+				rayParams.FilterDescendantsInstances = {ore, droppedFolder, Players:GetPlayers()}
+
+				local ray = workspace:Raycast(dropPos, Vector3.new(0, -50, 0), rayParams)
+				if ray then
+					droppedItem.Position = ray.Position + Vector3.new(0, 0.2, 0)
+				else
+					droppedItem.Position = dropPos
+				end
+
+				droppedItem.Anchored = true
+				droppedItem.CanCollide = false
 
 				local isRainbow = (itemName == "Szivárvány Kristály")
 				droppedItem.Color = isRainbow and Color3.fromRGB(255, 100, 255) or Color3.fromRGB(150, 150, 150)
@@ -113,20 +128,54 @@ local function setupOre(ore)
 				itemTag.Name = "ItemName"
 				itemTag.Value = itemName
 
-				local textBillboard = Instance.new("BillboardGui", droppedItem)
-				textBillboard.Size = UDim2.new(0, 150, 0, 25)
+				-- ==========================================
+				-- ÚJ: TULAJDONJOG, NÉV ÉS IDŐZÍTŐ
+				-- ==========================================
+				local killerName = killer and killer.Name or ""
+				local ownerTag = Instance.new("StringValue", droppedItem)
+				ownerTag.Name = "Owner"
+				ownerTag.Value = killerName
+
+				local textBillboard = Instance.new("BillboardGui")
+				textBillboard.Size = UDim2.new(0, 150, 0, 40) 
 				textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
 				textBillboard.AlwaysOnTop = true 
+				textBillboard.Adornee = droppedItem
+				textBillboard.Parent = droppedItem
 
-				local nameLabel = Instance.new("TextLabel", textBillboard)
-				nameLabel.Size = UDim2.new(1, 0, 1, 0)
-				nameLabel.BackgroundTransparency = 1
-				nameLabel.Text = itemName
-				nameLabel.Font = Enum.Font.GothamBold
-				nameLabel.TextScaled = true
-				nameLabel.TextColor3 = isRainbow and Color3.fromRGB(255, 150, 255) or Color3.fromRGB(200, 200, 100)
+				local dropNameLabel = Instance.new("TextLabel", textBillboard)
+				dropNameLabel.Size = UDim2.new(1, 0, 1, 0)
+				dropNameLabel.BackgroundTransparency = 1
+				dropNameLabel.RichText = true
+				dropNameLabel.Font = Enum.Font.GothamBold
+				dropNameLabel.TextScaled = true
+				dropNameLabel.TextStrokeTransparency = 0
+
+				-- Ha Szivárvány, akkor lilás, amúgy szürke
+				local r, g, b = 180, 180, 180
+				if isRainbow then r, g, b = 255, 150, 255 end
+				local baseColorStr = "rgb("..r..","..g..","..b..")"
+
+				if killerName ~= "" then
+					dropNameLabel.Text = '<font color="rgb(255, 255, 50)">' .. itemName .. '</font>\n<font color="rgb(200, 200, 200)">&lt;' .. killerName .. '&gt;</font>'
+				else
+					dropNameLabel.Text = '<font color="' .. baseColorStr .. '">' .. itemName .. '</font>'
+				end
 
 				droppedItem.Parent = droppedFolder
+
+				task.spawn(function()
+					task.wait(120) 
+					if droppedItem and droppedItem.Parent then
+						ownerTag.Value = ""
+						dropNameLabel.Text = '<font color="' .. baseColorStr .. '">' .. itemName .. '</font>' 
+					end
+
+					task.wait(180) 
+					if droppedItem and droppedItem.Parent then
+						droppedItem:Destroy()
+					end
+				end)
 			end
 
 			task.wait(0.5)

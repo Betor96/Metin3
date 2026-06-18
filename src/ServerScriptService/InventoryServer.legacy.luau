@@ -9,6 +9,9 @@ local DropItem = Events:WaitForChild("DropItem")
 local AutoStack = Events:FindFirstChild("AutoStack") or Instance.new("RemoteEvent", Events)
 AutoStack.Name = "AutoStack"
 
+local DestroyItem = Events:FindFirstChild("DestroyItem") or Instance.new("RemoteEvent", Events)
+DestroyItem.Name = "DestroyItem"
+
 local PAGE_UNLOCK_PRODUCT_ID = 3604998372 
 
 local UnlockPageGold = Events:FindFirstChild("UnlockPageGold") or Instance.new("RemoteEvent", Events)
@@ -22,9 +25,6 @@ local typeToSlot = {
 	["Pajzs"] = "Pajzs", ["Karkötő"] = "Karkoto"
 }
 
--- ==========================================
--- OLDALAK FELOLDÁSA
--- ==========================================
 UnlockPageGold.OnServerEvent:Connect(function(player)
 	local stats = player:FindFirstChild("PlayerStats")
 	if not stats then return end
@@ -44,9 +44,6 @@ PromptRobuxUnlock.OnServerEvent:Connect(function(player)
 	MarketplaceService:PromptProductPurchase(player, PAGE_UNLOCK_PRODUCT_ID)
 end)
 
--- ==========================================
--- TÁRGYAK MOZGATÁSA (BELEÉRTVE A BANKOT IS!)
--- ==========================================
 MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName, splitAmount)
 	local inv = player:FindFirstChild("Inventory")
 	local eq = player:FindFirstChild("Equipment")
@@ -57,7 +54,6 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 	local fromFolder = (fromFolderStr == "Inventory") and inv or ((fromFolderStr == "Equipment") and eq or bank)
 	local toFolder = (toFolderStr == "Inventory") and inv or ((toFolderStr == "Equipment") and eq or bank)
 
-	-- JAVÍTÁS: Zárolt oldalakra ne lehessen pakolni (Táska ÉS Bank esetén is)
 	if toFolderStr == "Inventory" or toFolderStr == "Bank" then
 		local toSlotNum = tonumber(toSlotName:match("%d+"))
 		if toSlotNum then
@@ -142,18 +138,23 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 end)
 
 -- ==========================================
--- ELDOBÁS ÉS AUTO-STACK
+-- JAVÍTÁS: TÁRGY ELDOBÁSA (Nincs rajta tulajdonos)
+-- ==========================================
+-- ==========================================
+-- JAVÍTÁS: TÁRGY ELDOBÁSA (Név elmentése törlés előtt!)
 -- ==========================================
 DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
-	-- Eldobni csak Táskából vagy Felszerelésből lehet! Bankból nem lehet egyből a földre dobni!
 	if folderStr == "Bank" then return end 
 	local folder = (folderStr == "Inventory") and player:FindFirstChild("Inventory") or player:FindFirstChild("Equipment")
 	if folder then
 		local slot = folder:FindFirstChild(slotName)
 		if slot and slot.Value ~= "" then
+			-- JAVÍTÁS: Mielőtt töröljük a táskából, mentsük el a nevét!
+			local itemName = slot.Value 
+
 			local dropQty = 1
 			if slot:FindFirstChild("Amount") then
-				dropQty = (splitAmount and splitAmount > 0 and splitAmount <= slot.Amount.Value) and splitAmount or 1
+				dropQty = (splitAmount and splitAmount > 0 and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
 				slot.Amount.Value = slot.Amount.Value - dropQty
 				if slot.Amount.Value <= 0 then slot.Value = "" end
 			else
@@ -168,14 +169,73 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 
 				local droppedItem = Instance.new("Part")
 				droppedItem.Name = "LootPart"
-				droppedItem.Size = Vector3.new(0.5, 0.2, 3) 
-				droppedItem.Position = root.Position + (root.CFrame.LookVector * 5) + Vector3.new(0, 3, 0)
+				droppedItem.Size = Vector3.new(0.5, 0.2, 2) 
 				droppedItem.Color = Color3.fromRGB(150, 150, 150)
+
+				local dropPos = root.Position + (root.CFrame.LookVector * 5) + Vector3.new(0, 3, 0)
+				local rayParams = RaycastParams.new()
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+				local ignoreList = {char, droppedFolder}
+				if workspace:FindFirstChild("Monsters") then table.insert(ignoreList, workspace.Monsters) end
+				if workspace:FindFirstChild("MetinStones") then table.insert(ignoreList, workspace.MetinStones) end
+				if workspace:FindFirstChild("Ores") then table.insert(ignoreList, workspace.Ores) end
+				rayParams.FilterDescendantsInstances = ignoreList
+
+				local ray = workspace:Raycast(dropPos, Vector3.new(0, -50, 0), rayParams)
+				if ray then
+					droppedItem.Position = ray.Position + Vector3.new(0, 0.2, 0)
+				else
+					droppedItem.Position = dropPos
+				end
+
+				droppedItem.Anchored = true    
+				droppedItem.CanCollide = false 
 
 				local itemTag = Instance.new("StringValue", droppedItem)
 				itemTag.Name = "ItemName"
-				itemTag.Value = slot.Value -- FIX: Megtartottuk a nevét eldobás előtt!
+				itemTag.Value = itemName
+
+				local textBillboard = Instance.new("BillboardGui")
+				textBillboard.Size = UDim2.new(0, 150, 0, 25)
+				textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
+				textBillboard.AlwaysOnTop = true 
+				textBillboard.Adornee = droppedItem
+				textBillboard.Parent = droppedItem
+
+				local nameLabel = Instance.new("TextLabel", textBillboard)
+				nameLabel.Size = UDim2.new(1, 0, 1, 0)
+				nameLabel.BackgroundTransparency = 1
+				nameLabel.RichText = true
+				nameLabel.Text = '<font color="rgb(180, 180, 180)">' .. itemName .. '</font>'
+				nameLabel.Font = Enum.Font.GothamBold
+				nameLabel.TextScaled = true
+				nameLabel.TextStrokeTransparency = 0
+
 				droppedItem.Parent = droppedFolder
+			end
+		end
+	end
+end)
+
+-- ==========================================
+-- ÚJ: TÁRGY VÉGLEGES MEGSEMMISÍTÉSE
+-- ==========================================
+DestroyItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
+	local folder = nil
+	if folderStr == "Inventory" then folder = player:FindFirstChild("Inventory")
+	elseif folderStr == "Equipment" then folder = player:FindFirstChild("Equipment")
+	elseif folderStr == "Bank" then folder = player:FindFirstChild("Bank") end
+
+	if folder then
+		local slot = folder:FindFirstChild(slotName)
+		if slot and slot.Value ~= "" then
+			local dropQty = 1
+			if slot:FindFirstChild("Amount") then
+				dropQty = (splitAmount and splitAmount > 0 and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
+				slot.Amount.Value = slot.Amount.Value - dropQty
+				if slot.Amount.Value <= 0 then slot.Value = "" end
+			else
+				slot.Value = "" 
 			end
 		end
 	end

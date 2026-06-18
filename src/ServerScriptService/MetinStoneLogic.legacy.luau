@@ -10,10 +10,8 @@ local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
 local droppedFolder = Workspace:FindFirstChild("DroppedItems") or Instance.new("Folder", Workspace)
 droppedFolder.Name = "DroppedItems"
-
 local metinFolder = Workspace:FindFirstChild("MetinStones") or Instance.new("Folder", Workspace)
 metinFolder.Name = "MetinStones"
-
 local monstersFolder = Workspace:FindFirstChild("Monsters") or Instance.new("Folder", Workspace)
 monstersFolder.Name = "Monsters"
 
@@ -40,30 +38,37 @@ local function setupMetinStone(stone)
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "StoneHPBar"
-	billboard.Size = UDim2.new(0, 150, 0, 20)
+	billboard.Size = UDim2.new(0, 150, 0, 45) -- Megnövelve a név miatt
 	billboard.StudsOffset = Vector3.new(0, 8, 0) 
 	billboard.AlwaysOnTop = true
 	billboard.Parent = rootPart
 
-	local bgFrame = Instance.new("Frame")
-	bgFrame.Size = UDim2.new(1, 0, 1, 0)
-	bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	bgFrame.Parent = billboard
+	-- ÚJ: NÉV KIÍRÁSA
+	local nameLabel = Instance.new("TextLabel", billboard)
+	nameLabel.Size = UDim2.new(1, 0, 0, 20)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = stone.Name
+	nameLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextScaled = true
 
-	local hpBar = Instance.new("Frame")
+	local bgFrame = Instance.new("Frame", billboard)
+	bgFrame.Size = UDim2.new(1, 0, 0, 20)
+	bgFrame.Position = UDim2.new(0, 0, 0, 25) -- HP csík lejjebb tolása
+	bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+	local hpBar = Instance.new("Frame", bgFrame)
 	hpBar.Size = UDim2.new(1, 0, 1, 0)
 	hpBar.BackgroundColor3 = Color3.fromRGB(200, 30, 30) 
 	hpBar.BorderSizePixel = 0
-	hpBar.Parent = bgFrame
 
-	local hpText = Instance.new("TextLabel")
+	local hpText = Instance.new("TextLabel", bgFrame)
 	hpText.Size = UDim2.new(1, 0, 1, 0)
 	hpText.BackgroundTransparency = 1
 	hpText.Text = humanoid.MaxHealth .. " / " .. humanoid.MaxHealth
 	hpText.TextColor3 = Color3.new(1, 1, 1)
 	hpText.Font = Enum.Font.GothamBold
 	hpText.TextScaled = true
-	hpText.Parent = bgFrame
 
 	local spawnRate = stone:GetAttribute("SpawnRate") or 5 
 	local lastHitTime = 0
@@ -71,7 +76,6 @@ local function setupMetinStone(stone)
 	local isDead = false
 
 	local function spawnMonsters()
-		-- JAVÍTÁS 1: Ha időközben elpusztult a kő, kilépünk, és NEM idézünk!
 		if isDead then return end 
 		if not monsterTemplate then return end
 
@@ -104,7 +108,6 @@ local function setupMetinStone(stone)
 
 		local killer = nil
 		local shortestDist = 50
-
 		for _, plr in pairs(Players:GetPlayers()) do
 			if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
 				local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
@@ -126,8 +129,7 @@ local function setupMetinStone(stone)
 
 		if myData.LootPool and #myData.LootPool > 0 then
 			for i = 1, dropCount do
-				local itemName = myData.LootPool[math.random(1, #myData.LootPool)]
-				table.insert(dropsToSpawn, itemName)
+				table.insert(dropsToSpawn, myData.LootPool[math.random(1, #myData.LootPool)])
 			end
 		end
 
@@ -139,10 +141,8 @@ local function setupMetinStone(stone)
 					table.insert(validForDouble, itemName)
 				end
 			end
-
 			if #validForDouble > 0 then
-				local randomItemToDouble = validForDouble[math.random(1, #validForDouble)]
-				table.insert(dropsToSpawn, randomItemToDouble) 
+				table.insert(dropsToSpawn, validForDouble[math.random(1, #validForDouble)]) 
 			end
 		end
 
@@ -151,7 +151,21 @@ local function setupMetinStone(stone)
 			local droppedItem = Instance.new("Part")
 			droppedItem.Name = "LootPart"
 			droppedItem.Size = Vector3.new(0.5, 0.2, 2)
-			droppedItem.Position = rootPart.Position + Vector3.new(math.random(-8, 8), 5, math.random(-8, 8))
+
+			local dropPos = rootPart.Position + Vector3.new(math.random(-8, 8), 5, math.random(-8, 8))
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Exclude
+			rayParams.FilterDescendantsInstances = {stone, droppedFolder, monstersFolder, Players:GetPlayers()}
+
+			local ray = workspace:Raycast(dropPos, Vector3.new(0, -50, 0), rayParams)
+			if ray then
+				droppedItem.Position = ray.Position + Vector3.new(0, 0.2, 0)
+			else
+				droppedItem.Position = dropPos
+			end
+
+			droppedItem.Anchored = true
+			droppedItem.CanCollide = false
 
 			local itemColor = Color3.fromRGB(150, 150, 150)
 			local textColor = Color3.new(1, 1, 1)
@@ -162,28 +176,57 @@ local function setupMetinStone(stone)
 			end
 
 			droppedItem.Color = itemColor
-			local itemTag = Instance.new("StringValue")
+			local itemTag = Instance.new("StringValue", droppedItem)
 			itemTag.Name = "ItemName"
 			itemTag.Value = itemName
-			itemTag.Parent = droppedItem
+
+			-- ==========================================
+			-- ÚJ: TULAJDONJOG, NÉV ÉS IDŐZÍTŐ
+			-- ==========================================
+			local killerName = killer and killer.Name or ""
+			local ownerTag = Instance.new("StringValue", droppedItem)
+			ownerTag.Name = "Owner"
+			ownerTag.Value = killerName
 
 			local textBillboard = Instance.new("BillboardGui")
-			textBillboard.Size = UDim2.new(0, 150, 0, 25)
+			textBillboard.Size = UDim2.new(0, 150, 0, 40)
 			textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
 			textBillboard.AlwaysOnTop = true 
 			textBillboard.Adornee = droppedItem
-
-			local nameLabel = Instance.new("TextLabel")
-			nameLabel.Size = UDim2.new(1, 0, 1, 0)
-			nameLabel.BackgroundTransparency = 1
-			nameLabel.Text = itemName
-			nameLabel.Font = Enum.Font.GothamBold
-			nameLabel.TextScaled = true
-			nameLabel.TextStrokeTransparency = 0 
-			nameLabel.TextColor3 = textColor
-			nameLabel.Parent = textBillboard
 			textBillboard.Parent = droppedItem
+
+			local dropNameLabel = Instance.new("TextLabel", textBillboard)
+			dropNameLabel.Size = UDim2.new(1, 0, 1, 0)
+			dropNameLabel.BackgroundTransparency = 1
+			dropNameLabel.RichText = true
+			dropNameLabel.Font = Enum.Font.GothamBold
+			dropNameLabel.TextScaled = true
+			dropNameLabel.TextStrokeTransparency = 0
+
+			-- Eredeti tárgy szín kinyerése a RichText-hez
+			local r, g, b = math.floor(textColor.R*255), math.floor(textColor.G*255), math.floor(textColor.B*255)
+			local baseColorStr = "rgb("..r..","..g..","..b..")"
+
+			if killerName ~= "" then
+				dropNameLabel.Text = '<font color="rgb(255, 255, 50)">' .. itemName .. '</font>\n<font color="rgb(200, 200, 200)">&lt;' .. killerName .. '&gt;</font>'
+			else
+				dropNameLabel.Text = '<font color="' .. baseColorStr .. '">' .. itemName .. '</font>'
+			end
+
 			droppedItem.Parent = droppedFolder
+
+			task.spawn(function()
+				task.wait(120) 
+				if droppedItem and droppedItem.Parent then
+					ownerTag.Value = ""
+					dropNameLabel.Text = '<font color="' .. baseColorStr .. '">' .. itemName .. '</font>' 
+				end
+
+				task.wait(180) 
+				if droppedItem and droppedItem.Parent then
+					droppedItem:Destroy()
+				end
+			end)
 		end
 
 		if killer then
@@ -217,7 +260,6 @@ local function setupMetinStone(stone)
 			task.spawn(function()
 				while stone and stone.Parent and not isDead and (tick() - lastHitTime < 5) do
 					task.wait(spawnRate)
-					-- JAVÍTÁS 2: Miután letelt a várakozás, még egyszer ellenőrizzük! Ha meghalt közben, leállítjuk a ciklust!
 					if isDead then break end 
 					spawnMonsters()
 				end
@@ -228,14 +270,10 @@ local function setupMetinStone(stone)
 end
 
 for _, child in pairs(metinFolder:GetChildren()) do
-	if child:IsA("Model") then
-		setupMetinStone(child)
-	end
+	if child:IsA("Model") then setupMetinStone(child) end
 end
 
 metinFolder.ChildAdded:Connect(function(child)
 	task.wait(0.1)
-	if child:IsA("Model") then
-		setupMetinStone(child)
-	end
+	if child:IsA("Model") then setupMetinStone(child) end
 end)
