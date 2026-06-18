@@ -96,19 +96,26 @@ local function setupPlayer(player)
 		slot.Changed:Connect(function() recalculateStats(player) end)
 	end
 
-	player.CharacterAdded:Connect(function(newChar)
-		-- JAVÍTÁS 1: Megvárjuk, amíg a karakter fizikailag biztosan létrejön!
-		newChar:WaitForChild("Humanoid", 5)
-		task.wait(0.5)
+	-- ==========================================
+	-- JAVÍTÁS: BIZTONSÁGOS KARAKTER BETÖLTÉS
+	-- ==========================================
+	local function onCharacterSpawned(newChar)
+		newChar:WaitForChild("Humanoid", 10)
+		-- Várunk 1 másodpercet, hogy a Roblox alaprendszerei 
+		-- biztosan beállítsák az alapértékeket, és csak utána írjuk felül!
+		task.wait(1) 
 		recalculateStats(player)
-	end)
+	end
 
-	-- JAVÍTÁS 2: Biztonsági frissítés! Amikor belépsz, adunk 2 másodpercet az adatbázisnak,
-	-- hogy mindent betöltsön, majd erőszakkal újraszámoljuk a statisztikákat.
-	task.spawn(function()
-		task.wait(2)
-		recalculateStats(player)
-	end)
+	-- Ha meghalsz és újraéledsz, ez fog lefutni
+	player.CharacterAdded:Connect(onCharacterSpawned)
+
+	-- HA A KARAKTER MÁR LÉTEZIK a belépéskor (ez okozta a hibát!):
+	if player.Character then
+		task.spawn(function()
+			onCharacterSpawned(player.Character)
+		end)
+	end
 end
 
 Players.PlayerAdded:Connect(setupPlayer)
