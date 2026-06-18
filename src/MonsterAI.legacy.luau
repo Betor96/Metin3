@@ -321,6 +321,7 @@ humanoid.Died:Connect(function()
 		textBillboard.Size = UDim2.new(0, 150, 0, 40)
 		textBillboard.StudsOffset = Vector3.new(0, 1.2, 0)
 		textBillboard.AlwaysOnTop = true
+		textBillboard.MaxDistance = 60 -- JAVÍTÁS: Szörny loot eltűnik
 		textBillboard.Adornee = droppedItem
 		textBillboard.Parent = droppedItem
 

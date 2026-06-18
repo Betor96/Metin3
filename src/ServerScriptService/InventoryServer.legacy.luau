@@ -199,6 +199,7 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 				textBillboard.Size = UDim2.new(0, 150, 0, 25)
 				textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
 				textBillboard.AlwaysOnTop = true 
+				textBillboard.MaxDistance = 60 -- JAVÍTÁS: Földre dobott tárgy eltűnik
 				textBillboard.Adornee = droppedItem
 				textBillboard.Parent = droppedItem
 

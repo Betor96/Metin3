@@ -27,6 +27,55 @@ local SpawnDatabase = {
 		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
 		MaxAlive = 3 
 	},
+	["Arany_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Arany Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
+	["Gyemant_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Gyémánt Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
+	["Kristály_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Kristály Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
+	["Ruby_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Ruby Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
+	["Smaragd_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Smaragd Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
+	["Jáde_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Jáde Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
+	["Ametiszt_Erc_Hegy"] = {
+		Type = "Ore", -- Fontos, hogy tudd, ez egy érc
+		Radius = 20,
+		Pack = {"Ametiszt Érc"}, 
+		SpawnRate = 5, -- TESZT: 5 másodperc alatt újraéled!
+		MaxAlive = 3 
+	},
 	-- IDE ÍRHATSZ BÁRMENNYI ZÓNÁT KÉSŐBB!
 }
 

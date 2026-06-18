@@ -38,12 +38,12 @@ local function setupMetinStone(stone)
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "StoneHPBar"
-	billboard.Size = UDim2.new(0, 150, 0, 45) -- Megnövelve a név miatt
+	billboard.Size = UDim2.new(0, 150, 0, 45)
 	billboard.StudsOffset = Vector3.new(0, 8, 0) 
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 120 
 	billboard.Parent = rootPart
 
-	-- ÚJ: NÉV KIÍRÁSA
 	local nameLabel = Instance.new("TextLabel", billboard)
 	nameLabel.Size = UDim2.new(1, 0, 0, 20)
 	nameLabel.BackgroundTransparency = 1
@@ -54,7 +54,7 @@ local function setupMetinStone(stone)
 
 	local bgFrame = Instance.new("Frame", billboard)
 	bgFrame.Size = UDim2.new(1, 0, 0, 20)
-	bgFrame.Position = UDim2.new(0, 0, 0, 25) -- HP csík lejjebb tolása
+	bgFrame.Position = UDim2.new(0, 0, 0, 25) 
 	bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 
 	local hpBar = Instance.new("Frame", bgFrame)
@@ -74,6 +74,10 @@ local function setupMetinStone(stone)
 	local lastHitTime = 0
 	local isActive = false 
 	local isDead = false
+
+	-- ÚJ: Támadók listája
+	local attackers = {}
+	local lastHp = humanoid.MaxHealth
 
 	local function spawnMonsters()
 		if isDead then return end 
@@ -106,22 +110,20 @@ local function setupMetinStone(stone)
 			end
 		end
 
-		local killer = nil
-		local shortestDist = 50
-		for _, plr in pairs(Players:GetPlayers()) do
-			if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-				local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-				if dist < shortestDist then 
-					shortestDist = dist 
-					killer = plr 
+		-- Biztonsági ellenőrzés: ha valamiért üres lenne a lista, betesszük a legközelebbi játékost
+		if #attackers == 0 then
+			local shortestDist = 50
+			local nearest = nil
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+					if dist < shortestDist then 
+						shortestDist = dist 
+						nearest = plr 
+					end
 				end
 			end
-		end
-
-		local doubleDropActive = false
-		if killer and killer:FindFirstChild("PlayerStats") then
-			local dd = killer.PlayerStats:FindFirstChild("DoubleDrop")
-			if dd and math.random(1, 100) <= dd.Value then doubleDropActive = true end
+			if nearest then table.insert(attackers, nearest) end
 		end
 
 		local dropCount = math.random(myData.MinDrops or 1, myData.MaxDrops or 2) 
@@ -130,6 +132,15 @@ local function setupMetinStone(stone)
 		if myData.LootPool and #myData.LootPool > 0 then
 			for i = 1, dropCount do
 				table.insert(dropsToSpawn, myData.LootPool[math.random(1, #myData.LootPool)])
+			end
+		end
+
+		-- Dupla drop esély (ha BÁRMELYIK támadónak van bónusza, érvényesül!)
+		local doubleDropActive = false
+		for _, plr in ipairs(attackers) do
+			if plr:FindFirstChild("PlayerStats") then
+				local dd = plr.PlayerStats:FindFirstChild("DoubleDrop")
+				if dd and math.random(1, 100) <= dd.Value then doubleDropActive = true break end
 			end
 		end
 
@@ -145,6 +156,16 @@ local function setupMetinStone(stone)
 				table.insert(dropsToSpawn, validForDouble[math.random(1, #validForDouble)]) 
 			end
 		end
+
+		-- ==========================================
+		-- ÚJ: LOOT SZÉTOSZTÁSA A TÁMADÓK KÖZÖTT
+		-- ==========================================
+		-- Megkeverjük a támadókat, hogy a maradékot (pl. 3 item 2 emberre) mindig random kapja valaki
+		local shuffledAttackers = {}
+		for _, v in ipairs(attackers) do table.insert(shuffledAttackers, v) end
+		table.sort(shuffledAttackers, function() return math.random() > 0.5 end)
+
+		local currentAttackerIndex = 1
 
 		for _, itemName in ipairs(dropsToSpawn) do
 			local itemData = ItemDatabase[itemName]
@@ -180,18 +201,23 @@ local function setupMetinStone(stone)
 			itemTag.Name = "ItemName"
 			itemTag.Value = itemName
 
-			-- ==========================================
-			-- ÚJ: TULAJDONJOG, NÉV ÉS IDŐZÍTŐ
-			-- ==========================================
-			local killerName = killer and killer.Name or ""
+			-- Kijelöljük az ehavi gazdát
+			local luckyPlayer = shuffledAttackers[currentAttackerIndex]
+			local killerName = luckyPlayer and luckyPlayer.Name or ""
+
+			-- Lépünk a következő támadóra (Kártyaosztás)
+			currentAttackerIndex += 1
+			if currentAttackerIndex > #shuffledAttackers then currentAttackerIndex = 1 end
+
 			local ownerTag = Instance.new("StringValue", droppedItem)
 			ownerTag.Name = "Owner"
 			ownerTag.Value = killerName
 
-			local textBillboard = Instance.new("BillboardGui")
+			local textBillboard = Instance.new("BillboardGui", droppedItem)
 			textBillboard.Size = UDim2.new(0, 150, 0, 40)
 			textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
 			textBillboard.AlwaysOnTop = true 
+			textBillboard.MaxDistance = 60
 			textBillboard.Adornee = droppedItem
 			textBillboard.Parent = droppedItem
 
@@ -203,7 +229,6 @@ local function setupMetinStone(stone)
 			dropNameLabel.TextScaled = true
 			dropNameLabel.TextStrokeTransparency = 0
 
-			-- Eredeti tárgy szín kinyerése a RichText-hez
 			local r, g, b = math.floor(textColor.R*255), math.floor(textColor.G*255), math.floor(textColor.B*255)
 			local baseColorStr = "rgb("..r..","..g..","..b..")"
 
@@ -229,8 +254,9 @@ local function setupMetinStone(stone)
 			end)
 		end
 
-		if killer then
-			local stats = killer:FindFirstChild("PlayerStats")
+		-- EXP kiosztása MINDEN támadónak
+		for _, plr in ipairs(attackers) do
+			local stats = plr:FindFirstChild("PlayerStats")
 			if stats and stats:FindFirstChild("Experience") then
 				stats.Experience.Value += (myData.ExpReward or 0)
 			end
@@ -242,6 +268,21 @@ local function setupMetinStone(stone)
 
 	humanoid.HealthChanged:Connect(function(currentHp)
 		if isDead then return end
+
+		-- ÚJ: Mindenkit, aki közel van és sebzéskor ott áll, felírunk a listára!
+		if currentHp < lastHp then
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+					if dist <= 15 then 
+						if not table.find(attackers, plr) then
+							table.insert(attackers, plr)
+						end
+					end
+				end
+			end
+		end
+		lastHp = currentHp
 
 		if currentHp <= 0 then
 			hpBar.Size = UDim2.new(0, 0, 1, 0)

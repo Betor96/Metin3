@@ -28,12 +28,12 @@ local function setupOre(ore)
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "OreHPBar"
-	billboard.Size = UDim2.new(0, 100, 0, 35) -- Megnövelve a név miatt
+	billboard.Size = UDim2.new(0, 100, 0, 35) 
 	billboard.StudsOffset = Vector3.new(0, 4, 0) 
 	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 80
 	billboard.Parent = rootPart
 
-	-- ÚJ: NÉV KIÍRÁSA AZ ÉRC FÖLÉ
 	local nameText = Instance.new("TextLabel", billboard)
 	nameText.Size = UDim2.new(1, 0, 0, 15)
 	nameText.BackgroundTransparency = 1
@@ -44,7 +44,7 @@ local function setupOre(ore)
 
 	local bgFrame = Instance.new("Frame", billboard)
 	bgFrame.Size = UDim2.new(1, 0, 0, 15)
-	bgFrame.Position = UDim2.new(0, 0, 0, 20) -- HP csík lejjebb tolása
+	bgFrame.Position = UDim2.new(0, 0, 0, 20) 
 	bgFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 
 	local hpBar = Instance.new("Frame", bgFrame)
@@ -62,8 +62,27 @@ local function setupOre(ore)
 
 	local isDead = false
 
+	-- ÚJ: Támadók listája
+	local attackers = {}
+	local lastHp = humanoid.MaxHealth
+
 	humanoid.HealthChanged:Connect(function(currentHp)
 		if isDead then return end
+
+		-- Támadók regisztrálása
+		if currentHp < lastHp then
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+					if dist <= 15 then 
+						if not table.find(attackers, plr) then
+							table.insert(attackers, plr)
+						end
+					end
+				end
+			end
+		end
+		lastHp = currentHp
 
 		if currentHp <= 0 then
 			isDead = true
@@ -71,35 +90,57 @@ local function setupOre(ore)
 			hpText.Text = "0 / " .. humanoid.MaxHealth
 			billboard:Destroy()
 
-			local killer = nil
-			local shortestDist = 50
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-					local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-					if dist < shortestDist then 
-						shortestDist = dist 
-						killer = plr 
+			if #attackers == 0 then
+				local shortestDist = 50
+				local nearest = nil
+				for _, plr in pairs(Players:GetPlayers()) do
+					if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+						local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+						if dist < shortestDist then 
+							shortestDist = dist 
+							nearest = plr 
+						end
+					end
+				end
+				if nearest then table.insert(attackers, nearest) end
+			end
+
+			local dropCount = math.random(1, 2)
+
+			-- Bármelyik támadónak van csákánya bónusszal? (Összeadjuk a legnagyobb esélyt)
+			local bestDoubleChance = 0
+			for _, plr in ipairs(attackers) do
+				if plr:FindFirstChild("Equipment") then
+					local wSlot = plr.Equipment:FindFirstChild("Fegyver")
+					if wSlot and wSlot.Value ~= "" then
+						local wData = ItemDatabase[wSlot.Value]
+						if wData and wData.IsPickaxe and wData.DoubleOreChance then
+							if wData.DoubleOreChance > bestDoubleChance then
+								bestDoubleChance = wData.DoubleOreChance
+							end
+						end
 					end
 				end
 			end
 
-			local dropCount = math.random(1, 2)
-			if killer and killer:FindFirstChild("Equipment") then
-				local wSlot = killer.Equipment:FindFirstChild("Fegyver")
-				if wSlot and wSlot.Value ~= "" then
-					local wData = ItemDatabase[wSlot.Value]
-					if wData and wData.IsPickaxe and wData.DoubleOreChance then
-						if math.random(1, 100) <= wData.DoubleOreChance then
-							dropCount = dropCount * 2 
-						end
-					end
-				end
+			if bestDoubleChance > 0 and math.random(1, 100) <= bestDoubleChance then
+				dropCount = dropCount * 2 
 			end
 
 			local dropsToSpawn = {}
 			for i = 1, dropCount do table.insert(dropsToSpawn, myData.DropItem) end
 
 			if math.random(1, 1000) <= 35 then table.insert(dropsToSpawn, "Szivárvány Kristály") end
+
+			-- ==========================================
+			-- JAVÍTÁS: LOOT SZÉTOSZTÁSA A TÁMADÓK KÖZÖTT
+			-- ==========================================
+			local shuffledAttackers = {}
+			for _, v in ipairs(attackers) do table.insert(shuffledAttackers, v) end
+			table.sort(shuffledAttackers, function() return math.random() > 0.5 end)
+
+			local currentAttackerIndex = 1
+
 			for _, itemName in ipairs(dropsToSpawn) do
 				local droppedItem = Instance.new("Part")
 				droppedItem.Name = "LootPart"
@@ -128,18 +169,22 @@ local function setupOre(ore)
 				itemTag.Name = "ItemName"
 				itemTag.Value = itemName
 
-				-- ==========================================
-				-- ÚJ: TULAJDONJOG, NÉV ÉS IDŐZÍTŐ
-				-- ==========================================
-				local killerName = killer and killer.Name or ""
+				-- Tulajdonos kiválasztása kártyaosztással
+				local luckyPlayer = shuffledAttackers[currentAttackerIndex]
+				local killerName = luckyPlayer and luckyPlayer.Name or ""
+
+				currentAttackerIndex += 1
+				if currentAttackerIndex > #shuffledAttackers then currentAttackerIndex = 1 end
+
 				local ownerTag = Instance.new("StringValue", droppedItem)
 				ownerTag.Name = "Owner"
 				ownerTag.Value = killerName
 
-				local textBillboard = Instance.new("BillboardGui")
+				local textBillboard = Instance.new("BillboardGui", droppedItem)
 				textBillboard.Size = UDim2.new(0, 150, 0, 40) 
 				textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
 				textBillboard.AlwaysOnTop = true 
+				textBillboard.MaxDistance = 60
 				textBillboard.Adornee = droppedItem
 				textBillboard.Parent = droppedItem
 
@@ -151,7 +196,6 @@ local function setupOre(ore)
 				dropNameLabel.TextScaled = true
 				dropNameLabel.TextStrokeTransparency = 0
 
-				-- Ha Szivárvány, akkor lilás, amúgy szürke
 				local r, g, b = 180, 180, 180
 				if isRainbow then r, g, b = 255, 150, 255 end
 				local baseColorStr = "rgb("..r..","..g..","..b..")"
