@@ -53,7 +53,7 @@ local function showDeathScreen()
 
 	task.spawn(function()
 		-- Golyóálló ciklus a visszaszámláláshoz
-		for i = 5, 1, -1 do
+		for i = 10, 1, -1 do
 			if not darkBg.Visible then return end -- Ha közben eltűnt az ablak, leáll!
 			btnHere.Text = "Újraéledés itt (" .. i .. ")"
 			task.wait(1)

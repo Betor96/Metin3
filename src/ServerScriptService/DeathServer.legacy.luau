@@ -33,25 +33,46 @@ RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 	local root = newChar:WaitForChild("HumanoidRootPart", 5)
 	local hum = newChar:WaitForChild("Humanoid", 5)
 
-	-- JAVÍTÁS: Várunk 0.5 másodpercet, hogy a Te SpawnManager-ed befejezze a teleportálást!
-	-- Csak UTÁNA ragadjuk meg a karaktert és rakjuk a jó helyre.
-	task.wait(0.5)
+	task.wait() -- Azonnali éledés villanás nélkül
 
 	if spawnType == "Here" then
 
 		-- ==========================================
-		-- TÖKÉLETES SÉRTHETETLENSÉG ROBLOX FORCEFIELD-DEL
+		-- JAVÍTÁS: 10 MÁSODPERCES SÉRTHETETLENSÉG ÉS LÁTHATATLANSÁG
 		-- ==========================================
 		local ff = Instance.new("ForceField")
-		ff.Visible = true -- Kék védőgömb a karakter körül
+		ff.Visible = true 
 		ff.Parent = newChar
-		game.Debris:AddItem(ff, 5) -- Pontosan 5 másodperc múlva automatikusan letörli!
+		game.Debris:AddItem(ff,5) -- 10 másodperc múlva automatikusan letörli!
+
+		-- Karakter átlátszóvá tétele
+		for _, part in pairs(newChar:GetDescendants()) do
+			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+				part.Transparency = 0.5 
+			end
+		end
+
+		task.spawn(function()
+			task.wait(5) -- 10 másodperc múlva visszakapja a normál kinézetét
+			if newChar then
+				for _, part in pairs(newChar:GetDescendants()) do
+					if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+						part.Transparency = 0 
+					end
+				end
+			end
+		end)
 
 		if root then
 			local rayParams = RaycastParams.new()
 			rayParams.FilterType = Enum.RaycastFilterType.Exclude
-			rayParams.FilterDescendantsInstances = {newChar}
-			local ray = workspace:Raycast(dPos + Vector3.new(0, 15, 0), Vector3.new(0, -50, 0), rayParams)
+
+			local ignoreList = {newChar}
+			if workspace:FindFirstChild("Monsters") then table.insert(ignoreList, workspace.Monsters) end
+			if workspace:FindFirstChild("MetinStones") then table.insert(ignoreList, workspace.MetinStones) end
+			rayParams.FilterDescendantsInstances = ignoreList
+
+			local ray = workspace:Raycast(dPos + Vector3.new(0, 15, 0), Vector3.new(0, -100, 0), rayParams)
 
 			if ray then
 				newChar:PivotTo(CFrame.new(ray.Position + Vector3.new(0, 3, 0)))
@@ -66,29 +87,63 @@ RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 		end)
 
 	elseif spawnType == "Town" then
-		local townFolder = workspace:FindFirstChild("TownSpawns")
-		local targetPos = Vector3.new(0, 50, 0)
 
-		if townFolder and #townFolder:GetChildren() > 0 then
-			local spawns = townFolder:GetChildren()
-			local nearest = spawns[1]
-			local shortestDist = (nearest.Position - dPos).Magnitude
+		local targetPos = nil 
+		local validSpawns = {}
 
-			for _, spwn in pairs(spawns) do
-				local dist = (spwn.Position - dPos).Magnitude
-				if dist < shortestDist then
-					shortestDist = dist
-					nearest = spwn
+		for _, obj in pairs(workspace:GetDescendants()) do
+			local name = string.lower(obj.Name) 
+
+			if name == "townspawns" or name == "townspawn" then
+				if obj:IsA("Folder") or obj:IsA("Model") then
+					for _, child in pairs(obj:GetChildren()) do
+						if child:IsA("BasePart") then
+							table.insert(validSpawns, child.Position)
+						elseif child:IsA("Model") and child.PrimaryPart then
+							table.insert(validSpawns, child.PrimaryPart.Position)
+						elseif child:IsA("Model") then
+							table.insert(validSpawns, child:GetPivot().Position)
+						end
+					end
+				elseif obj:IsA("BasePart") then
+					table.insert(validSpawns, obj.Position)
 				end
 			end
-			targetPos = nearest.Position
+		end
+
+		if #validSpawns > 0 then
+			targetPos = validSpawns[1]
+			local shortestDist = (targetPos - dPos).Magnitude
+
+			for _, pos in pairs(validSpawns) do
+				local dist = (pos - dPos).Magnitude
+				if dist < shortestDist then
+					shortestDist = dist
+					targetPos = pos
+				end
+			end
+		end
+
+		if not targetPos then
+			warn("FIGYELEM: A TownSpawns mappa/part nem található! Teleport a kezdőpontra...")
+			local defSpawn = workspace:FindFirstChildWhichIsA("SpawnLocation")
+			if defSpawn then
+				targetPos = defSpawn.Position
+			else
+				targetPos = Vector3.new(0, 50, 0)
+			end
 		end
 
 		if root then
 			local rayParams = RaycastParams.new()
 			rayParams.FilterType = Enum.RaycastFilterType.Exclude
-			rayParams.FilterDescendantsInstances = {newChar}
-			local ray = workspace:Raycast(targetPos + Vector3.new(0, 50, 0), Vector3.new(0, -150, 0), rayParams)
+
+			local ignoreList = {newChar}
+			if workspace:FindFirstChild("Monsters") then table.insert(ignoreList, workspace.Monsters) end
+			if workspace:FindFirstChild("MetinStones") then table.insert(ignoreList, workspace.MetinStones) end
+			rayParams.FilterDescendantsInstances = ignoreList
+
+			local ray = workspace:Raycast(targetPos + Vector3.new(0, 100, 0), Vector3.new(0, -500, 0), rayParams)
 
 			if ray then
 				newChar:PivotTo(CFrame.new(ray.Position + Vector3.new(0, 3, 0)))
