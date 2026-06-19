@@ -424,8 +424,28 @@ buyRobuxBtn.Text = "Feloldás: 55 Robux"
 buyRobuxBtn.Font = Enum.Font.GothamBold
 buyRobuxBtn.ZIndex = 21
 
-buyGoldBtn.MouseButton1Click:Connect(function() Events:WaitForChild("UnlockPageGold"):FireServer() end)
-buyRobuxBtn.MouseButton1Click:Connect(function() Events:WaitForChild("PromptRobuxUnlock"):FireServer() end)
+buyGoldBtn.MouseButton1Click:Connect(function() 
+	local stats = player:FindFirstChild("PlayerStats")
+	local gold = stats and stats:FindFirstChild("Gold")
+	local pages = stats and stats:FindFirstChild("UnlockedPages")
+
+	if gold and pages then
+		local cost = pages.Value * 25000
+		if gold.Value >= cost then
+			Events:WaitForChild("UnlockPageGold"):FireServer()
+		else
+			-- Táskánál is jelezzük az Arany hiányát!
+			local originalText = buyGoldBtn.Text
+			buyGoldBtn.Text = "Nincs elég Arany!"
+			task.wait(1.5)
+			buyGoldBtn.Text = originalText
+		end
+	end
+end)
+
+buyRobuxBtn.MouseButton1Click:Connect(function() 
+	Events:WaitForChild("PromptRobuxUnlock"):FireServer() 
+end)
 
 local function renderItems()
 	local stats = player:WaitForChild("PlayerStats", 5)

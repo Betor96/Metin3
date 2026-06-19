@@ -98,7 +98,7 @@ end)
 -- ==========================================
 -- BANK OLDAL FELOLDÁSA (ROBUX)
 -- ==========================================
-local BANK_PAGE_PRODUCT_ID = 444555666 -- IDE ÍRD MAJD A ROBUX PRODUCT ID-DAT A BANKHOZ!
+local BANK_PAGE_PRODUCT_ID = 3605410365 -- Raktár Robux ID
 local PromptBankRobuxUnlock = Events:FindFirstChild("PromptBankRobuxUnlock") or Instance.new("RemoteEvent", Events)
 PromptBankRobuxUnlock.Name = "PromptBankRobuxUnlock"
 
@@ -106,29 +106,34 @@ PromptBankRobuxUnlock.OnServerEvent:Connect(function(player)
 	MarketplaceService:PromptProductPurchase(player, BANK_PAGE_PRODUCT_ID)
 end)
 
-local INVENTORY_PAGE_PRODUCT_ID = 3604998372 -- A normál táska Robux ID-ja
+local INVENTORY_PAGE_PRODUCT_ID = 3604998372 -- Táska Robux ID
 
 MarketplaceService.ProcessReceipt = function(receiptInfo)
 	local player = game.Players:GetPlayerByUserId(receiptInfo.PlayerId)
-	if player then
-		local stats = player:FindFirstChild("PlayerStats")
-		if stats then
-			-- 1. BANK OLDAL VÁSÁRLÁS
-			if receiptInfo.ProductId == BANK_PAGE_PRODUCT_ID then
-				local _, bankPages = ensureBankDataExists(stats)
-				if bankPages.Value < 4 then
-					bankPages.Value += 1
-					return Enum.ProductPurchaseDecision.PurchaseGranted
-				end
-				-- 2. TÁSKA OLDAL VÁSÁRLÁS (EZ HIÁNYZOTT!)
-			elseif receiptInfo.ProductId == INVENTORY_PAGE_PRODUCT_ID then
-				local unlockedPages = stats:FindFirstChild("UnlockedPages")
-				if unlockedPages and unlockedPages.Value < 4 then
-					unlockedPages.Value += 1
-					return Enum.ProductPurchaseDecision.PurchaseGranted
-				end
+
+	-- Ha a játékos pont kilépett, majd később újra megpróbáljuk
+	if not player then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	local stats = player:FindFirstChild("PlayerStats")
+	if stats then
+		-- 1. BANK VÁSÁRLÁS
+		if receiptInfo.ProductId == BANK_PAGE_PRODUCT_ID then
+			local _, bankPages = ensureBankDataExists(stats)
+			if bankPages.Value < 4 then
+				bankPages.Value += 1
+			end
+			-- 2. TÁSKA VÁSÁRLÁS
+		elseif receiptInfo.ProductId == INVENTORY_PAGE_PRODUCT_ID then
+			local unlockedPages = stats:FindFirstChild("UnlockedPages")
+			if unlockedPages and unlockedPages.Value < 4 then
+				unlockedPages.Value += 1
 			end
 		end
 	end
-	return Enum.ProductPurchaseDecision.NotProcessedYet
+
+	-- JAVÍTÁS: MINDIG visszaadjuk, hogy "Megkaptuk!". Ez azonnal kitisztítja 
+	-- a beragadt tranzakciókat és feloldja a Roblox blokkolását!
+	return Enum.ProductPurchaseDecision.PurchaseGranted
 end

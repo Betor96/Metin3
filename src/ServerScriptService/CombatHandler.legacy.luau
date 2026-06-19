@@ -8,6 +8,10 @@ local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
 MeleeAttack.OnServerEvent:Connect(function(player)
 	local character = player.Character
+	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A SÉRTHETETLENSÉGET!
+	if character and character:GetAttribute("Invincible") then
+		character:SetAttribute("Invincible", false)
+	end
 	local stats = player:FindFirstChild("PlayerStats")
 	local equipment = player:FindFirstChild("Equipment")
 	if not character or not stats or not equipment then return end
@@ -54,6 +58,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	end
 
 	-- ÚJ: ÉRCEK BEOLVASÁSA
+	-- ÚJ: ÉRCEK BEOLVASÁSA
 	local oFolder = workspace:FindFirstChild("Ores")
 	if oFolder then
 		for _, ore in pairs(oFolder:GetChildren()) do
@@ -61,12 +66,20 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		end
 	end
 
+	local oreHitCount = 0 -- JAVÍTÁS: Számláló, hogy csak 1 ércet üthess egyszerre!
+
 	for _, obj in pairs(possibleTargets) do
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
 			local targetHum = obj.Humanoid
 
 			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
+
+				-- ==========================================
+				-- ÚJ: SÉRTHETETLENSÉG (VÉDELEM) ELLENŐRZÉSE
+				-- ==========================================
+				if obj:GetAttribute("Invincible") then continue end
+
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
 				local directionToTarget = (targetRoot.Position - rootPart.Position).Unit
 				local facingDirection = rootPart.CFrame.LookVector
@@ -77,22 +90,23 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 					local isCrit = false
 
 					-- ==========================================
-					-- ÚJ: BÁNYÁSZAT (ÉRC) ELLENŐRZÉSE
+					-- JAVÍTÁS: BÁNYÁSZAT (ÉRC) ELLENŐRZÉSE
 					-- ==========================================
-					local isOre = obj:GetAttribute("IsOre")
+					local isOre = (obj.Parent and obj.Parent.Name == "Ores") or obj:GetAttribute("IsOre")
 
 					if isOre then
-						-- Van-e csákány a kezében?
+						if oreHitCount >= 1 then continue end -- Ha már ütöttünk egyet, a többit átugorjuk!
+
 						local isPickaxe = false
 						if weaponName ~= "" and ItemDatabase[weaponName] and ItemDatabase[weaponName].IsPickaxe then
 							isPickaxe = true
 						end
 
-						-- Ha nincs csákány, megszakítjuk az ütést (nem sebez!)
-						if not isPickaxe then return end 
+						-- Ha nincs csákány, átugorjuk (FONTOS: continue kell, nem return!)
+						if not isPickaxe then continue end 
 
-						-- A csákány mindig 1-et sebez az ércbe
 						finalDamage = 1 
+						oreHitCount += 1
 					else
 						-- NORMÁL SZÖRNY / JÁTÉKOS SEBZÉS
 						local defense = 0 

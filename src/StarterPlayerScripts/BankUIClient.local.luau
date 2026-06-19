@@ -365,8 +365,30 @@ prevBtn.MouseButton1Click:Connect(function()
 	if bankCurrentPage > 1 then bankCurrentPage -= 1 renderBankItems() end
 end)
 
-buyGoldBtn.MouseButton1Click:Connect(function() Events:WaitForChild("UnlockBankPageGold"):FireServer() end)
-buyRobuxBtn.MouseButton1Click:Connect(function() Events:WaitForChild("PromptBankRobuxUnlock"):FireServer() end)
+buyGoldBtn.MouseButton1Click:Connect(function() 
+	local stats = player:FindFirstChild("PlayerStats")
+	local gold = stats and stats:FindFirstChild("Gold")
+	local pages = stats and stats:FindFirstChild("BankUnlockedPages")
+
+	if gold and pages then
+		local cost = pages.Value * 50000
+		if gold.Value >= cost then
+			Events:WaitForChild("UnlockBankPageGold"):FireServer()
+		else
+			-- Ha nincs elég aranya, egyértelműen kiírjuk neki!
+			local originalText = buyGoldBtn.Text
+			buyGoldBtn.Text = "Nincs elég Arany!"
+			task.wait(1.5)
+			buyGoldBtn.Text = originalText
+		end
+	end
+end)
+
+-- Biztonságos, szimpla Robux hívás
+buyRobuxBtn.MouseButton1Click:Connect(function() 
+	Events:WaitForChild("PromptBankRobuxUnlock"):FireServer() 
+end)
+
 bankCloseBtn.MouseButton1Click:Connect(function() bankMainFrame.Visible = false end)
 
 task.spawn(function()
