@@ -37,22 +37,38 @@ RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 	local root = newChar:WaitForChild("HumanoidRootPart", 5)
 	local hum = newChar:WaitForChild("Humanoid", 5)
 
-	task.wait(0.1) -- Biztonsági várakozás, hogy a Roblox fizikája betöltsön
+	task.wait(0.2) -- Biztonsági várakozás, hogy a Roblox fizikája betöltsön
+
+	-- SÉRTHETETLENSÉG BEÁLLÍTÁSA AZONNAL!
+	newChar:SetAttribute("Invincible", true)
+	task.spawn(function()
+		task.wait(5)
+		if newChar and newChar:GetAttribute("Invincible") then
+			newChar:SetAttribute("Invincible", false)
+		end
+	end)
 
 	if spawnType == "Here" then
 		if root then
-			root.CFrame = CFrame.new(dPos + Vector3.new(0, 3, 0))
-		end
-		if hum then
-			hum.Health = hum.MaxHealth * 0.1 -- 10% HP
+			-- JAVÍTÁS: Föld keresése Raycasttal, hogy ne éledj a levegőben!
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Exclude
+			rayParams.FilterDescendantsInstances = {newChar}
+			local ray = workspace:Raycast(dPos + Vector3.new(0, 5, 0), Vector3.new(0, -20, 0), rayParams)
+
+			if ray then
+				root.CFrame = CFrame.new(ray.Position + Vector3.new(0, 3, 0))
+			else
+				root.CFrame = CFrame.new(dPos + Vector3.new(0, 3, 0))
+			end
 		end
 
-		-- SÉRTHETETLENSÉG BEÁLLÍTÁSA
-		newChar:SetAttribute("Invincible", true)
+		-- JAVÍTÁS: Várunk 1.5 másodpercet, hogy a StatHandler rápakolja a bónusz HP-kat,
+		-- ÉS CSAK UTÁNA vesszük le a HP-t 10%-ra!
 		task.spawn(function()
-			task.wait(5)
-			if newChar and newChar:GetAttribute("Invincible") then
-				newChar:SetAttribute("Invincible", false)
+			task.wait(1.5)
+			if hum then
+				hum.Health = hum.MaxHealth * 0.1 
 			end
 		end)
 
@@ -76,8 +92,16 @@ RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 				root.CFrame = nearest.CFrame + Vector3.new(0, 3, 0)
 			end
 		else
-			-- Ha elfelejtettél TownSpawn-t lerakni, ide dobja
+			-- Ha elfelejtettél TownSpawn-t lerakni
 			if root then root.CFrame = CFrame.new(0, 50, 0) end
 		end
+
+		-- Városi éledésnél tele HP-t adunk, de itt is várunk 1.5 mp-et a StatHandlerre!
+		task.spawn(function()
+			task.wait(1.5)
+			if hum then
+				hum.Health = hum.MaxHealth
+			end
+		end)
 	end
 end)

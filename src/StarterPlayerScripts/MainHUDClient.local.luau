@@ -2,8 +2,6 @@
 
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
 
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -76,14 +74,29 @@ expBar.Size = UDim2.new(0.5, 0, 1, 0)
 expBar.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
 expBar.BorderSizePixel = 0
 
+
+-- ==========================================
+-- JAVÍTÁS: Mindig az éppen aktuális karakter HP-ját nézzük!
+-- ==========================================
+local currentHumanoid = nil
+
 local function updateHP()
-	local percent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-	hpBar.Size = UDim2.new(percent, 0, 1, 0)
-	hpText.Text = math.floor(humanoid.Health) .. " / " .. math.floor(humanoid.MaxHealth)
+	if currentHumanoid then
+		local percent = math.clamp(currentHumanoid.Health / currentHumanoid.MaxHealth, 0, 1)
+		hpBar.Size = UDim2.new(percent, 0, 1, 0)
+		hpText.Text = math.floor(currentHumanoid.Health) .. " / " .. math.floor(currentHumanoid.MaxHealth)
+	end
 end
 
-humanoid.HealthChanged:Connect(updateHP)
-updateHP()
+local function setupCharacter(char)
+	currentHumanoid = char:WaitForChild("Humanoid")
+	currentHumanoid.HealthChanged:Connect(updateHP)
+	updateHP()
+end
+
+player.CharacterAdded:Connect(setupCharacter)
+if player.Character then setupCharacter(player.Character) end
+
 
 local function updateMPXP()
 	local stats = player:FindFirstChild("PlayerStats")
@@ -172,9 +185,6 @@ for i = 1, 8 do
 	itemIcon.ZIndex = 2
 end
 
--- ==========================================
--- ÚJ: GYORSGOMBOK FRISSÍTÉSE (Dinamikus!)
--- ==========================================
 -- ==========================================
 -- ÚJ: GYORSGOMBOK FRISSÍTÉSE (Dinamikus!)
 -- ==========================================

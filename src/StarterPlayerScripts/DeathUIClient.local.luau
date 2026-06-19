@@ -10,10 +10,11 @@ local RespawnPlayer = Events:WaitForChild("RespawnPlayer")
 -- ==========================================
 -- 1. HALÁL ABLAK LÉTREHOZÁSA (Kódból generálva)
 -- ==========================================
-local sg = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+local sg = Instance.new("ScreenGui")
 sg.Name = "DeathHUD"
 sg.ResetOnSpawn = false
 sg.DisplayOrder = 1000 -- Mindig legfelül
+sg.Parent = player:WaitForChild("PlayerGui")
 
 local darkBg = Instance.new("Frame", sg)
 darkBg.Size = UDim2.new(1, 0, 1, 0)
@@ -60,28 +61,35 @@ invIcon.Text = "🛡️"
 invIcon.Font = Enum.Font.GothamBold
 invIcon.TextScaled = true
 invIcon.Visible = false
-Instance.new("UICorner", invIcon).CornerRadius = UDim.new(1, 0)
+local corner = Instance.new("UICorner", invIcon)
+corner.CornerRadius = UDim.new(1, 0)
 
-local countdownConn = nil
+-- ==========================================
+-- JAVÍTÁS: Golyóálló visszaszámláló ID-vel
+-- ==========================================
+local deathCounter = 0
 
 local function showDeathScreen()
 	darkBg.Visible = true
 	btnHere.AutoButtonColor = false
 	btnHere.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 
+	deathCounter += 1
+	local currentDeath = deathCounter
 	local timeLeft = 5
 	btnHere.Text = "Újraéledés itt (" .. timeLeft .. ")"
 
-	if countdownConn then countdownConn:Disconnect() end
-	countdownConn = task.spawn(function()
+	task.spawn(function()
 		while timeLeft > 0 do
 			task.wait(1)
+			-- Ha közben újra meghalt, vagy eltűnt az ablak, a régi szál némán leáll!
+			if currentDeath ~= deathCounter or not darkBg.Visible then return end
+
 			timeLeft -= 1
-			if darkBg.Visible then
-				btnHere.Text = "Újraéledés itt (" .. timeLeft .. ")"
-			end
+			btnHere.Text = "Újraéledés itt (" .. timeLeft .. ")"
 		end
-		if darkBg.Visible then
+
+		if currentDeath == deathCounter and darkBg.Visible then
 			btnHere.Text = "Újraéledés itt"
 			btnHere.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 			btnHere.AutoButtonColor = true
@@ -101,8 +109,7 @@ btnTown.MouseButton1Click:Connect(function()
 	RespawnPlayer:FireServer("Town")
 end)
 
--- Követjük a játékos karakterét
-player.CharacterAdded:Connect(function(char)
+local function setupCharacter(char)
 	local hum = char:WaitForChild("Humanoid", 5)
 	if hum then
 		hum.Died:Connect(showDeathScreen)
@@ -112,15 +119,10 @@ player.CharacterAdded:Connect(function(char)
 		invIcon.Visible = char:GetAttribute("Invincible") or false
 	end)
 	invIcon.Visible = char:GetAttribute("Invincible") or false
-end)
+end
 
--- Ha belépéskor már él a karakter
+player.CharacterAdded:Connect(setupCharacter)
+
 if player.Character then
-	local hum = player.Character:FindFirstChild("Humanoid")
-	if hum then hum.Died:Connect(showDeathScreen) end
-
-	player.Character:GetAttributeChangedSignal("Invincible"):Connect(function()
-		invIcon.Visible = player.Character:GetAttribute("Invincible") or false
-	end)
-	invIcon.Visible = player.Character:GetAttribute("Invincible") or false
+	setupCharacter(player.Character)
 end
