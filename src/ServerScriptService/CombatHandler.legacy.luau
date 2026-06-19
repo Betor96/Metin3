@@ -9,8 +9,12 @@ local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 MeleeAttack.OnServerEvent:Connect(function(player)
 	local character = player.Character
 	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A SÉRTHETETLENSÉGET!
-	if character and character:GetAttribute("Invincible") then
-		character:SetAttribute("Invincible", false)
+	-- ==========================================
+	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A PAJZSÁT!
+	-- ==========================================
+	if character then
+		local ff = character:FindFirstChildOfClass("ForceField")
+		if ff then ff:Destroy() end
 	end
 	local stats = player:FindFirstChild("PlayerStats")
 	local equipment = player:FindFirstChild("Equipment")

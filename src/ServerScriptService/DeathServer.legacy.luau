@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 
--- Kikapcsoljuk az automata Roblox újraéledést (9999 másodpercre állítjuk)
 Players.RespawnTime = 99999
 
 local RespawnPlayer = Events:FindFirstChild("RespawnPlayer") or Instance.new("RemoteEvent", Events)
@@ -17,7 +16,6 @@ Players.PlayerAdded:Connect(function(player)
 		local hum = character:WaitForChild("Humanoid", 5)
 		if hum then
 			hum.Died:Connect(function()
-				-- Épp a halál pillanatában elmentjük a pozícióját
 				local root = character:FindFirstChild("HumanoidRootPart")
 				if root then
 					deathPositions[player.UserId] = root.Position
@@ -30,51 +28,47 @@ end)
 RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 	local dPos = deathPositions[player.UserId] or Vector3.new(0, 50, 0)
 
-	-- Újrageneráljuk a karaktert
 	player:LoadCharacter()
-
 	local newChar = player.Character or player.CharacterAdded:Wait()
 	local root = newChar:WaitForChild("HumanoidRootPart", 5)
 	local hum = newChar:WaitForChild("Humanoid", 5)
 
-	task.wait(0.2) -- Biztonsági várakozás, hogy a Roblox fizikája betöltsön
-
-	-- SÉRTHETETLENSÉG BEÁLLÍTÁSA AZONNAL!
-	newChar:SetAttribute("Invincible", true)
-	task.spawn(function()
-		task.wait(5)
-		if newChar and newChar:GetAttribute("Invincible") then
-			newChar:SetAttribute("Invincible", false)
-		end
-	end)
+	-- JAVÍTÁS: Várunk 0.5 másodpercet, hogy a Te SpawnManager-ed befejezze a teleportálást!
+	-- Csak UTÁNA ragadjuk meg a karaktert és rakjuk a jó helyre.
+	task.wait(0.5)
 
 	if spawnType == "Here" then
+
+		-- ==========================================
+		-- TÖKÉLETES SÉRTHETETLENSÉG ROBLOX FORCEFIELD-DEL
+		-- ==========================================
+		local ff = Instance.new("ForceField")
+		ff.Visible = true -- Kék védőgömb a karakter körül
+		ff.Parent = newChar
+		game.Debris:AddItem(ff, 5) -- Pontosan 5 másodperc múlva automatikusan letörli!
+
 		if root then
-			-- JAVÍTÁS: Föld keresése Raycasttal, hogy ne éledj a levegőben!
 			local rayParams = RaycastParams.new()
 			rayParams.FilterType = Enum.RaycastFilterType.Exclude
 			rayParams.FilterDescendantsInstances = {newChar}
-			local ray = workspace:Raycast(dPos + Vector3.new(0, 5, 0), Vector3.new(0, -20, 0), rayParams)
+			local ray = workspace:Raycast(dPos + Vector3.new(0, 15, 0), Vector3.new(0, -50, 0), rayParams)
 
 			if ray then
-				root.CFrame = CFrame.new(ray.Position + Vector3.new(0, 3, 0))
+				newChar:PivotTo(CFrame.new(ray.Position + Vector3.new(0, 3, 0)))
 			else
-				root.CFrame = CFrame.new(dPos + Vector3.new(0, 3, 0))
+				newChar:PivotTo(CFrame.new(dPos + Vector3.new(0, 3, 0)))
 			end
 		end
 
-		-- JAVÍTÁS: Várunk 1.5 másodpercet, hogy a StatHandler rápakolja a bónusz HP-kat,
-		-- ÉS CSAK UTÁNA vesszük le a HP-t 10%-ra!
 		task.spawn(function()
 			task.wait(1.5)
-			if hum then
-				hum.Health = hum.MaxHealth * 0.1 
-			end
+			if hum then hum.Health = math.max(1, hum.MaxHealth * 0.1) end
 		end)
 
 	elseif spawnType == "Town" then
-		-- Megkeressük a legközelebbi falut
 		local townFolder = workspace:FindFirstChild("TownSpawns")
+		local targetPos = Vector3.new(0, 50, 0)
+
 		if townFolder and #townFolder:GetChildren() > 0 then
 			local spawns = townFolder:GetChildren()
 			local nearest = spawns[1]
@@ -87,21 +81,25 @@ RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 					nearest = spwn
 				end
 			end
-
-			if root then
-				root.CFrame = nearest.CFrame + Vector3.new(0, 3, 0)
-			end
-		else
-			-- Ha elfelejtettél TownSpawn-t lerakni
-			if root then root.CFrame = CFrame.new(0, 50, 0) end
+			targetPos = nearest.Position
 		end
 
-		-- Városi éledésnél tele HP-t adunk, de itt is várunk 1.5 mp-et a StatHandlerre!
+		if root then
+			local rayParams = RaycastParams.new()
+			rayParams.FilterType = Enum.RaycastFilterType.Exclude
+			rayParams.FilterDescendantsInstances = {newChar}
+			local ray = workspace:Raycast(targetPos + Vector3.new(0, 50, 0), Vector3.new(0, -150, 0), rayParams)
+
+			if ray then
+				newChar:PivotTo(CFrame.new(ray.Position + Vector3.new(0, 3, 0)))
+			else
+				newChar:PivotTo(CFrame.new(targetPos + Vector3.new(0, 3, 0)))
+			end
+		end
+
 		task.spawn(function()
 			task.wait(1.5)
-			if hum then
-				hum.Health = hum.MaxHealth
-			end
+			if hum then hum.Health = hum.MaxHealth end
 		end)
 	end
 end)
