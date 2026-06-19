@@ -1,7 +1,8 @@
-#-----------------------------------------------------------------#
-#játék frissitések, aktuális dolgok#
-#bekerült a halál rendszer, még tesztelni kell, lehet bugos#
-#-----------------------------------------------------------------#
+
+# játék frissitések, aktuális dolgok
+bekerült a halál rendszer, még tesztelni kell, lehet bugos
+
+# -----------------------------------------------------------------
 
 
 
