@@ -30,14 +30,14 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 
 		if slotVal and slotVal.Value ~= "" then
 			isCooldown = true
-
+			
 			local skillName = slotVal.Value
 			local target = mouse.Target
 			local mousePos = mouse.Hit.Position
 			local char = player.Character
 			local hum = char and char:FindFirstChild("Humanoid")
 			local root = char and char:FindFirstChild("HumanoidRootPart")
-
+			
 			-- ÚJ: AUTO-APPROACH (Célra sétálás, ha túl messze van)
 			local maxRange = SkillDatabase.Ranges[skillName]
 			if maxRange and maxRange > 0 and target and target.Parent:FindFirstChild("Humanoid") then
@@ -47,7 +47,7 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 					if dist > maxRange then
 						-- Odasétálunk az ellenfélhez!
 						hum:MoveTo(targetRoot.Position)
-
+						
 						-- Várunk, amíg beérünk a hatótávba
 						local connection
 						connection = RunService.Heartbeat:Connect(function()
@@ -69,7 +69,7 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 					end
 				end
 			end
-
+			
 			-- Ha eleve közel van, vagy ez egy sima Poti / Buff, azonnal elsütjük:
 			UseItem:FireServer(skillName, mousePos, target) 
 

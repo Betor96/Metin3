@@ -190,7 +190,7 @@ for i = 1, 8 do
 	itemIcon.TextScaled = true
 	itemIcon.Font = Enum.Font.GothamBold
 	itemIcon.ZIndex = 2
-
+	
 	-- ÚJ: Cooldown (Újratöltés) Fekete Réteg
 	local cdOverlay = Instance.new("Frame", slotFrame)
 	cdOverlay.Name = "CDOverlay"
@@ -223,7 +223,7 @@ local function renderHotbar()
 				if slotVal.Value ~= "" then
 					icon.Text = slotVal.Value
 					local sVal = slotVal.Value
-
+					
 					-- ELLENŐRZÉS: Benne van-e a Képesség Adatbázisban?
 					if SkillDatabase.Ranges[sVal] then
 						-- EZ EGY KÉPESSÉG! Nem nézünk darabszámot!
@@ -235,7 +235,7 @@ local function renderHotbar()
 						if sVal == "Iron Skin" and player:GetAttribute("IronSkin_Active") then isActive = true end
 						if sVal == "Seal of Power" and player:GetAttribute("SealOfPower_Active") then isActive = true end
 						if sVal == "Seal of Protection" and player:GetAttribute("SealOfProtection_Active") then isActive = true end
-
+						
 						if isActive then
 							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) -- ARANY Buff
 						else
@@ -306,18 +306,18 @@ SkillCooldown.OnClientEvent:Connect(function(skillName, cdTime)
 	for i = 1, 8 do
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
 		local uiSlot = hotbarContainer:FindFirstChild("HotbarSlotUI_" .. i)
-
+		
 		if slotVal and slotVal.Value == skillName and uiSlot then
 			local cdOverlay = uiSlot:FindFirstChild("CDOverlay")
 			if cdOverlay then
 				cdOverlay.Visible = true
 				cdOverlay.Size = UDim2.new(1, 0, 1, 0) -- Teljesen eltakarja
-
+				
 				-- Lefelé csúszik az idő alatt!
 				local tweenInfo = TweenInfo.new(cdTime, Enum.EasingStyle.Linear)
 				local tween = TweenService:Create(cdOverlay, tweenInfo, {Size = UDim2.new(1, 0, 0, 0)})
 				tween:Play()
-
+				
 				tween.Completed:Connect(function()
 					cdOverlay.Visible = false
 				end)
@@ -343,7 +343,7 @@ local function setupHotbarConnections()
 	for _, child in pairs(hotbarFolder:GetChildren()) do
 		if child:IsA("ValueBase") then child.Changed:Connect(triggerUpdate) end
 	end
-
+	
 	player.AttributeChanged:Connect(function(attr)
 		if attr:match("_Active") then renderHotbar() end
 	end)
