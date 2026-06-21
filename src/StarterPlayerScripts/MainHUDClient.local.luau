@@ -1,9 +1,27 @@
 -- Fájl helye: StarterPlayer -> StarterPlayerScripts -> MainHUDClient
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
 local playerGui = player:WaitForChild("PlayerGui")
+local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
+local Events = ReplicatedStorage:WaitForChild("Events")
+local SkillCooldown = Events:WaitForChild("SkillCooldown")
+
+local hotbarFolder = player:FindFirstChild("Hotbar")
+if not hotbarFolder then
+	hotbarFolder = Instance.new("Folder")
+	hotbarFolder.Name = "Hotbar"
+	for i = 1, 8 do
+		local slotVal = Instance.new("StringValue")
+		slotVal.Name = "Hotbar_" .. i
+		slotVal.Value = ""
+		slotVal.Parent = hotbarFolder
+	end
+	hotbarFolder.Parent = player
+end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MetinHUD"
@@ -11,9 +29,6 @@ screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1
 screenGui.Parent = playerGui
 
--- ==========================================
--- BAL ALSÓ SÁV (HP, MP, EXP)
--- ==========================================
 local statusContainer = Instance.new("Frame")
 statusContainer.Size = UDim2.new(0, 300, 0, 80)
 statusContainer.AnchorPoint = Vector2.new(1, 1) 
@@ -74,10 +89,6 @@ expBar.Size = UDim2.new(0.5, 0, 1, 0)
 expBar.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
 expBar.BorderSizePixel = 0
 
-
--- ==========================================
--- JAVÍTÁS: Mindig az éppen aktuális karakter HP-ját nézzük!
--- ==========================================
 local currentHumanoid = nil
 
 local function updateHP()
@@ -96,7 +107,6 @@ end
 
 player.CharacterAdded:Connect(setupCharacter)
 if player.Character then setupCharacter(player.Character) end
-
 
 local function updateMPXP()
 	local stats = player:FindFirstChild("PlayerStats")
@@ -124,9 +134,6 @@ task.spawn(function()
 	while task.wait(0.5) do updateMPXP() end
 end)
 
--- ==========================================
--- KÖZÉPSŐ GYORSGOMBOK (HOTBAR 1-8)
--- ==========================================
 local hotbarContainer = Instance.new("Frame")
 hotbarContainer.Size = UDim2.new(0, 440, 0, 60)
 hotbarContainer.AnchorPoint = Vector2.new(0.5, 1) 
@@ -183,18 +190,29 @@ for i = 1, 8 do
 	itemIcon.TextScaled = true
 	itemIcon.Font = Enum.Font.GothamBold
 	itemIcon.ZIndex = 2
+
+	-- ÚJ: Cooldown (Újratöltés) Fekete Réteg
+	local cdOverlay = Instance.new("Frame", slotFrame)
+	cdOverlay.Name = "CDOverlay"
+	cdOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
+	cdOverlay.BackgroundTransparency = 0.5
+	cdOverlay.Size = UDim2.new(1, 0, 0, 0) -- Alapból 0 magas, nem látszik
+	cdOverlay.Position = UDim2.new(0, 0, 1, 0)
+	cdOverlay.AnchorPoint = Vector2.new(0, 1) -- Lentről felfelé nő, fentről lefelé fogy!
+	cdOverlay.ZIndex = 4
+	cdOverlay.Visible = false
 end
 
 -- ==========================================
--- ÚJ: GYORSGOMBOK FRISSÍTÉSE (Dinamikus!)
+-- JAVÍTÁS: Nincs több "0" bug, adatbázisból ellenőrizzük!
 -- ==========================================
 local function renderHotbar()
-	local hotbarFolder = player:FindFirstChild("Hotbar")
+	local hbFolder = player:FindFirstChild("Hotbar")
 	local invFolder = player:FindFirstChild("Inventory")
-	if not hotbarFolder or not invFolder then return end
+	if not hbFolder or not invFolder then return end
 
 	for i = 1, 8 do
-		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
+		local slotVal = hbFolder:FindFirstChild("Hotbar_" .. i)
 		local uiSlot = hotbarContainer:FindFirstChild("HotbarSlotUI_" .. i)
 
 		if slotVal and uiSlot then
@@ -204,57 +222,75 @@ local function renderHotbar()
 
 				if slotVal.Value ~= "" then
 					icon.Text = slotVal.Value
+					local sVal = slotVal.Value
 
-					-- A TELJES TÁSKÁT VÉGIGNÉZZÜK!
-					local totalAmount = 0
-					for _, invSlot in pairs(invFolder:GetChildren()) do
-						if invSlot:IsA("StringValue") and invSlot.Value == slotVal.Value then
-							local amt = invSlot:FindFirstChild("Amount")
-							totalAmount = totalAmount + (amt and amt.Value or 1)
+					-- ELLENŐRZÉS: Benne van-e a Képesség Adatbázisban?
+					if SkillDatabase.Ranges[sVal] then
+						-- EZ EGY KÉPESSÉG! Nem nézünk darabszámot!
+						icon.BackgroundTransparency = 0
+						local isActive = false
+						if sVal == "Blade Spirit" and player:GetAttribute("BladeSpirit_Active") then isActive = true end
+						if sVal == "Bloodlust" and player:GetAttribute("Bloodlust_Active") then isActive = true end
+						if sVal == "Spirit Blessing" and player:GetAttribute("SpiritBlessing_Active") then isActive = true end
+						if sVal == "Iron Skin" and player:GetAttribute("IronSkin_Active") then isActive = true end
+						if sVal == "Seal of Power" and player:GetAttribute("SealOfPower_Active") then isActive = true end
+						if sVal == "Seal of Protection" and player:GetAttribute("SealOfProtection_Active") then isActive = true end
+
+						if isActive then
+							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) -- ARANY Buff
+						else
+							icon.BackgroundColor3 = Color3.fromRGB(80, 40, 120) -- LILA Képesség
+						end
+						icon.TextTransparency = 0
+					else
+						-- EZ EGY TÁRGY (Poti)! Megszámoljuk a táskában.
+						local totalAmount = 0
+						for _, invSlot in pairs(invFolder:GetChildren()) do
+							if invSlot:IsA("StringValue") and invSlot.Value == sVal then
+								local amt = invSlot:FindFirstChild("Amount")
+								totalAmount = totalAmount + (amt and amt.Value or 1)
+							end
+						end
+
+						if totalAmount > 0 then
+							icon.BackgroundTransparency = 0
+							icon.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+							icon.TextTransparency = 0
+
+							local amtLabel = Instance.new("TextLabel")
+							amtLabel.Name = "AmountLabel"
+							amtLabel.Size = UDim2.new(0, 20, 0, 20)
+							amtLabel.Position = UDim2.new(1, -20, 1, -20) 
+							amtLabel.BackgroundTransparency = 1
+							amtLabel.TextColor3 = Color3.new(1, 1, 1) 
+							amtLabel.TextStrokeColor3 = Color3.new(0, 0, 0) 
+							amtLabel.TextStrokeTransparency = 0
+							amtLabel.Text = tostring(totalAmount)
+							amtLabel.Font = Enum.Font.GothamBold
+							amtLabel.TextSize = 14
+							amtLabel.ZIndex = 10 
+							amtLabel.Parent = icon
+						else
+							icon.BackgroundTransparency = 0
+							icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+							icon.TextTransparency = 0.6 
+
+							local amtLabel = Instance.new("TextLabel")
+							amtLabel.Name = "AmountLabel"
+							amtLabel.Size = UDim2.new(0, 20, 0, 20)
+							amtLabel.Position = UDim2.new(1, -20, 1, -20)
+							amtLabel.BackgroundTransparency = 1
+							amtLabel.TextColor3 = Color3.fromRGB(255, 50, 50) 
+							amtLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+							amtLabel.TextStrokeTransparency = 0
+							amtLabel.Text = "0"
+							amtLabel.Font = Enum.Font.GothamBold
+							amtLabel.TextSize = 14
+							amtLabel.ZIndex = 10 
+							amtLabel.Parent = icon
 						end
 					end
-
-					if totalAmount > 0 then
-						-- VAN BELŐLE: Sima, színes kinézet
-						icon.BackgroundTransparency = 0
-						icon.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
-						icon.TextTransparency = 0
-
-						local amtLabel = Instance.new("TextLabel")
-						amtLabel.Name = "AmountLabel"
-						amtLabel.Size = UDim2.new(0, 20, 0, 20)
-						amtLabel.Position = UDim2.new(1, -20, 1, -20) -- Pontosan a jobb alsó sarokba!
-						amtLabel.BackgroundTransparency = 1
-						amtLabel.TextColor3 = Color3.new(1, 1, 1) -- Fehér szám
-						amtLabel.TextStrokeColor3 = Color3.new(0, 0, 0) -- Fekete körvonal!
-						amtLabel.TextStrokeTransparency = 0
-						amtLabel.Text = tostring(totalAmount)
-						amtLabel.Font = Enum.Font.GothamBold
-						amtLabel.TextSize = 14
-						amtLabel.ZIndex = 10 -- JAVÍTÁS: Legfelülre rakjuk, hogy semmi ne takarja ki!
-						amtLabel.Parent = icon
-					else
-						-- ELFOGYOTT: Szürke szín és 0-ás érték!
-						icon.BackgroundTransparency = 0
-						icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-						icon.TextTransparency = 0.6 
-
-						local amtLabel = Instance.new("TextLabel")
-						amtLabel.Name = "AmountLabel"
-						amtLabel.Size = UDim2.new(0, 20, 0, 20)
-						amtLabel.Position = UDim2.new(1, -20, 1, -20)
-						amtLabel.BackgroundTransparency = 1
-						amtLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Piros "0"
-						amtLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-						amtLabel.TextStrokeTransparency = 0
-						amtLabel.Text = "0"
-						amtLabel.Font = Enum.Font.GothamBold
-						amtLabel.TextSize = 14
-						amtLabel.ZIndex = 10 -- JAVÍTÁS: Legfelülre rakjuk!
-						amtLabel.Parent = icon
-					end
 				else
-					-- ÜRES REKESZ
 					icon.Text = ""
 					icon.BackgroundTransparency = 1
 				end
@@ -264,40 +300,53 @@ local function renderHotbar()
 end
 
 -- ==========================================
--- JAVÍTOTT ESEMÉNYFIGYELŐ
+-- COOLDOWN ANIMÁCIÓ (Fekete lecsúszó réteg)
 -- ==========================================
+SkillCooldown.OnClientEvent:Connect(function(skillName, cdTime)
+	for i = 1, 8 do
+		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
+		local uiSlot = hotbarContainer:FindFirstChild("HotbarSlotUI_" .. i)
+
+		if slotVal and slotVal.Value == skillName and uiSlot then
+			local cdOverlay = uiSlot:FindFirstChild("CDOverlay")
+			if cdOverlay then
+				cdOverlay.Visible = true
+				cdOverlay.Size = UDim2.new(1, 0, 1, 0) -- Teljesen eltakarja
+
+				-- Lefelé csúszik az idő alatt!
+				local tweenInfo = TweenInfo.new(cdTime, Enum.EasingStyle.Linear)
+				local tween = TweenService:Create(cdOverlay, tweenInfo, {Size = UDim2.new(1, 0, 0, 0)})
+				tween:Play()
+
+				tween.Completed:Connect(function()
+					cdOverlay.Visible = false
+				end)
+			end
+		end
+	end
+end)
+
 local function setupHotbarConnections()
-	local hotbarFolder = player:WaitForChild("Hotbar")
 	local invFolder = player:WaitForChild("Inventory")
 
-	local function triggerUpdate()
-		renderHotbar()
-	end
+	local function triggerUpdate() renderHotbar() end
 
-	-- Figyelünk minden új tárgyat, ami bekerül a táskába!
 	invFolder.DescendantAdded:Connect(function(descendant)
-		if descendant:IsA("ValueBase") then
-			descendant.Changed:Connect(triggerUpdate)
-		end
+		if descendant:IsA("ValueBase") then descendant.Changed:Connect(triggerUpdate) end
 		triggerUpdate()
 	end)
-
-	-- Figyeljük, ha elveszünk/törlünk egy tárgyat!
 	invFolder.DescendantRemoving:Connect(triggerUpdate)
 
-	-- Felcsatoljuk az alapból bent lévő tárgyakra is!
 	for _, descendant in pairs(invFolder:GetDescendants()) do
-		if descendant:IsA("ValueBase") then
-			descendant.Changed:Connect(triggerUpdate)
-		end
+		if descendant:IsA("ValueBase") then descendant.Changed:Connect(triggerUpdate) end
+	end
+	for _, child in pairs(hotbarFolder:GetChildren()) do
+		if child:IsA("ValueBase") then child.Changed:Connect(triggerUpdate) end
 	end
 
-	-- A Hotbar változását is figyeljük
-	for _, child in pairs(hotbarFolder:GetChildren()) do
-		if child:IsA("ValueBase") then
-			child.Changed:Connect(triggerUpdate)
-		end
-	end
+	player.AttributeChanged:Connect(function(attr)
+		if attr:match("_Active") then renderHotbar() end
+	end)
 end
 
 task.spawn(setupHotbarConnections)

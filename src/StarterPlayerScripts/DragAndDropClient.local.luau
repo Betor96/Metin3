@@ -176,9 +176,7 @@ local function promptSell(slotName, itemName)
 	sellFrame.Visible = true
 end
 
--- ==========================================
--- ÚJ: ELDOBÁS / MEGSEMMISÍTÉS ABLAK (PROMPT)
--- ==========================================
+-- ELDOBÁS / MEGSEMMISÍTÉS ABLAK
 local discardFrame = Instance.new("Frame")
 discardFrame.Size = UDim2.new(0, 300, 0, 150)
 discardFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
@@ -260,10 +258,7 @@ btnDestroy.MouseButton1Click:Connect(function()
 	end
 end)
 
-
--- ==========================================
--- TOOLTIP RENDSZER (KÜLÖN RÉTEGEN)
--- ==========================================
+-- TOOLTIP RENDSZER
 local tooltipGui = Instance.new("ScreenGui")
 tooltipGui.Name = "TooltipHUD"
 tooltipGui.DisplayOrder = 99999
@@ -311,16 +306,14 @@ RunService.RenderStepped:Connect(updateTooltipPosition)
 
 local function getTooltipText(itemName)
 	local data = ItemDatabase[itemName]
-	if not data then return "Nincs információ erről a tárgyról." end
+	if not data then return "A képességeidet behúzhatod a Hotbarba a használathoz!" end
 	local text = ""
 	if data.Type == "Fegyver" then text = "Szint: " .. (data.Level or 1) .. "\nSebzés: " .. (data.MinDmg or 0) .. " - " .. (data.MaxDmg or 0) .. "\n\n"
 	elseif data.Type == "Páncél" then text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n" end
 	return text .. (data.Description or "")
 end
 
--- ==========================================
 -- TAKARÍTÁS ÉS UI GENERÁLÁS
--- ==========================================
 local currentPage = 1
 local maxPages = 4
 
@@ -434,7 +427,6 @@ buyGoldBtn.MouseButton1Click:Connect(function()
 		if gold.Value >= cost then
 			Events:WaitForChild("UnlockPageGold"):FireServer()
 		else
-			-- Táskánál is jelezzük az Arany hiányát!
 			local originalText = buyGoldBtn.Text
 			buyGoldBtn.Text = "Nincs elég Arany!"
 			task.wait(1.5)
@@ -560,7 +552,7 @@ task.delay(1, function()
 end)
 
 -- ==========================================
--- EGÉR KATTINTÁSOK (DRAG, ELADÁS, DUPLA KLIKK, SHIFT SPLIT)
+-- KÉPESSÉGEK FELISMERÉSE ÉS DRAG & DROP
 -- ==========================================
 local dragging = false
 local dragClone = nil
@@ -589,6 +581,10 @@ local function getSlotData(guiObject)
 		local num = guiObject.Name:match("%d+")
 		local hotbarFolder = player:FindFirstChild("Hotbar")
 		if hotbarFolder then return "Hotbar", "Hotbar_" .. num, hotbarFolder:FindFirstChild("Hotbar_" .. num) end
+		-- KÉPESSÉG (SKILL) FELISMERÉSE A KARAKTER ABLAKBÓL
+	elseif guiObject.Name:match("SkillUI_") then
+		local skillName = guiObject.Name:sub(9) -- Levágja a "SkillUI_" előtagot
+		return "Skill", skillName, {Value = skillName} -- Hamis SlotVal, hogy a Drag&Drop működjön!
 	end
 	return nil, nil, nil
 end
@@ -664,17 +660,32 @@ UserInputService.InputBegan:Connect(function(input)
 				tooltip.Visible = false
 
 				local isShiftDown = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
-				local currentAmtObj = slotVal:FindFirstChild("Amount")
-				local currentAmt = currentAmtObj and currentAmtObj.Value or 1
-				dragSplitAmount = nil
 
+				-- ==========================================
+				-- JAVÍTÁS ITT: CSAK AKKOR KERESSÜK AZ "Amount"-ot HA IGAZI PÁLYA-ELEM (Instance)!
+				-- ==========================================
+				local currentAmt = 1
+				if typeof(slotVal) == "Instance" then
+					local currentAmtObj = slotVal:FindFirstChild("Amount")
+					if currentAmtObj then
+						currentAmt = currentAmtObj.Value
+					end
+				end
+
+				dragSplitAmount = nil
 				if isShiftDown and currentAmt > 1 and folderStr == "Inventory" then
 					dragSplitAmount = math.floor(currentAmt / 2)
 				end
 
 				dragClone = Instance.new("TextLabel", playerGui:WaitForChild("InventoryHUD"))
 				dragClone.Size = UDim2.new(0, 40, 0, 40)
-				dragClone.BackgroundColor3 = Color3.fromRGB(150, 150, 50)
+
+				if folderStr == "Skill" then
+					dragClone.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
+				else
+					dragClone.BackgroundColor3 = Color3.fromRGB(150, 150, 50)
+				end
+
 				dragClone.Text = slotVal.Value
 				dragClone.TextScaled = true
 				dragClone.Font = Enum.Font.GothamBold
@@ -761,22 +772,33 @@ UserInputService.InputEnded:Connect(function(input)
 		elseif fromFolderStr == "Hotbar" then 
 			local hbFolder = player:FindFirstChild("Hotbar")
 			if hbFolder and hbFolder:FindFirstChild(fromSlotName) then itemName = hbFolder[fromSlotName].Value end
+		elseif fromFolderStr == "Skill" then
+			itemName = fromSlotName 
 		end
 
 		if targetSlotUI then
 			local toFolderStr, toSlotName = getSlotData(targetSlotUI)
 
-			if fromFolderStr == "Hotbar" then
-				local hbFolder = player:FindFirstChild("Hotbar")
-				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then hbFolder[fromSlotName].Value = "" end
+			if fromFolderStr == "Skill" then
 				if toFolderStr == "Hotbar" then
 					local targetHb = player.Hotbar:FindFirstChild(toSlotName)
 					if targetHb then targetHb.Value = itemName end
 				end
+
+			elseif fromFolderStr == "Hotbar" then
+				local hbFolder = player:FindFirstChild("Hotbar")
+				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then hbFolder[fromSlotName].Value = "" end
+
+				if toFolderStr == "Hotbar" then
+					local targetHb = player.Hotbar:FindFirstChild(toSlotName)
+					if targetHb then targetHb.Value = itemName end
+				end
+
 			elseif toFolderStr == "Hotbar" and fromFolderStr == "Inventory" then
 				local hotbarSlot = player.Hotbar:FindFirstChild(toSlotName)
 				if hotbarSlot then hotbarSlot.Value = itemName end
-			elseif fromFolderStr ~= "Hotbar" and toFolderStr ~= "Hotbar" then
+
+			elseif fromFolderStr ~= "Hotbar" and toFolderStr ~= "Hotbar" and toFolderStr ~= "Skill" then
 				if fromSlotName ~= toSlotName or fromFolderStr ~= toFolderStr then
 					MoveItem:FireServer(fromFolderStr, fromSlotName, toFolderStr, toSlotName, dragSplitAmount)
 				end
@@ -785,6 +807,9 @@ UserInputService.InputEnded:Connect(function(input)
 			if fromFolderStr == "Hotbar" then
 				local hbFolder = player:FindFirstChild("Hotbar")
 				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then hbFolder[fromSlotName].Value = "" end
+
+			elseif fromFolderStr == "Skill" then
+				-- Nem csinálunk semmit
 			else
 				local droppedOnShop = false
 				for _, gui in pairs(guisAtPosition) do
@@ -808,9 +833,6 @@ UserInputService.InputEnded:Connect(function(input)
 							bsFrame.Visible = true
 						end
 					else
-						-- ==========================================
-						-- JAVÍTÁS: HA KINT VAN A LEVEGŐBEN, MEGJELENIK A PROMPT ABLAK
-						-- ==========================================
 						local amtText = ""
 						if dragSplitAmount then amtText = " (x" .. dragSplitAmount .. ")" end
 						discardInfo.Text = "Mit szeretnél tenni ezzel:\n" .. itemName .. amtText .. "?"
