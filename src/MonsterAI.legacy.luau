@@ -2,7 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local PhysicsService = game:GetService("PhysicsService") -- ÚJ: Fizikai motor betöltése
+local PhysicsService = game:GetService("PhysicsService") 
 local MonsterDatabase = require(ReplicatedStorage:WaitForChild("MonsterDatabase"))
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 local QuestDatabase = require(ReplicatedStorage:WaitForChild("QuestDatabase"))
@@ -23,13 +23,11 @@ humanoid.Health = humanoid.MaxHealth
 humanoid.WalkSpeed = myData.WalkSpeed or 14 
 
 -- ==========================================
--- ÚJ: EGYMÁSRA MÁSZÁS ELLENI VÉDELEM
+-- EGYMÁSRA MÁSZÁS ELLENI VÉDELEM
 -- ==========================================
--- 1. Kikapcsoljuk az ugrást és a falmászást
 humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
 humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 
--- 2. "Szellem mód": A szörnyek ne ütközzenek egymással!
 pcall(function()
 	PhysicsService:RegisterCollisionGroup("Monsters")
 	PhysicsService:CollisionGroupSetCollidable("Monsters", "Monsters", false)
@@ -40,17 +38,15 @@ for _, part in pairs(npc:GetDescendants()) do
 		part.CollisionGroup = "Monsters"
 	end
 end
--- ==========================================
 
 local canAttack = true
 local isDead = false
 
 local spawnPosition = npc:GetPivot().Position 
-local roamRadius = 25       
+local roamRadius = 25        
 
--- JAVÍTÁS: Maximalizáljuk az észlelést 20 stud-ra (az adatbázisban lévő 40-50 túl nagy volt!)
 local dbAggro = myData.AggroRange or 20
-local aggroRange = math.min(dbAggro, 20)  
+local aggroRange = math.min(dbAggro, 10)  
 
 local attackRange = myData.AttackRange or 5 
 local leashDistance = 100   
@@ -59,13 +55,19 @@ local currentState = "IDLE"
 local currentTarget = nil
 local nextRoamTime = tick() + math.random(1, 3)
 
-local function getNearestTarget()
+-- ==========================================
+-- CÉLPONT KERESÉSE (Távolság felülírással)
+-- ==========================================
+local function getNearestTarget(overrideRange)
 	local target = nil
-	local shortestDistance = aggroRange
+	local shortestDistance = overrideRange or aggroRange
 
 	for _, player in pairs(Players:GetPlayers()) do
 		local char = player.Character
 		if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+			-- HA SÉRTHETETLEN, LÁTHATATLAN A SZÖRNYEKNEK!
+			if char:FindFirstChildOfClass("ForceField") or char:GetAttribute("Invincible") then continue end
+
 			local charRoot = char:FindFirstChild("HumanoidRootPart")
 			if charRoot then
 				local dist = (rootPart.Position - charRoot.Position).Magnitude
@@ -80,6 +82,10 @@ local function getNearestTarget()
 end
 
 local function attack(target)
+	if not target or not target.Parent then return end
+	local playerChar = target.Parent
+	if playerChar:FindFirstChildOfClass("ForceField") or playerChar:GetAttribute("Invincible") then return end
+
 	if canAttack and not isDead then
 		canAttack = false
 		local targetHumanoid = target.Parent:FindFirstChild("Humanoid")
@@ -110,24 +116,42 @@ local function attack(target)
 end
 
 -- ==========================================
--- ÚJ: FALKA AGGRO (Ha megütnek, szólok a többieknek)
+-- ÚJ: FALKA RIASZTÓ FÜGGVÉNY
+-- ==========================================
+local function alertPack(targetInstance)
+	local packID = npc:GetAttribute("PackID")
+	if not packID then return end
+
+	for _, otherNpc in pairs(workspace.Monsters:GetChildren()) do
+		if otherNpc ~= npc and otherNpc:GetAttribute("PackID") == packID then
+			local shared = otherNpc:FindFirstChild("SharedTarget")
+			if not shared then
+				shared = Instance.new("ObjectValue")
+				shared.Name = "SharedTarget"
+				shared.Parent = otherNpc
+			end
+			shared.Value = targetInstance
+			otherNpc:SetAttribute("Alerted", true)
+		end
+	end
+end
+
+-- ==========================================
+-- SEBZÉS ÉRZÉKELÉSE ÉS FALKA AGGRO
 -- ==========================================
 humanoid.HealthChanged:Connect(function(currentHp)
-	if currentHp < humanoid.MaxHealth and currentState == "IDLE" and not isDead then
-		local target = getNearestTarget()
-		if target then
-			currentState = "CHASE"
-			currentTarget = target
-
-			-- Szólunk a falka többi tagjának!
-			local packID = npc:GetAttribute("PackID")
-			if packID then
-				for _, otherNpc in pairs(workspace.Monsters:GetChildren()) do
-					if otherNpc ~= npc and otherNpc:GetAttribute("PackID") == packID then
-						otherNpc:SetAttribute("Alerted", true)
-					end
-				end
+	if currentHp < humanoid.MaxHealth and not isDead then
+		if not currentTarget then
+			-- Ha békés volt, de megütötték távolról, 150 studig ellát, hogy kiszúrja a támadót!
+			local target = getNearestTarget(150)
+			if target then
+				currentState = "CHASE"
+				currentTarget = target
+				alertPack(target)
 			end
+		else
+			-- Ha már harcolt, de kap egy ütést, megerősíti a riasztást a falkának
+			alertPack(currentTarget)
 		end
 	end
 end)
@@ -140,38 +164,61 @@ task.spawn(function()
 
 		-- 1. ÁLLAPOT: SÉTÁLGATÁS / VÁRAKOZÁS
 		if currentState == "IDLE" then
-			
-			if npc:GetAttribute("Alerted") then
-				npc:SetAttribute("Alerted", false)
-				currentTarget = getNearestTarget()
-				if currentTarget then currentState = "CHASE" end
-			end
-			
-			currentTarget = getNearestTarget()
-			if currentTarget then
-				currentState = "CHASE"
-			else
-				-- JAVÍTÁS: Ha az idő letelt, elsétál...
-				if tick() >= nextRoamTime then
-					local rx = spawnPosition.X + (math.random() * roamRadius * 2) - roamRadius
-					local rz = spawnPosition.Z + (math.random() * roamRadius * 2) - roamRadius
-					humanoid:MoveTo(Vector3.new(rx, spawnPosition.Y, rz))
+			local sharedTarget = npc:FindFirstChild("SharedTarget")
 
-					-- ÚJ IDŐZÍTÉS: A séta hossza + garantált 6-8 másodperc egy helyben állás!
-					nextRoamTime = tick() + math.random(9, 12) 
+			-- Ha a társak riasztottak, ráugrik a közös célpontra!
+			if npc:GetAttribute("Alerted") and sharedTarget and sharedTarget.Value then
+				npc:SetAttribute("Alerted", false)
+				currentTarget = sharedTarget.Value
+				currentState = "CHASE"
+				sharedTarget.Value = nil
+			else
+				currentTarget = getNearestTarget()
+				if currentTarget then
+					currentState = "CHASE"
+					-- JAVÍTÁS: Ha önszántából meglát téged, AZONNAL szól a többieknek is!
+					alertPack(currentTarget)
+				else
+					if tick() >= nextRoamTime then
+						local rx = spawnPosition.X + (math.random() * roamRadius * 2) - roamRadius
+						local rz = spawnPosition.Z + (math.random() * roamRadius * 2) - roamRadius
+						humanoid:MoveTo(Vector3.new(rx, spawnPosition.Y, rz))
+						nextRoamTime = tick() + math.random(9, 12) 
+					end
 				end
 			end
 
 			-- 2. ÁLLAPOT: ÜLDÖZÉS ÉS HARC
 		elseif currentState == "CHASE" then
 			if not currentTarget or not currentTarget.Parent or currentTarget.Parent:FindFirstChild("Humanoid").Health <= 0 then
-				currentState = "RETURN"
-				currentTarget = nil
+
+				local newTarget = getNearestTarget()
+				if newTarget then
+					currentTarget = newTarget
+					alertPack(newTarget)
+				else
+					currentState = "RETURN"
+					currentTarget = nil
+				end
+
 			else
+				-- HA ÜLDÖZÉS KÖZBEN LESZ SÉRTHETETLEN, MÁSIK CÉLPONTOT KERES!
+				if currentTarget.Parent:FindFirstChildOfClass("ForceField") or currentTarget.Parent:GetAttribute("Invincible") then
+					local newTarget = getNearestTarget()
+					if newTarget then
+						currentTarget = newTarget
+						alertPack(newTarget)
+					else
+						currentState = "RETURN"
+						currentTarget = nil
+					end
+					continue 
+				end
+
 				local distToTarget = (rootPart.Position - currentTarget.Position).Magnitude
 				local distToSpawn = (rootPart.Position - spawnPosition).Magnitude
 
-				if distToSpawn > leashDistance or distToTarget > (aggroRange * 1.5) then
+				if distToSpawn > leashDistance or distToTarget > 50 then
 					currentState = "RETURN"
 					currentTarget = nil
 				else
@@ -186,14 +233,22 @@ task.spawn(function()
 
 			-- 3. ÁLLAPOT: HAZATÉRÉS
 		elseif currentState == "RETURN" then
-			humanoid:MoveTo(spawnPosition)
-			humanoid.Health = humanoid.MaxHealth 
 
-			local distToSpawn = (rootPart.Position - spawnPosition).Magnitude
-			if distToSpawn < 3 then
-				currentState = "IDLE"
-				-- Hazatérés után is pihen 5 másodpercet
-				nextRoamTime = tick() + math.random(4, 6)
+			local newTarget = getNearestTarget()
+			if newTarget then
+				currentTarget = newTarget
+				currentState = "CHASE"
+				alertPack(newTarget)
+			else
+				humanoid:MoveTo(spawnPosition)
+				humanoid.Health = humanoid.MaxHealth 
+
+				local distToSpawn = Vector3.new(rootPart.Position.X - spawnPosition.X, 0, rootPart.Position.Z - spawnPosition.Z).Magnitude
+
+				if distToSpawn < 5 then
+					currentState = "IDLE"
+					nextRoamTime = tick() + math.random(4, 6)
+				end
 			end
 		end
 
@@ -202,20 +257,20 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- HALÁL ESEMÉNY (Loot, EXP, Küldetés)
+-- HALÁL ESEMÉNY ÉS LOOT
 -- ==========================================
 humanoid.Died:Connect(function()
 	if isDead then return end
 	isDead = true
 
 	humanoid.WalkSpeed = 0 
-	
+
 	if npc:GetAttribute("NoDrop") then
-		task.wait(0.5) -- Pici animációs várakozás, hogy látszódjon, ahogy összeesik
+		task.wait(0.5) 
 		npc:Destroy()
 		return
 	end
-	
+
 	local deathPosition = npc:GetPivot().Position
 
 	local killer = nil
@@ -273,14 +328,10 @@ humanoid.Died:Connect(function()
 		droppedItem.Name = "LootPart"
 		droppedItem.Size = Vector3.new(0.4, 0.4, 0.4) 
 
-		-- ==========================================
-		-- JAVÍTÁS: RAYCAST A FÖLDHÖZ ÉS HITBOX LEVÉTELE
-		-- ==========================================
 		local dropPos = deathPosition + Vector3.new(math.random(-3,3), 3, math.random(-3,3))
 
 		local rayParams = RaycastParams.new()
 		rayParams.FilterType = Enum.RaycastFilterType.Exclude
-		-- A lézer menjen át magán a szörnyön, az eddigi tárgyakon és a játékosokon
 		rayParams.FilterDescendantsInstances = {npc, droppedFolder, Players:GetPlayers()}
 
 		local ray = workspace:Raycast(dropPos, Vector3.new(0, -50, 0), rayParams)
@@ -309,9 +360,6 @@ humanoid.Died:Connect(function()
 		itemTag.Name = "ItemName"
 		itemTag.Value = itemName
 
-		-- ==========================================
-		-- ÚJ: TULAJDONJOG, NÉV ÉS IDŐZÍTŐ
-		-- ==========================================
 		local killerName = killer and killer.Name or ""
 		local ownerTag = Instance.new("StringValue", droppedItem)
 		ownerTag.Name = "Owner"
@@ -321,7 +369,7 @@ humanoid.Died:Connect(function()
 		textBillboard.Size = UDim2.new(0, 150, 0, 40)
 		textBillboard.StudsOffset = Vector3.new(0, 1.2, 0)
 		textBillboard.AlwaysOnTop = true
-		textBillboard.MaxDistance = 60 -- JAVÍTÁS: Szörny loot eltűnik
+		textBillboard.MaxDistance = 60 
 		textBillboard.Adornee = droppedItem
 		textBillboard.Parent = droppedItem
 
@@ -333,7 +381,6 @@ humanoid.Died:Connect(function()
 		dropNameLabel.TextScaled = true
 		dropNameLabel.TextStrokeTransparency = 0
 
-		-- Eredeti tárgy szín kinyerése a RichText-hez
 		local r, g, b = math.floor(textColor.R*255), math.floor(textColor.G*255), math.floor(textColor.B*255)
 		local baseColorStr = "rgb("..r..","..g..","..b..")"
 
