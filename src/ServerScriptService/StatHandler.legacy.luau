@@ -12,14 +12,18 @@ local function recalculateStats(player)
 	local char = player.Character
 	if not stats or not eq then return end
 
+	local str = stats.STR.Value
 	local vit = stats.VIT.Value
 	local int = stats.INT.Value
 	local dex = stats.DEX.Value
 
+	-- Kiolvassuk a játékos kasztját a menüből (Ha nincs, alapértelmezett a GUARDIAN)
+	local pClass = player:GetAttribute("Class") or "GUARDIAN"
+
 	-- Alap bónuszok nullázása
 	local bDef, bMetin, bMonst, bHum, bLs, bCrit, bDD, bDG, bAs, bMs, bDodge, eqHp, eqMp = 0,0,0,0,0,0,0,0,0,0,0,0,0
 
-	-- Tárgyak bónuszainak összeadása
+	-- Tárgyak bónuszainak összeadása (Felszerelésből)
 	for _, slot in pairs(eq:GetChildren()) do
 		if slot.Value ~= "" then
 			local dat = ItemDatabase[slot.Value]
@@ -41,14 +45,64 @@ local function recalculateStats(player)
 		end
 	end
 
-	-- Értékek beállítása
-	stats.Defense.Value = bDef
+	-- ==========================================
+	-- ÚJ: KASZTSPECIFIKUS SZÁMOLÁSOK ÉS BÜNTETÉSEK
+	-- ==========================================
+	local finalMaxHP = 100
+	local finalDamage = 5
+	local finalDefense = bDef
+	local finalSpeed = 16 * (1 + (bMs / 100)) -- Alap sebesség + a cipő bónusza
+
+	if pClass == "GUARDIAN" then
+		finalMaxHP = 100 + (vit * 25)
+		finalDamage = 5 + (str * 2.5)
+		-- BÜNTETÉS: Magas INT csökkenti a páncélt
+		if int > 10 then
+			local penalty = math.floor((int - 10) * 1.5)
+			finalDefense = math.max(0, finalDefense - penalty)
+		end
+
+	elseif pClass == "SHADOWBLADE" then
+		finalMaxHP = 100 + (vit * 12)
+		finalDamage = 5 + (str * 1.5) + (dex * 2.5)
+		finalSpeed = finalSpeed + (dex * 0.1)
+		-- BÜNTETÉS: Túl sok páncél lassít és gyengít
+		if finalDefense > 30 then
+			local slowPenalty = (finalDefense - 30) * 0.2
+			finalSpeed = math.max(10, finalSpeed - slowPenalty)
+			finalDamage = finalDamage * 0.80
+		end
+
+	elseif pClass == "SOULWEAVER" then
+		finalMaxHP = 100 + (vit * 10) 
+		finalDamage = 5 + (int * 3.5) + (dex * 0.5)
+		-- BÜNTETÉS: Túl sok HP gyengíti a varázslatot és sebezhetőbbé tesz
+		if vit > 20 then
+			finalDamage = finalDamage * 0.70
+			finalDefense = finalDefense - 15
+		end
+
+	elseif pClass == "SEALER" then
+		finalMaxHP = 100 + (vit * 15)
+		finalDamage = 5 + (int * 2.5) + (str * 1)
+		-- BÜNTETÉS: Magas DEX rontja a képességeket
+		if dex > 15 then
+			finalDamage = finalDamage * 0.75
+		end
+	end
+
+	-- Hozzáadjuk a kaszt által kapott HP-hoz a Felszerelés által adott bónuszt
+	finalMaxHP = finalMaxHP + eqHp
+	local finalMaxMana = 100 + (int * 10) + eqMp
+
+	-- Értékek beállítása (A régi rendszered alapján)
+	stats.Defense.Value = finalDefense
 	stats.StrongVsMetin.Value = bMetin
 	stats.StrongVsMonster.Value = bMonst
 	stats.StrongVsPlayer.Value = bHum
 	stats.LifeSteal.Value = bLs
-	
-	-- DEX adja a kritikus esélyt (Minden 10 DEX = +1% Crit, azaz 0.1/pont)
+
+	-- DEX adja a kritikus esélyt (Minden 10 DEX = +1% Crit)
 	stats.CritChance.Value = math.clamp(math.floor(dex / 10) + bCrit, 0, 100)
 
 	stats.DoubleDrop.Value = bDD
@@ -56,19 +110,22 @@ local function recalculateStats(player)
 	stats.AttackSpeed.Value = bAs
 	stats.MovementSpeed.Value = bMs
 	stats.DodgeChance.Value = math.clamp(bDodge, 0, 100)
-
-	-- INT adja a maximális Manát (Minden INT = +10 Mana)
-	stats.MaxMana.Value = 100 + (int * 10) + eqMp
+	stats.MaxMana.Value = finalMaxMana
 
 	if char and char:FindFirstChild("Humanoid") then
 		local hum = char.Humanoid
-		-- VIT adja a maximális HP-t (Minden VIT = +20 HP)
-		hum.MaxHealth = 100 + (vit * 20) + eqHp
-		if hum.Health > hum.MaxHealth then hum.Health = hum.MaxHealth end
 
-		-- Alap sebesség 16 + a mozgási sebesség bónusz százaléka
-		hum.WalkSpeed = 16 * (1 + (bMs / 100))
+		-- Kiszámoljuk az arányt, hogy szintlépéskor/cucc levételkor ne fogyjon el a HP-ja vizuálisan
+		local currentHpPercent = hum.MaxHealth > 0 and (hum.Health / hum.MaxHealth) or 1
+
+		hum.MaxHealth = finalMaxHP
+		hum.Health = finalMaxHP * currentHpPercent
+		hum.WalkSpeed = finalSpeed
 	end
+
+	-- Eltároljuk a végső statokat a játékoson, hogy a CombatHandler (Harcrendszer) ezekből számoljon!
+	player:SetAttribute("AttackDamage", math.floor(finalDamage))
+	player:SetAttribute("Armor", math.floor(finalDefense))
 end
 
 local function setupPlayer(player)
@@ -88,6 +145,7 @@ local function setupPlayer(player)
 	end)
 
 	-- Bármilyen stat vagy felszerelés változik, újraszámolunk!
+	stats.STR.Changed:Connect(function() recalculateStats(player) end) -- ÚJ: STR is be lett kötve!
 	stats.VIT.Changed:Connect(function() recalculateStats(player) end)
 	stats.INT.Changed:Connect(function() recalculateStats(player) end)
 	stats.DEX.Changed:Connect(function() recalculateStats(player) end)
@@ -97,7 +155,7 @@ local function setupPlayer(player)
 	end
 
 	-- ==========================================
-	-- JAVÍTÁS: BIZTONSÁGOS KARAKTER BETÖLTÉS
+	-- BIZTONSÁGOS KARAKTER BETÖLTÉS
 	-- ==========================================
 	local function onCharacterSpawned(newChar)
 		newChar:WaitForChild("Humanoid", 10)
@@ -110,7 +168,7 @@ local function setupPlayer(player)
 	-- Ha meghalsz és újraéledsz, ez fog lefutni
 	player.CharacterAdded:Connect(onCharacterSpawned)
 
-	-- HA A KARAKTER MÁR LÉTEZIK a belépéskor (ez okozta a hibát!):
+	-- HA A KARAKTER MÁR LÉTEZIK a belépéskor:
 	if player.Character then
 		task.spawn(function()
 			onCharacterSpawned(player.Character)

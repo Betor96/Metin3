@@ -1,6 +1,6 @@
 
 # játék frissitések, aktuális dolgok
-bekerült a halál rendszer, még tesztelni kell, lehet bugos
+halál rendzser finimitása, szörnyek ai-ja erősitva és falka támádaásr aképesek
 
 # -----------------------------------------------------------------
 

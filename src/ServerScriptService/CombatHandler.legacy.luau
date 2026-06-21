@@ -8,7 +8,6 @@ local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
 MeleeAttack.OnServerEvent:Connect(function(player)
 	local character = player.Character
-	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A SÉRTHETETLENSÉGET!
 	-- ==========================================
 	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A PAJZSÁT!
 	-- ==========================================
@@ -16,6 +15,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		local ff = character:FindFirstChildOfClass("ForceField")
 		if ff then ff:Destroy() end
 	end
+
 	local stats = player:FindFirstChild("PlayerStats")
 	local equipment = player:FindFirstChild("Equipment")
 	if not character or not stats or not equipment then return end
@@ -29,7 +29,12 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		maxDmg = ItemDatabase[weaponName].MaxDmg or 5
 	end
 
-	local baseDamage = math.random(minDmg, maxDmg) + (stats.STR.Value * 2)
+	-- ==========================================
+	-- JAVÍTÁS: KASZT-SPECIFIKUS SEBZÉS BEKÖTÉSE!
+	-- (A StatHandler számolja ki a kaszt büntetéseit/bónuszait)
+	-- ==========================================
+	local classDamage = player:GetAttribute("AttackDamage") or 5
+	local baseDamage = classDamage + math.random(minDmg, maxDmg)
 
 	local protectedNPCs = {
 		["Fegyverkereskedo"] = true, 
@@ -61,8 +66,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		end
 	end
 
-	-- ÚJ: ÉRCEK BEOLVASÁSA
-	-- ÚJ: ÉRCEK BEOLVASÁSA
+	-- ÉRCEK BEOLVASÁSA
 	local oFolder = workspace:FindFirstChild("Ores")
 	if oFolder then
 		for _, ore in pairs(oFolder:GetChildren()) do
@@ -70,7 +74,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		end
 	end
 
-	local oreHitCount = 0 -- JAVÍTÁS: Számláló, hogy csak 1 ércet üthess egyszerre!
+	local oreHitCount = 0 -- Számláló, hogy csak 1 ércet üthess egyszerre!
 
 	for _, obj in pairs(possibleTargets) do
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
@@ -79,9 +83,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 
 			if targetRoot and targetHum.Health > 0 and not protectedNPCs[obj.Name] then
 
-				-- ==========================================
-				-- ÚJ: SÉRTHETETLENSÉG (VÉDELEM) ELLENŐRZÉSE
-				-- ==========================================
+				-- SÉRTHETETLENSÉG (VÉDELEM) ELLENŐRZÉSE
 				if obj:GetAttribute("Invincible") then continue end
 
 				local distance = (rootPart.Position - targetRoot.Position).Magnitude
@@ -93,9 +95,7 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 					local finalDamage = 0
 					local isCrit = false
 
-					-- ==========================================
-					-- JAVÍTÁS: BÁNYÁSZAT (ÉRC) ELLENŐRZÉSE
-					-- ==========================================
+					-- BÁNYÁSZAT (ÉRC) ELLENŐRZÉSE
 					local isOre = (obj.Parent and obj.Parent.Name == "Ores") or obj:GetAttribute("IsOre")
 
 					if isOre then

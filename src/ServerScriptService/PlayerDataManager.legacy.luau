@@ -1,32 +1,66 @@
 -- Fájl helye: ServerScriptService -> PlayerDataManager
 
 local DataStoreService = game:GetService("DataStoreService")
-local playerDataStore = DataStoreService:GetDataStore("PlayerSaveData_V3") -- V3-ra váltva a tiszta indulásért
+-- Új adatbázis név a 3 slotos rendszer miatt, hogy tiszta lappal induljunk!
+local playerDataStore = DataStoreService:GetDataStore("Metin3_PlayerData_V1") 
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Events = ReplicatedStorage:WaitForChild("Events")
+
+local GetCharacterList = Events:WaitForChild("GetCharacterList")
+local CreateCharacter = Events:WaitForChild("CreateCharacter")
+local SelectCharacter = Events:WaitForChild("SelectCharacter")
 
 local savingPlayers = {} 
+local activeSlots = {} -- NYILVÁNTARTJUK: Ki melyik sloton játszik éppen!
 
-local function setupPlayer(player)
-	-- ==========================================
-	-- 1. ADATOK LEKÉRDEZÉSE A FELHŐBŐL
-	-- Ezt az ELEJÉN kell csinálni, hogy tudjuk, van-e mentés!
-	-- ==========================================
-	local success, data = pcall(function() return playerDataStore:GetAsync("Player_" .. player.UserId) end)
+-- ==========================================
+-- 1. KARAKTER LISTA LEKÉRÉSE A MENÜHÖZ (Kliens hívja meg)
+-- ==========================================
+GetCharacterList.OnServerInvoke = function(player)
+	local charList = {}
 
-	-- Ha nincs data (új játékos), csinálunk egy üreset, hogy ne fagyjon le a kód!
-	if not success or not data then
-		data = {
-			Stats = {},
-			Inventory = {},
-			Equipment = {},
-			CompletedQuests = {},
-			Bank = {},
-			BankPassword = "000000",
-			BankUnlockedPages = 1
-		}
+	for slot = 1, 3 do
+		local success, data = pcall(function() 
+			return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slot) 
+		end)
+
+		if success and data then
+			charList[slot] = {
+				Exists = true,
+				Class = data.Class or "Ismeretlen",
+				Level = (data.Stats and data.Stats.Level) or 1
+			}
+		else
+			charList[slot] = { Exists = false }
+		end
 	end
 
+	return charList
+end
+
+
+-- ==========================================
+-- 2. KARAKTER BETÖLTÉSE ÉS JÁTÉK INDÍTÁSA
+-- (Ezt feljebb hoztuk, hogy a létrehozás is meg tudja hívni!)
+-- ==========================================
+local function setupPlayer(player, slotId)
+	local success, data = pcall(function() 
+		return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId) 
+	end)
+
+	if not success or not data then
+		warn("HIBA: A játékos megpróbált betölteni egy üres vagy hibás slotot!")
+		return
+	end
+
+	activeSlots[player.UserId] = slotId -- Rögzítjük, hogy ezen a sloton játszik!
+
+	-- Ide mentjük el a játékos kasztját, hogy más scriptek (pl. StatHandler) is lássák!
+	player:SetAttribute("Class", data.Class)
+
 	-- ==========================================
-	-- 2. ALAPVETŐ MAPPÁK ÉS STATOK LÉTREHOZÁSA
+	-- STATOK LÉTREHOZÁSA (Ugyanaz mint régen)
 	-- ==========================================
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -66,7 +100,7 @@ local function setupPlayer(player)
 	end
 
 	-- ==========================================
-	-- 3. TÁSKA (128 REKESZ)
+	-- TÁSKA, BANK, FELSZERELÉS, KÜLDETÉS BETÖLTÉSE
 	-- ==========================================
 	local inv = Instance.new("Folder", player)
 	inv.Name = "Inventory"
@@ -90,18 +124,6 @@ local function setupPlayer(player)
 		end
 	end
 
-	-- Új játékosnak kezdőkard adása (ha teljesen üres a mentés)
-	if not success then
-		print(player.Name .. " új játékos, alapértékek beállítva.")
-		inv.Slot_1.Value = "Kezdőkard"
-		inv.Slot_1.Amount.Value = 1
-	else
-		print(player.Name .. " adatai sikeresen betöltve!")
-	end
-
-	-- ==========================================
-	-- 4. FELSZERELÉS ÉS HOTBAR
-	-- ==========================================
 	local eq = Instance.new("Folder", player)
 	eq.Name = "Equipment"
 	local eqSlots = {"Sapka", "Pancel", "Cipo", "Fegyver", "Fulbevalo", "Nyaklanc", "Pajzs", "Karkoto"}
@@ -111,16 +133,6 @@ local function setupPlayer(player)
 		eqSlot.Value = (data.Equipment and data.Equipment[name]) or ""
 	end
 
-	local hotbar = Instance.new("Folder", player)
-	hotbar.Name = "Hotbar"
-	for i = 1, 8 do 
-		Instance.new("StringValue", hotbar).Name = "Hotbar_" .. i 
-		-- Ha mentettük volna a hotbart, ide jönne a betöltés
-	end
-
-	-- ==========================================
-	-- 5. BANK (RAKTÁR) RENDSZER
-	-- ==========================================
 	local bankPwd = Instance.new("StringValue", stats)
 	bankPwd.Name = "BankPassword"
 	bankPwd.Value = data.BankPassword or "000000"
@@ -145,12 +157,8 @@ local function setupPlayer(player)
 		end
 	end
 
-	-- ==========================================
-	-- 6. KÉSZ KÜLDETÉSEK
-	-- ==========================================
 	local completedFolder = Instance.new("Folder", player)
 	completedFolder.Name = "CompletedQuests"
-
 	if data.CompletedQuests then
 		for _, qName in ipairs(data.CompletedQuests) do
 			local doneMark = Instance.new("StringValue")
@@ -158,38 +166,81 @@ local function setupPlayer(player)
 			doneMark.Parent = completedFolder
 		end
 	end
+
+	-- MIUTÁN MINDEN BETÖLTÖTT, BE TUDJUK SPAWNOLNI A JÁTÉKOST (Mert a CharacterAutoLoad ki van kapcsolva!)
+	player:LoadCharacter()
 end
+-- Esemény bekötése a szerver felé
+SelectCharacter.OnServerEvent:Connect(setupPlayer)
+
 
 -- ==========================================
--- ADATOK MENTÉSE
+-- 3. ÚJ KARAKTER LÉTREHOZÁSA
+-- ==========================================
+CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
+	if slotId < 1 or slotId > 3 then return end
+
+	local validClasses = {["GUARDIAN"] = true, ["SHADOWBLADE"] = true, ["SOULWEAVER"] = true, ["SEALER"] = true}
+	-- JAVÍTÁS: Biztosítjuk a nagybetűs egyezést!
+	if not validClasses[string.upper(className)] then return end
+
+	-- Alapértelmezett, szűz adatok a kiválasztott kaszttal
+	local newData = {
+		Class = string.upper(className),
+		Stats = {Level = 1, Experience = 0, Gold = 0, StatPoints = 0, STR = 1, VIT = 1, INT = 1, DEX = 1, Mana = 100, MaxMana = 100, UnlockedPages = 1},
+		Inventory = {Slot_1 = "Kezdőkard", Amount_1 = 1}, -- Mindenki kap egy kardot
+		Equipment = {},
+		CompletedQuests = {},
+		Bank = {},
+		BankPassword = "000000",
+		BankUnlockedPages = 1
+	}
+
+	local success, errorMessage = pcall(function() 
+		playerDataStore:SetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, newData) 
+	end)
+
+	if success then
+		print(player.Name .. " létrehozott egy új " .. className .. " karaktert a " .. slotId .. ". sloton!")
+
+		-- JAVÍTÁS: Miután elkészült, azonnal meg is hívjuk a fenti betöltő függvényt!
+		setupPlayer(player, slotId)
+	else
+		warn("Hiba a karakter készítésekor: " .. tostring(errorMessage))
+	end
+end)
+
+
+-- ==========================================
+-- 4. ADATOK MENTÉSE AZ AKTÍV SLOTRA
 -- ==========================================
 local function savePlayerData(player)
 	if savingPlayers[player.UserId] then return end
+
+	local slotId = activeSlots[player.UserId]
+	if not slotId then return end -- Ha be se lépett a menüből, nincs mit menteni!
+
 	savingPlayers[player.UserId] = true
 
-	local data = { Stats = {}, Inventory = {}, Equipment = {}, CompletedQuests = {}, Bank = {} }
+	local data = { 
+		Class = player:GetAttribute("Class") or "Ismeretlen",
+		Stats = {}, Inventory = {}, Equipment = {}, CompletedQuests = {}, Bank = {} 
+	}
 
-	-- Statok
 	if player:FindFirstChild("PlayerStats") then
 		for _, stat in pairs(player.PlayerStats:GetChildren()) do 
-			if stat.Name == "BankPassword" then
-				data.BankPassword = stat.Value
-			elseif stat.Name == "BankUnlockedPages" then
-				data.BankUnlockedPages = stat.Value
-			else
-				data.Stats[stat.Name] = stat.Value 
-			end
+			if stat.Name == "BankPassword" then data.BankPassword = stat.Value
+			elseif stat.Name == "BankUnlockedPages" then data.BankUnlockedPages = stat.Value
+			else data.Stats[stat.Name] = stat.Value end
 		end
 	end
 
-	-- Táska
 	if player:FindFirstChild("Inventory") then
 		for _, slot in pairs(player.Inventory:GetChildren()) do 
 			data.Inventory[slot.Name] = {Name = slot.Value, Amount = slot.Amount.Value}
 		end
 	end
 
-	-- Bank
 	if player:FindFirstChild("Bank") then
 		for i = 1, 128 do
 			local slot = player.Bank:FindFirstChild("Slot_" .. i)
@@ -199,24 +250,24 @@ local function savePlayerData(player)
 		end
 	end
 
-	-- Felszerelés
 	if player:FindFirstChild("Equipment") then
 		for _, slot in pairs(player.Equipment:GetChildren()) do 
 			data.Equipment[slot.Name] = slot.Value 
 		end
 	end
 
-	-- Küldetések
 	if player:FindFirstChild("CompletedQuests") then
 		for _, q in pairs(player.CompletedQuests:GetChildren()) do
 			table.insert(data.CompletedQuests, q.Name)
 		end
 	end
 
-	-- Mentés végrehajtása
-	local success, errorMessage = pcall(function() playerDataStore:SetAsync("Player_" .. player.UserId, data) end)
+	local success, errorMessage = pcall(function() 
+		playerDataStore:SetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, data) 
+	end)
+
 	if success then 
-		print(player.Name .. " adatai elmentve!") 
+		print(player.Name .. " (" .. data.Class .. ") adatai elmentve a " .. slotId .. ". slotra!") 
 	else 
 		warn("Nem sikerült menteni! " .. tostring(errorMessage)) 
 	end
@@ -224,7 +275,6 @@ local function savePlayerData(player)
 	savingPlayers[player.UserId] = nil
 end
 
-game.Players.PlayerAdded:Connect(setupPlayer)
 game.Players.PlayerRemoving:Connect(savePlayerData)
 
 game:BindToClose(function()
