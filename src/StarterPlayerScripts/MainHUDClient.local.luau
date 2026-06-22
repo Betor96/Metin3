@@ -11,8 +11,107 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 
 local SyncHotbarSlot = Events:WaitForChild("SyncHotbarSlot", 5)
 
+-- ==================================================
+-- PASSZÍV KÉPESSÉG INDIKÁTOROK (ESZKÖZTÁR FÖLÖTT)
+-- ==================================================
+-- ==================================================
+-- PASSZÍV KÉPESSÉG INDIKÁTOROK (ESZKÖZTÁR FÖLÖTT)
+-- ==================================================
+task.spawn(function()
+	local Players = game:GetService("Players")
+	local localPlayer = Players.LocalPlayer
+	local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+	if playerGui:FindFirstChild("PassiveIndicatorHUD") then return end
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "PassiveIndicatorHUD"
+	screenGui.ResetOnSpawn = false
+	screenGui.DisplayOrder = 50
+	screenGui.Parent = playerGui
+
+	local indicatorFrame = Instance.new("Frame")
+	indicatorFrame.Size = UDim2.new(0, 240, 0, 35)
+	indicatorFrame.Position = UDim2.new(0.5, -120, 1, -140) 
+	indicatorFrame.BackgroundTransparency = 0.6
+	indicatorFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	indicatorFrame.BorderSizePixel = 0
+	indicatorFrame.Visible = false
+	indicatorFrame.Parent = screenGui
+
+	local uiCorner = Instance.new("UICorner", indicatorFrame)
+	uiCorner.CornerRadius = UDim.new(0, 8)
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.TextScaled = true
+	textLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+	textLabel.Text = ""
+	textLabel.Parent = indicatorFrame
+
+	local function updateIndicator()
+		local char = localPlayer.Character
+		local hum = char and char:FindFirstChild("Humanoid")
+
+		-- JAVÍTÁS: Kisbetűssé alakítjuk a kaszt nevét, hogy a "SEALER" is "sealer" legyen a kódnak!
+		local rawClass = localPlayer:GetAttribute("Class") or (char and char:GetAttribute("Class")) or ""
+		local pClass = string.lower(rawClass)
+
+		-- 1. SEALER
+		if pClass == "sealer" then
+			local charges = localPlayer:GetAttribute("SealCharges") or 0
+			if charges > 0 then
+				indicatorFrame.Visible = true
+				textLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+				local bonus = charges * 2
+				textLabel.Text = "🔮 Seal Mastery: " .. charges .. "/5 (+" .. bonus .. "%)"
+			else
+				indicatorFrame.Visible = false
+			end
+
+			-- 2. GUARDIAN
+		elseif pClass == "guardian" and hum then
+			local hpPercent = hum.Health / hum.MaxHealth
+			if hpPercent <= 0.50 then
+				indicatorFrame.Visible = true
+				textLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+
+				local armorBonus = "+10%"
+				if hpPercent <= 0.15 then
+					armorBonus = "+30%"
+				elseif hpPercent <= 0.30 then
+					armorBonus = "+20%"
+				end
+
+				textLabel.Text = "🛡️ Iron Will Aktív (" .. armorBonus .. " Def)"
+			else
+				indicatorFrame.Visible = false
+			end
+		else
+			indicatorFrame.Visible = false
+		end
+	end
+
+	localPlayer:GetAttributeChangedSignal("SealCharges"):Connect(updateIndicator)
+	localPlayer:GetAttributeChangedSignal("Class"):Connect(updateIndicator)
+
+	local function setupCharacter(char)
+		local hum = char:WaitForChild("Humanoid", 5)
+		if hum then hum.HealthChanged:Connect(updateIndicator) end
+		char:GetAttributeChangedSignal("Class"):Connect(updateIndicator)
+		updateIndicator()
+	end
+
+	if localPlayer.Character then setupCharacter(localPlayer.Character) end
+	localPlayer.CharacterAdded:Connect(setupCharacter)
+
+	updateIndicator()
+end)
+
 -- ==========================================
--- JAVÍTÁS: NINCS TÖBB KAMU LOKÁLIS MAPPA!
+-- NINCS TÖBB KAMU LOKÁLIS MAPPA!
 -- Megvárjuk, amíg a Szerver letölti az igazi adatbázist.
 -- ==========================================
 local hotbarFolder = player:WaitForChild("Hotbar", 99999)

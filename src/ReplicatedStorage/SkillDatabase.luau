@@ -55,7 +55,7 @@ function SkillDatabase.getEnemiesInRadius(centerPos, radius, excludeChar)
 	-- Átnézzük a fő mappákat
 	scanFolder(workspace)
 	scanFolder(workspace:FindFirstChild("Monsters"))
-	scanFolder(workspace:FindFirstChild("MetinStones")) -- <== JAVÍTÁS: Most már a Metin köveket is letapogatja!
+	scanFolder(workspace:FindFirstChild("MetinStones")) 
 
 	return enemies
 end
@@ -77,7 +77,14 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		end
 	end
 
-	local playerClass = attacker:GetAttribute("Class") or ""
+	-- KASZTOK BIZTONSÁGOS LEKÉRÉSE
+	local attackerPlayer = attacker:IsA("Player") and attacker or Players:GetPlayerFromCharacter(attacker)
+	local rawPlayerClass = attackerPlayer and attackerPlayer:GetAttribute("Class") or attacker:GetAttribute("Class") or ""
+	local playerClass = string.lower(rawPlayerClass)
+
+	local targetPlayer = Players:GetPlayerFromCharacter(targetModel)
+	local targetRawClass = targetPlayer and targetPlayer:GetAttribute("Class") or targetModel:GetAttribute("Class") or ""
+	local targetClass = string.lower(targetRawClass)
 
 	-- =======================================
 	-- TÁMADÓ BUFFOK ÉS PASSZÍVOK (OUTGOING DAMAGE)
@@ -95,55 +102,63 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		finalDmg = math.floor(finalDmg * 1.15)
 	end
 
-	-- 👑 SEALER: Seal Mastery (+2% sebzés per töltet)
-	if playerClass == "Sealer" then
+	-- 👑 SEALER: Seal Mastery
+	if playerClass == "sealer" then
 		local sealCharges = attacker:GetAttribute("SealCharges") or 0
 		if sealCharges > 0 then
 			finalDmg = math.floor(finalDmg * (1 + (sealCharges * 0.02)))
 		end
 	end
 
-	-- ⚔️ SHADOWBLADE: Shadow Mastery (Hátbatámadás & Kivégzés)
-	if playerClass == "Shadowblade" then
-		-- Hátbatámadás vizsgálata (ugyanabba az irányba néznek-e)
+	-- ⚔️ SHADOWBLADE: Shadow Mastery (Színkódolás előkészítése)
+	local isBackstab = false
+	local isExecute = false
+
+	if playerClass == "shadowblade" then
 		local attackerRoot = attacker:FindFirstChild("HumanoidRootPart")
 		if attackerRoot then
 			local dirToTarget = (root.Position - attackerRoot.Position).Unit
 			local targetLook = root.CFrame.LookVector
-			-- Ha a skaláris szorzat (Dot product) pozitív, akkor nagyjából hátulról jött a támadás
+
 			if dirToTarget:Dot(targetLook) > 0.5 then 
 				finalDmg = math.floor(finalDmg * 1.10)
+				isBackstab = true
 			end
 		end
 
-		-- Kivégzés (Ha 30% HP alatt van a célpont)
 		if (hum.Health / hum.MaxHealth) < 0.3 then
 			finalDmg = math.floor(finalDmg * 1.10)
+			isExecute = true
 		end
 	end
 
 	-- =======================================
-	-- VÉDEKEZŐ BUFFOK ÉS PASSZÍVOK (INCOMING DAMAGE)
+	-- VÉDEKEZŐ BUFFOK, PÁNCÉL ÉS PASSZÍVOK
 	-- =======================================
 	local damageReduction = 1
-
 	if targetModel:GetAttribute("IronSkin_Active") then
 		damageReduction = damageReduction * 0.5
 	end
 
-	-- 🛡️ GUARDIAN: Iron Will (HP alapú védelem / Armor növekedés)
-	if targetModel:GetAttribute("Class") == "Guardian" then
+	-- Alap Páncélzat (Defense) bekérése a PlayerStats-ból
+	local targetStats = targetModel:FindFirstChild("PlayerStats")
+	local targetDefense = targetStats and targetStats:FindFirstChild("Defense") and targetStats.Defense.Value or 0
+
+	-- 🛡️ GUARDIAN: Iron Will (Páncél %-os növelése)
+	if targetClass == "guardian" then
 		local hpPercent = hum.Health / hum.MaxHealth
 		if hpPercent <= 0.15 then
-			damageReduction = damageReduction * 0.70 -- 30% Armor bónusz egyenértéke
+			targetDefense = math.floor(targetDefense * 1.30) -- pl. 20-ból 26
 		elseif hpPercent <= 0.30 then
-			damageReduction = damageReduction * 0.80 -- 20% Armor bónusz egyenértéke
+			targetDefense = math.floor(targetDefense * 1.20) -- pl. 20-ból 24
 		elseif hpPercent <= 0.50 then
-			damageReduction = damageReduction * 0.90 -- 10% Armor bónusz egyenértéke
+			targetDefense = math.floor(targetDefense * 1.10) -- pl. 20-ból 22
 		end
 	end
 
+	-- Sebzés kiszámítása: Szorzó (Iron Skin), majd mínusz Páncél
 	finalDmg = math.floor(finalDmg * damageReduction)
+	finalDmg = math.max(1, finalDmg - targetDefense)
 
 	-- =======================================
 	-- DEATH MARK BÓNUSZ ÉS LIFE STEAL
@@ -175,25 +190,75 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		end
 	end
 
-	-- =======================================
-	-- SEBZÉS KIOSZTÁSA ÉS UI MEGJELENÍTÉS
-	-- =======================================
 	hum:TakeDamage(totalDamageToDeal)
 
+	-- =======================================
+	-- SEBZÉS KIOSZTÁSA ÉS UI MEGJELENÍTÉS (Shadowblade színekkel)
+	-- =======================================
+	local function spawnCustomDamageUI(dmg, pos, color)
+		local part = Instance.new("Part")
+		part.Transparency = 1
+		part.Anchored = true
+		part.CanCollide = false
+		part.Position = pos + Vector3.new(math.random(-10, 10)/10, 2, math.random(-10, 10)/10)
+
+		local bb = Instance.new("BillboardGui")
+		bb.Size = UDim2.new(0, 100, 0, 50)
+		bb.AlwaysOnTop = true
+
+		local txt = Instance.new("TextLabel")
+		txt.Size = UDim2.new(1.2, 0, 1.2, 0)
+		txt.BackgroundTransparency = 1
+		txt.Text = tostring(dmg)
+		txt.TextColor3 = color
+		txt.TextScaled = true
+		txt.Font = Enum.Font.GothamBlack
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 2
+		stroke.Color = Color3.new(0, 0, 0)
+		stroke.Parent = txt
+
+		txt.Parent = bb
+		bb.Parent = part
+		part.Parent = workspace
+
+		local ts = game:GetService("TweenService")
+		ts:Create(part, TweenInfo.new(0.8, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Position = part.Position + Vector3.new(0, 3, 0)}):Play()
+		ts:Create(txt, TweenInfo.new(0.8, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {TextTransparency = 1}):Play()
+		ts:Create(stroke, TweenInfo.new(0.8, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {Transparency = 1}):Play()
+
+		Debris:AddItem(part, 1)
+	end
+
+	local customColor = nil
+	if isBackstab and isExecute then
+		customColor = Color3.fromRGB(255, 0, 0) -- Vérvörös
+	elseif isExecute then
+		customColor = Color3.fromRGB(255, 100, 50) -- Narancsos-piros
+	elseif isBackstab then
+		customColor = Color3.fromRGB(180, 50, 255) -- Lila
+	end
+
 	if hasDeathMark then
-		ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
+		if customColor then
+			spawnCustomDamageUI(finalDmg, root.Position, customColor)
+		else
+			ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
+		end
 		task.delay(0.15, function()
 			ShowDamage:FireAllClients(bonusDmg, root.Position + Vector3.new(0, 2, 0), true, false)
 		end)
 	else
-		ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
+		if customColor then
+			spawnCustomDamageUI(finalDmg, root.Position, customColor)
+		else
+			ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
+		end
 	end
 
-	-- =======================================
-	-- 🔮 SOULWEAVER: Soul Echo (Lélekvisszhang)
-	-- =======================================
-	-- Csak varázslatoknál (skillMultiplier > 1), és elkerüljük a végtelen visszhangot (IsEchoHit)
-	if playerClass == "Soulweaver" and skillMultiplier > 1 and not targetModel:GetAttribute("IsEchoHit") then
+	-- 🔮 SOULWEAVER: Soul Echo
+	if playerClass == "soulweaver" and skillMultiplier > 1 and not targetModel:GetAttribute("IsEchoHit") then
 		if math.random(1, 100) <= 15 then
 			task.delay(0.4, function()
 				if targetModel and targetModel:FindFirstChild("Humanoid") and targetModel.Humanoid.Health > 0 then
@@ -202,7 +267,6 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 					local echoDmg = math.max(1, math.floor(totalDamageToDeal * 0.35))
 					targetModel.Humanoid:TakeDamage(echoDmg)
 
-					-- Vizuális visszajelzés a visszhangról
 					SkillDatabase.playVFX(root.Position, Color3.fromRGB(150, 50, 255), 6)
 					ShowDamage:FireAllClients(echoDmg, root.Position, false, false) 
 
@@ -256,6 +320,23 @@ function SkillDatabase.applyBuffVFX(character, buffName, color, duration)
 
 	-- A buff lejártakor (7200 mp) a rendszer automatikusan letörli az aurát
 	Debris:AddItem(att, duration)
+end
+
+-- =======================================
+-- ÚJ: SEALER TÖLTET IDŐZÍTŐ
+-- =======================================
+function SkillDatabase.resetChargeTimer(player)
+	if player:FindFirstChild("ChargeTimer") then player.ChargeTimer:Destroy() end
+
+	local timer = Instance.new("StringValue", player)
+	timer.Name = "ChargeTimer"
+
+	task.delay(10, function()
+		if timer and timer.Parent then
+			player:SetAttribute("SealCharges", 0)
+			timer:Destroy()
+		end
+	end)
 end
 
 SkillDatabase.Skills = {
@@ -549,14 +630,14 @@ SkillDatabase.Skills = {
 			local isActive = player:GetAttribute("Bloodlust_Active")
 
 			if not isActive then
-				-- BEKAPCSOLÁS: Közvetlenül a PlayerStats-ot növeljük meg, így a CombatClient azonnal alkalmazza!
+				-- BEKAPCSOLÁS
 				player:SetAttribute("Bloodlust_Active", true)
 				SkillDatabase.playVFX(root.Position, Color3.fromRGB(255, 0, 0), 6)
 
 				movementSpeed.Value += 15 -- +15% Mozgási sebesség
 				attackSpeed.Value += 30   -- +30% Támadási sebesség
 			else
-				-- KIKAPCSOLÁS: Levonjuk a bónuszt a statokból
+				-- KIKAPCSOLÁS
 				player:SetAttribute("Bloodlust_Active", false)
 
 				movementSpeed.Value = math.max(0, movementSpeed.Value - 15)
@@ -611,7 +692,6 @@ SkillDatabase.Skills = {
 		end
 	},
 
-	-- 🔮 SOULWEAVER
 	-- 🔮 SOULWEAVER
 	["Soul Orb"] = {
 		Mana = 10, Cooldown = 3,
@@ -816,6 +896,11 @@ SkillDatabase.Skills = {
 	["Seal of Power"] = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
 		Execute = function(player, char, root, mousePos, target)
+			-- Seal Mastery Töltet generálása (1 töltet)
+			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
+			player:SetAttribute("SealCharges", charges)
+			SkillDatabase.resetChargeTimer(player)
+
 			local buffTarget = player
 			if target and target.Parent:FindFirstChild("IsPlayer") then buffTarget = Players:GetPlayerFromCharacter(target.Parent) or player end
 
@@ -827,8 +912,9 @@ SkillDatabase.Skills = {
 			local intStat = stats and stats:FindFirstChild("INT")
 			local intVal = intStat and intStat.Value or 1
 
-			-- Bónusz matek: Alap 5% sebzés + minden 10 INT után +1%
-			local bonusPercent = 5 + math.floor(intVal / 10)
+			-- Bónusz matek: Alap 5% sebzés + INT skálázódás + Seal Mastery töltetek
+			local masteryBonus = charges * 2
+			local bonusPercent = 5 + math.floor(intVal / 10) + masteryBonus
 			local multi = 1 + (bonusPercent / 100)
 
 			-- Pirosas Erő Aura
@@ -849,6 +935,11 @@ SkillDatabase.Skills = {
 	["Seal of Protection"] = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
 		Execute = function(player, char, root, mousePos, target)
+			-- Seal Mastery Töltet generálása
+			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
+			player:SetAttribute("SealCharges", charges)
+			SkillDatabase.resetChargeTimer(player)
+
 			local buffTarget = player
 			if target and target.Parent:FindFirstChild("IsPlayer") then buffTarget = Players:GetPlayerFromCharacter(target.Parent) or player end
 
@@ -866,9 +957,12 @@ SkillDatabase.Skills = {
 			local targetStats = buffTarget:FindFirstChild("PlayerStats")
 			local defStat = targetStats and targetStats:FindFirstChild("Defense")
 
-			-- JAVÍTÁS: INT x 0.15 skálázódás (10 + 0.15 INT)
-			local addedDef = 10 + math.floor(intVal * 0.15)
-			local hpPercent = 0.05 + (intVal * 0.001) 
+			-- Seal Mastery bónusz (+2% buff erősség per töltet)
+			local masteryBonus = charges * 0.02
+
+			-- INT x 0.15 skálázódás (10 + 0.15 INT) szorozva a mastery bónusszal
+			local addedDef = math.floor((10 + (intVal * 0.15)) * (1 + masteryBonus))
+			local hpPercent = (0.05 + (intVal * 0.001)) * (1 + masteryBonus) 
 			local addedHP = math.floor(hum.MaxHealth * hpPercent)
 
 			if defStat then defStat.Value += addedDef end
@@ -893,6 +987,11 @@ SkillDatabase.Skills = {
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
+
+			-- Töltet generálás
+			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
+			player:SetAttribute("SealCharges", charges)
+			SkillDatabase.resetChargeTimer(player)
 
 			local eRoot = enemyModel:FindFirstChild("HumanoidRootPart")
 			if not eRoot then return false end
@@ -954,7 +1053,7 @@ SkillDatabase.Skills = {
 
 					local enemies = SkillDatabase.getEnemiesInRadius(explosionPos, 15, char)
 					for _, enemy in pairs(enemies) do
-						-- JAVÍTÁS: Balanszolt Sebzés (Fő célpont: 2.2x, AOE: 1.2x)
+						-- Balanszolt Sebzés (Fő célpont: 2.2x, AOE: 1.2x)
 						if enemy == enemyModel then
 							SkillDatabase.applyDamage(player, enemy, 2.2)
 						else
@@ -972,6 +1071,11 @@ SkillDatabase.Skills = {
 			local primaryTarget = target and target.Parent
 			if not SkillDatabase.isValidTarget(primaryTarget) then return false end
 
+			-- Töltet generálás
+			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
+			player:SetAttribute("SealCharges", charges)
+			SkillDatabase.resetChargeTimer(player)
+
 			local maxTargets = primaryTarget:FindFirstChild("IsPlayer") and 3 or 5
 			local chainRadius = 15
 			local visited = {}
@@ -980,7 +1084,7 @@ SkillDatabase.Skills = {
 			task.spawn(function()
 				local currentTarget = primaryTarget
 				local jumps = 1
-				local currentDmgMulti = 2.5 -- JAVÍTÁS: Kezdeti sebzés szorzó
+				local currentDmgMulti = 2.5 -- Kezdeti sebzés szorzó
 
 				while currentTarget and jumps <= maxTargets do
 					local cRoot = currentTarget:FindFirstChild("HumanoidRootPart")
@@ -1024,7 +1128,7 @@ SkillDatabase.Skills = {
 						SkillDatabase.applyDamage(player, currentTarget, currentDmgMulti) 
 					end
 
-					-- JAVÍTÁS: Sebzés csökkentése a következő ugrásra (-15%)
+					-- Sebzés csökkentése a következő ugrásra (-15%)
 					currentDmgMulti = currentDmgMulti * 0.85 
 
 					if jumps < maxTargets then
