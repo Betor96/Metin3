@@ -11,8 +11,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local effectGui = Instance.new("ScreenGui")
 effectGui.Name = "EffectHUD"
 effectGui.ResetOnSpawn = false
--- JAVÍTÁS: Lekényszerítjük a 0-ás rétegre, így az ablakok MINDIG elé ugranak!
-effectGui.DisplayOrder = 0 
+effectGui.DisplayOrder = 0
 effectGui.Parent = playerGui
 
 local container = Instance.new("Frame")
@@ -31,7 +30,34 @@ layout.Parent = container
 
 local activeEffects = {}
 
+-- Segédfüggvény: Idő átalakítása szebb formátumba (pl. 2:00:00 vagy 1m 30s)
+local function formatTime(seconds)
+	if seconds >= 90000 then return "∞" end -- Végtelen (Toggle) skillek jelzése (pl. Blade Spirit)
+	if seconds >= 3600 then
+		local h = math.floor(seconds / 3600)
+		local m = math.floor((seconds % 3600) / 60)
+		local s = seconds % 60
+		return string.format("%d:%02d:%02d", h, m, s)
+	elseif seconds >= 60 then
+		local m = math.floor(seconds / 60)
+		local s = seconds % 60
+		return string.format("%dm %ds", m, s)
+	else
+		return seconds .. "s"
+	end
+end
+
 ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration)
+
+	-- Ha az idő 0 vagy kevesebb (pl. Kikapcsolás), azonnal töröljük az ikont!
+	if duration <= 0 then
+		if activeEffects[effectType] then
+			activeEffects[effectType].TimeLeft = 0
+		end
+		return
+	end
+
+	-- Ha már van ilyen buff, csak frissítjük az idejét
 	if activeEffects[effectType] then
 		activeEffects[effectType].TimeLeft = duration
 		return
@@ -61,9 +87,17 @@ ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration
 	timeLabel.BackgroundTransparency = 1
 	timeLabel.TextColor3 = Color3.new(1, 1, 1)
 	timeLabel.Font = Enum.Font.GothamBold
-	timeLabel.TextSize = 11
+	timeLabel.TextSize = 10
 	timeLabel.TextStrokeTransparency = 0
 	timeLabel.Parent = box
+
+	-- Dinamikus Tooltip (Ha a value 0, ne írja ki a "+0"-t, mert hülyén néz ki a debuffoknál/képességeknél)
+	local tooltipText = itemName
+	if value and value ~= 0 then
+		tooltipText = tooltipText .. "\n+" .. tostring(value) .. " " .. effectType
+	else
+		tooltipText = tooltipText .. "\n" .. effectType
+	end
 
 	local tooltip = Instance.new("TextLabel")
 	tooltip.Size = UDim2.new(0, 140, 0, 35)
@@ -72,7 +106,7 @@ ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration
 	tooltip.TextColor3 = Color3.new(1, 1, 1)
 	tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
 	tooltip.BorderSizePixel = 2
-	tooltip.Text = itemName .. "\n+" .. value .. " " .. effectType
+	tooltip.Text = tooltipText
 	tooltip.Font = Enum.Font.Gotham
 	tooltip.TextSize = 11
 	tooltip.ZIndex = 10
@@ -86,13 +120,14 @@ ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration
 
 	task.spawn(function()
 		while activeEffects[effectType] and activeEffects[effectType].TimeLeft > 0 do
-			timeLabel.Text = activeEffects[effectType].TimeLeft .. "s"
+			timeLabel.Text = formatTime(activeEffects[effectType].TimeLeft)
 			task.wait(1)
 			if activeEffects[effectType] then
 				activeEffects[effectType].TimeLeft -= 1
 			end
 		end
 
+		-- Ha letelt az idő (vagy 0-ra állították kikapcsoláskor)
 		if activeEffects[effectType] then
 			activeEffects[effectType].UI:Destroy()
 			activeEffects[effectType] = nil

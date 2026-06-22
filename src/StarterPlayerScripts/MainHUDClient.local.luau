@@ -8,8 +8,8 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
 local Events = ReplicatedStorage:WaitForChild("Events")
-local SkillCooldown = Events:WaitForChild("SkillCooldown")
 
+-- Hotbar mappa létrehozása, ha nem létezik
 local hotbarFolder = player:FindFirstChild("Hotbar")
 if not hotbarFolder then
 	hotbarFolder = Instance.new("Folder")
@@ -190,22 +190,18 @@ for i = 1, 8 do
 	itemIcon.TextScaled = true
 	itemIcon.Font = Enum.Font.GothamBold
 	itemIcon.ZIndex = 2
-	
-	-- ÚJ: Cooldown (Újratöltés) Fekete Réteg
+
 	local cdOverlay = Instance.new("Frame", slotFrame)
 	cdOverlay.Name = "CDOverlay"
 	cdOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
 	cdOverlay.BackgroundTransparency = 0.5
-	cdOverlay.Size = UDim2.new(1, 0, 0, 0) -- Alapból 0 magas, nem látszik
+	cdOverlay.Size = UDim2.new(1, 0, 0, 0)
 	cdOverlay.Position = UDim2.new(0, 0, 1, 0)
-	cdOverlay.AnchorPoint = Vector2.new(0, 1) -- Lentről felfelé nő, fentről lefelé fogy!
+	cdOverlay.AnchorPoint = Vector2.new(0, 1) 
 	cdOverlay.ZIndex = 4
 	cdOverlay.Visible = false
 end
 
--- ==========================================
--- JAVÍTÁS: Nincs több "0" bug, adatbázisból ellenőrizzük!
--- ==========================================
 local function renderHotbar()
 	local hbFolder = player:FindFirstChild("Hotbar")
 	local invFolder = player:FindFirstChild("Inventory")
@@ -223,10 +219,8 @@ local function renderHotbar()
 				if slotVal.Value ~= "" then
 					icon.Text = slotVal.Value
 					local sVal = slotVal.Value
-					
-					-- ELLENŐRZÉS: Benne van-e a Képesség Adatbázisban?
+
 					if SkillDatabase.Ranges[sVal] then
-						-- EZ EGY KÉPESSÉG! Nem nézünk darabszámot!
 						icon.BackgroundTransparency = 0
 						local isActive = false
 						if sVal == "Blade Spirit" and player:GetAttribute("BladeSpirit_Active") then isActive = true end
@@ -235,15 +229,14 @@ local function renderHotbar()
 						if sVal == "Iron Skin" and player:GetAttribute("IronSkin_Active") then isActive = true end
 						if sVal == "Seal of Power" and player:GetAttribute("SealOfPower_Active") then isActive = true end
 						if sVal == "Seal of Protection" and player:GetAttribute("SealOfProtection_Active") then isActive = true end
-						
+
 						if isActive then
-							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) -- ARANY Buff
+							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) 
 						else
-							icon.BackgroundColor3 = Color3.fromRGB(80, 40, 120) -- LILA Képesség
+							icon.BackgroundColor3 = Color3.fromRGB(80, 40, 120) 
 						end
 						icon.TextTransparency = 0
 					else
-						-- EZ EGY TÁRGY (Poti)! Megszámoljuk a táskában.
 						local totalAmount = 0
 						for _, invSlot in pairs(invFolder:GetChildren()) do
 							if invSlot:IsA("StringValue") and invSlot.Value == sVal then
@@ -299,33 +292,6 @@ local function renderHotbar()
 	end
 end
 
--- ==========================================
--- COOLDOWN ANIMÁCIÓ (Fekete lecsúszó réteg)
--- ==========================================
-SkillCooldown.OnClientEvent:Connect(function(skillName, cdTime)
-	for i = 1, 8 do
-		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
-		local uiSlot = hotbarContainer:FindFirstChild("HotbarSlotUI_" .. i)
-		
-		if slotVal and slotVal.Value == skillName and uiSlot then
-			local cdOverlay = uiSlot:FindFirstChild("CDOverlay")
-			if cdOverlay then
-				cdOverlay.Visible = true
-				cdOverlay.Size = UDim2.new(1, 0, 1, 0) -- Teljesen eltakarja
-				
-				-- Lefelé csúszik az idő alatt!
-				local tweenInfo = TweenInfo.new(cdTime, Enum.EasingStyle.Linear)
-				local tween = TweenService:Create(cdOverlay, tweenInfo, {Size = UDim2.new(1, 0, 0, 0)})
-				tween:Play()
-				
-				tween.Completed:Connect(function()
-					cdOverlay.Visible = false
-				end)
-			end
-		end
-	end
-end)
-
 local function setupHotbarConnections()
 	local invFolder = player:WaitForChild("Inventory")
 
@@ -343,7 +309,7 @@ local function setupHotbarConnections()
 	for _, child in pairs(hotbarFolder:GetChildren()) do
 		if child:IsA("ValueBase") then child.Changed:Connect(triggerUpdate) end
 	end
-	
+
 	player.AttributeChanged:Connect(function(attr)
 		if attr:match("_Active") then renderHotbar() end
 	end)
@@ -351,3 +317,32 @@ end
 
 task.spawn(setupHotbarConnections)
 task.spawn(renderHotbar)
+
+-- JAVÍTÁS: A Cooldown csatlakozás NEM BLOKKOLJA a scriptet, csak ha az event létezik, akkor rácsatlakozik!
+task.spawn(function()
+	local SkillCooldown = Events:WaitForChild("SkillCooldown", 10) -- 10 mp után feladja a várakozást, de nem fagy ki a script
+	if SkillCooldown then
+		SkillCooldown.OnClientEvent:Connect(function(skillName, cdTime)
+			for i = 1, 8 do
+				local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
+				local uiSlot = hotbarContainer:FindFirstChild("HotbarSlotUI_" .. i)
+
+				if slotVal and slotVal.Value == skillName and uiSlot then
+					local cdOverlay = uiSlot:FindFirstChild("CDOverlay")
+					if cdOverlay then
+						cdOverlay.Visible = true
+						cdOverlay.Size = UDim2.new(1, 0, 1, 0) 
+
+						local tweenInfo = TweenInfo.new(cdTime, Enum.EasingStyle.Linear)
+						local tween = TweenService:Create(cdOverlay, tweenInfo, {Size = UDim2.new(1, 0, 0, 0)})
+						tween:Play()
+
+						tween.Completed:Connect(function()
+							cdOverlay.Visible = false
+						end)
+					end
+				end
+			end
+		end)
+	end
+end)
