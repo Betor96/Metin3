@@ -2,18 +2,23 @@
 
 local SkillDatabase = {}
 local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
+local ShowDamage = Events:WaitForChild("ShowDamage") 
 
--- Védett NPC-k listája (Nehogy a boltosokat leüssük)
 local protectedNPCs = {
 	["Fegyverkereskedo"] = true, ["Pancelkereskedo"] = true, ["Vegyesbolt"] = true, 
 	["Kovacs"] = true, ["Faluose"] = true, ["Varosor"] = true, ["Raktaros"] = true
 }
 
--- ==========================================
--- 1. SEGÉDFÜGGVÉNYEK (Célzás, Sebzés, Látvány)
--- ==========================================
+SkillDatabase.Ranges = {
+	["Shield Charge"] = 25, ["Earthbreaker"] = 15, ["Blade Spirit"] = 0, ["Iron Skin"] = 0,
+	["Shadow Strike"] = 35, ["Whirling Blades"] = 12, ["Bloodlust"] = 0, ["Death Mark"] = 70,
+	["Soul Orb"] = 60, ["Spirit Chain"] = 45, ["Spirit Blessing"] = 0, ["Soul Explosion"] = 25,
+	["Seal of Power"] = 50, ["Seal of Protection"] = 50, ["Explosive Seal"] = 40, ["Dragon Shackles"] = 40
+}
 
 function SkillDatabase.isValidTarget(obj)
 	if not obj or not obj:IsA("Model") then return false end
@@ -21,6 +26,13 @@ function SkillDatabase.isValidTarget(obj)
 	local root = obj:FindFirstChild("HumanoidRootPart")
 	if not hum or not root or hum.Health <= 0 then return false end
 	if protectedNPCs[obj.Name] or obj:GetAttribute("IsNPC") then return false end
+
+	local nameLower = string.lower(obj.Name)
+	if string.find(nameLower, "érc") or string.find(nameLower, "erc") or string.find(nameLower, "vein") then
+		return false
+	end
+	if obj:GetAttribute("IsOre") then return false end
+
 	return true
 end
 
@@ -28,17 +40,13 @@ function SkillDatabase.getEnemiesInRadius(centerPos, radius, excludeChar)
 	local enemies = {}
 	for _, obj in pairs(workspace:GetChildren()) do
 		if obj ~= excludeChar and SkillDatabase.isValidTarget(obj) then
-			if (obj.HumanoidRootPart.Position - centerPos).Magnitude <= radius then
-				table.insert(enemies, obj)
-			end
+			if (obj.HumanoidRootPart.Position - centerPos).Magnitude <= radius then table.insert(enemies, obj) end
 		end
 	end
 	if workspace:FindFirstChild("Monsters") then
 		for _, obj in pairs(workspace.Monsters:GetChildren()) do
 			if obj ~= excludeChar and SkillDatabase.isValidTarget(obj) then
-				if (obj.HumanoidRootPart.Position - centerPos).Magnitude <= radius then
-					table.insert(enemies, obj)
-				end
+				if (obj.HumanoidRootPart.Position - centerPos).Magnitude <= radius then table.insert(enemies, obj) end
 			end
 		end
 	end
@@ -52,8 +60,8 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 
 	local baseDmg = attacker:GetAttribute("AttackDamage") or 10
 	local finalDmg = math.floor(baseDmg * skillMultiplier)
-
 	local isCrit = false
+
 	local stats = attacker:FindFirstChild("PlayerStats")
 	if stats and stats:FindFirstChild("CritChance") then
 		if math.random(1, 100) <= stats.CritChance.Value then
@@ -62,27 +70,32 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		end
 	end
 
-	if targetModel:GetAttribute("DeathMark") then
-		finalDmg = math.floor(finalDmg * (targetModel:FindFirstChild("IsPlayer") and 1.1 or 1.2))
+	local markApplier = targetModel:GetAttribute("DeathMark_Applier")
+	if markApplier and markApplier == attacker.UserId then
+		targetModel:SetAttribute("DeathMark_Applier", nil) 
+
+		local head = targetModel:FindFirstChild("Head")
+		if head and head:FindFirstChild("DeathMarkVisual") then head.DeathMarkVisual:Destroy() end
+
+		local bonusDmg = math.floor(finalDmg * (targetModel:FindFirstChild("IsPlayer") and 0.5 or 0.8)) 
+
+		hum:TakeDamage(finalDmg + bonusDmg)
+		ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
+
+		task.delay(0.15, function()
+			ShowDamage:FireAllClients(bonusDmg, root.Position + Vector3.new(0, 2, 0), true, false)
+		end)
+		return 
 	end
 
 	hum:TakeDamage(finalDmg)
-
-	-- Dinamikus lekérés a Deadlock (fagyás) elkerülésére!
-	local ShowDamage = Events:FindFirstChild("ShowDamage")
-	if ShowDamage then
-		ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
-	end
+	ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
 end
 
 function SkillDatabase.playVFX(position, color, size, duration)
 	local part = Instance.new("Part")
 	part.Position = position
-	part.Anchored = true
-	part.CanCollide = false
-	part.Transparency = 1
-	part.Parent = workspace
-
+	part.Anchored = true; part.CanCollide = false; part.Transparency = 1; part.Parent = workspace
 	local att = Instance.new("Attachment", part)
 	local emitter = Instance.new("ParticleEmitter", att)
 	emitter.Color = ColorSequence.new(color)
@@ -94,42 +107,23 @@ function SkillDatabase.playVFX(position, color, size, duration)
 	Debris:AddItem(part, duration or 1)
 end
 
--- ==========================================
--- 2. KÉPESSÉGEK DEFINÍCIÓI
--- ==========================================
-SkillDatabase.Ranges = {
-	["Shield Charge"] = 25, ["Earthbreaker"] = 15, ["Blade Spirit"] = 0, ["Iron Skin"] = 0,
-	["Shadow Strike"] = 35, ["Whirling Blades"] = 12, ["Bloodlust"] = 0, ["Death Mark"] = 50,
-	["Soul Orb"] = 60, ["Spirit Chain"] = 45, ["Spirit Blessing"] = 0, ["Soul Explosion"] = 25,
-	["Seal of Power"] = 50, ["Seal of Protection"] = 50, ["Explosive Seal"] = 40, ["Dragon Shackles"] = 40
-}
+function SkillDatabase.sendBuffUI(player, skillName, effectType, duration)
+	local ApplyEffect = Events:FindFirstChild("ApplyEffect")
+	if ApplyEffect then ApplyEffect:FireClient(player, skillName, effectType, 0, duration) end
+end
 
 SkillDatabase.Skills = {
+
 	-- 🛡️ GUARDIAN
 	["Shield Charge"] = {
 		Mana = 15, Cooldown = 8,
 		Execute = function(player, char, root, mousePos, target)
 			SkillDatabase.playVFX(root.Position, Color3.fromRGB(255, 200, 50), 5)
 			local bv = Instance.new("BodyVelocity", root)
-			bv.Velocity = root.CFrame.LookVector * 60
-			bv.MaxForce = Vector3.new(100000, 0, 100000)
-			Debris:AddItem(bv, 0.25)
-
+			bv.Velocity = root.CFrame.LookVector * 60; bv.MaxForce = Vector3.new(100000, 0, 100000); Debris:AddItem(bv, 0.25)
 			task.wait(0.25)
 			local enemies = SkillDatabase.getEnemiesInRadius(root.Position, 8, char)
-			for _, enemy in pairs(enemies) do
-				SkillDatabase.applyDamage(player, enemy, 1.2)
-				if enemy:FindFirstChild("IsPlayer") then
-					local eHum = enemy:FindFirstChild("Humanoid")
-					local oldSpeed = eHum.WalkSpeed
-					eHum.WalkSpeed = math.max(0, oldSpeed - 4)
-					task.delay(2, function() if eHum then eHum.WalkSpeed = oldSpeed end end)
-
-					local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-					local enemyPlayer = game.Players:GetPlayerFromCharacter(enemy)
-					if enemyPlayer and ApplyEffect then ApplyEffect:FireClient(enemyPlayer, "Shield Charge", "Lassítás", 0, 2) end
-				end
-			end
+			for _, enemy in pairs(enemies) do SkillDatabase.applyDamage(player, enemy, 1.2) end
 			return true
 		end
 	},
@@ -154,8 +148,7 @@ SkillDatabase.Skills = {
 		Execute = function(player, char, root, mousePos, target)
 			SkillDatabase.playVFX(root.Position, Color3.fromRGB(150, 150, 150), 6)
 			player:SetAttribute("IronSkin_Active", true)
-			local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-			if ApplyEffect then ApplyEffect:FireClient(player, "Iron Skin", "Buff", 0, 6) end
+			SkillDatabase.sendBuffUI(player, "Iron Skin", "Védelem", 6)
 			task.delay(6, function() if player then player:SetAttribute("IronSkin_Active", false) end end)
 			return true
 		end
@@ -170,6 +163,7 @@ SkillDatabase.Skills = {
 			local tRoot = enemyModel:FindFirstChild("HumanoidRootPart")
 			SkillDatabase.playVFX(root.Position, Color3.fromRGB(30, 30, 30), 4) 
 			root.CFrame = tRoot.CFrame * CFrame.new(0, 0, 3)
+			root.CFrame = CFrame.lookAt(root.Position, tRoot.Position)
 			SkillDatabase.playVFX(root.Position, Color3.fromRGB(150, 0, 0), 5) 
 			SkillDatabase.applyDamage(player, enemyModel, 2.5) 
 			return true
@@ -178,16 +172,63 @@ SkillDatabase.Skills = {
 	["Whirling Blades"] = {
 		Mana = 25, Cooldown = 8,
 		Execute = function(player, char, root, mousePos, target)
-			SkillDatabase.playVFX(root.Position, Color3.fromRGB(200, 50, 50), 12)
-			local enemies = SkillDatabase.getEnemiesInRadius(root.Position, 12, char)
-			for _, enemy in pairs(enemies) do SkillDatabase.applyDamage(player, enemy, 1.4) end
+			local hum = char:FindFirstChild("Humanoid")
+			if not hum then return false end
+
+			local oldWalkSpeed = hum.WalkSpeed
+			hum.WalkSpeed = 0 
+
+			local function createRedAura()
+				local circle = Instance.new("Part")
+				circle.Size = Vector3.new(0.5, 24, 24) 
+				circle.Position = root.Position - Vector3.new(0, 2.5, 0)
+				circle.Anchored = true; circle.CanCollide = false; circle.Color = Color3.fromRGB(200, 20, 20)
+				circle.Material = Enum.Material.Neon; circle.Shape = Enum.PartType.Cylinder
+				circle.CFrame = CFrame.new(root.Position - Vector3.new(0, 2.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
+				circle.Transparency = 0.5; circle.Parent = workspace
+				game:GetService("TweenService"):Create(circle, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Transparency = 1, Size = Vector3.new(0.5, 26, 26)}):Play()
+				Debris:AddItem(circle, 0.6)
+			end
+
+			task.spawn(function()
+				for i = 1, 3 do
+					createRedAura()
+					SkillDatabase.playVFX(root.Position, Color3.fromRGB(200, 50, 50), 12)
+					local enemies = SkillDatabase.getEnemiesInRadius(root.Position, 12, char)
+					for _, enemy in pairs(enemies) do SkillDatabase.applyDamage(player, enemy, 0.6) end
+					task.wait(2/3) 
+				end
+				if hum then hum.WalkSpeed = oldWalkSpeed end 
+			end)
 			return true
 		end
 	},
 	["Bloodlust"] = {
-		Mana = 35, Cooldown = 2, IsToggle = true, ToggleAttribute = "Bloodlust_Active",
+		Mana = 35, Cooldown = 5, IsToggle = true, ToggleAttribute = "Bloodlust_Active",
 		Execute = function(player, char, root, mousePos, target)
-			SkillDatabase.playVFX(root.Position, Color3.fromRGB(255, 0, 0), 6)
+			local stats = player:FindFirstChild("PlayerStats")
+			if not stats then return false end
+
+			local movementSpeed = stats:FindFirstChild("MovementSpeed")
+			local attackSpeed = stats:FindFirstChild("AttackSpeed")
+			if not movementSpeed or not attackSpeed then return false end
+
+			local isActive = player:GetAttribute("Bloodlust_Active")
+
+			if not isActive then
+				-- BEKAPCSOLÁS: Közvetlenül a PlayerStats-ot növeljük meg, így a CombatClient azonnal alkalmazza!
+				player:SetAttribute("Bloodlust_Active", true)
+				SkillDatabase.playVFX(root.Position, Color3.fromRGB(255, 0, 0), 6)
+
+				movementSpeed.Value += 15 -- +15% Mozgási sebesség
+				attackSpeed.Value += 30   -- +30% Támadási sebesség
+			else
+				-- KIKAPCSOLÁS: Levonjuk a bónuszt a statokból
+				player:SetAttribute("Bloodlust_Active", false)
+
+				movementSpeed.Value = math.max(0, movementSpeed.Value - 15)
+				attackSpeed.Value = math.max(0, attackSpeed.Value - 30)
+			end
 			return true
 		end
 	},
@@ -196,14 +237,23 @@ SkillDatabase.Skills = {
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
-			enemyModel:SetAttribute("DeathMark", true)
-			SkillDatabase.playVFX(enemyModel.HumanoidRootPart.Position, Color3.fromRGB(50, 0, 0), 6)
-			if enemyModel:FindFirstChild("IsPlayer") then
-				local targetPlayer = game.Players:GetPlayerFromCharacter(enemyModel)
-				local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-				if targetPlayer and ApplyEffect then ApplyEffect:FireClient(targetPlayer, "Death Mark", "Debuff", 0, 10) end
+			enemyModel:SetAttribute("DeathMark_Applier", player.UserId)
+
+			local head = enemyModel:FindFirstChild("Head")
+			if head then
+				local existing = head:FindFirstChild("DeathMarkVisual")
+				if existing then existing:Destroy() end
+				local bb = Instance.new("BillboardGui")
+				bb.Name = "DeathMarkVisual"; bb.Size = UDim2.new(0, 60, 0, 60); bb.StudsOffset = Vector3.new(0, 3.5, 0); bb.AlwaysOnTop = true; bb.Parent = head
+				local txt = Instance.new("TextLabel")
+				txt.Size = UDim2.new(1, 0, 1, 0); txt.BackgroundTransparency = 1; txt.Text = "☠️"; txt.TextColor3 = Color3.fromRGB(255, 50, 50); txt.TextScaled = true; txt.Parent = bb
+				Debris:AddItem(bb, 5) 
 			end
-			task.delay(10, function() if enemyModel then enemyModel:SetAttribute("DeathMark", false) end end)
+
+			SkillDatabase.playVFX(enemyModel.HumanoidRootPart.Position, Color3.fromRGB(150, 0, 0), 6)
+			task.delay(5, function() 
+				if enemyModel and enemyModel:GetAttribute("DeathMark_Applier") == player.UserId then enemyModel:SetAttribute("DeathMark_Applier", nil) end 
+			end)
 			return true
 		end
 	},
@@ -220,8 +270,7 @@ SkillDatabase.Skills = {
 			orb.CFrame = root.CFrame * CFrame.new(0, 0, -3)
 			local lv = Instance.new("LinearVelocity", orb)
 			local att = Instance.new("Attachment", orb)
-			lv.Attachment0 = att; lv.MaxForce = 100000
-			lv.VectorVelocity = (tRoot.Position - root.Position).Unit * 80
+			lv.Attachment0 = att; lv.MaxForce = 100000; lv.VectorVelocity = (tRoot.Position - root.Position).Unit * 80
 			Debris:AddItem(orb, 2)
 			local hitOnce = false
 			orb.Touched:Connect(function(hit)
@@ -267,20 +316,8 @@ SkillDatabase.Skills = {
 	["Soul Explosion"] = {
 		Mana = 60, Cooldown = 20,
 		Execute = function(player, char, root, mousePos, target)
-			SkillDatabase.playVFX(root.Position, Color3.fromRGB(200, 50, 255), 25)
 			local enemies = SkillDatabase.getEnemiesInRadius(root.Position, 25, char) 
-			for _, enemy in pairs(enemies) do
-				SkillDatabase.applyDamage(player, enemy, 2.0)
-				if enemy:FindFirstChild("IsPlayer") then
-					local eHum = enemy:FindFirstChild("Humanoid")
-					local oldSpeed = eHum.WalkSpeed
-					eHum.WalkSpeed = math.max(0, oldSpeed - 6)
-					task.delay(1.5, function() if eHum then eHum.WalkSpeed = oldSpeed end end)
-					local enemyPlayer = game.Players:GetPlayerFromCharacter(enemy)
-					local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-					if enemyPlayer and ApplyEffect then ApplyEffect:FireClient(enemyPlayer, "Soul Explosion", "Lassítás", 0, 1.5) end
-				end
-			end
+			for _, enemy in pairs(enemies) do SkillDatabase.applyDamage(player, enemy, 2.0) end
 			return true
 		end
 	},
@@ -290,14 +327,11 @@ SkillDatabase.Skills = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
 		Execute = function(player, char, root, mousePos, target)
 			local buffTarget = player
-			if target and target.Parent:FindFirstChild("IsPlayer") then
-				buffTarget = game.Players:GetPlayerFromCharacter(target.Parent) or player
-			end
+			if target and target.Parent:FindFirstChild("IsPlayer") then buffTarget = Players:GetPlayerFromCharacter(target.Parent) or player end
 			local bRoot = buffTarget.Character and buffTarget.Character:FindFirstChild("HumanoidRootPart")
 			if bRoot then SkillDatabase.playVFX(bRoot.Position, Color3.fromRGB(255, 50, 50), 6) end
 			buffTarget:SetAttribute("SealOfPower_Active", true)
-			local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-			if ApplyEffect then ApplyEffect:FireClient(buffTarget, "Seal of Power", "Buff", 0, 7200) end
+			SkillDatabase.sendBuffUI(buffTarget, "Seal of Power", "Sebzés Bónusz", 7200)
 			task.delay(7200, function() if buffTarget then buffTarget:SetAttribute("SealOfPower_Active", false) end end)
 			return true
 		end
@@ -306,14 +340,11 @@ SkillDatabase.Skills = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
 		Execute = function(player, char, root, mousePos, target)
 			local buffTarget = player
-			if target and target.Parent:FindFirstChild("IsPlayer") then
-				buffTarget = game.Players:GetPlayerFromCharacter(target.Parent) or player
-			end
+			if target and target.Parent:FindFirstChild("IsPlayer") then buffTarget = Players:GetPlayerFromCharacter(target.Parent) or player end
 			local bRoot = buffTarget.Character and buffTarget.Character:FindFirstChild("HumanoidRootPart")
 			if bRoot then SkillDatabase.playVFX(bRoot.Position, Color3.fromRGB(50, 100, 255), 6) end
 			buffTarget:SetAttribute("SealOfProtection_Active", true)
-			local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-			if ApplyEffect then ApplyEffect:FireClient(buffTarget, "Seal of Protection", "Buff", 0, 7200) end
+			SkillDatabase.sendBuffUI(buffTarget, "Seal of Protection", "Védelem Bónusz", 7200)
 			task.delay(7200, function() if buffTarget then buffTarget:SetAttribute("SealOfProtection_Active", false) end end)
 			return true
 		end
@@ -324,12 +355,7 @@ SkillDatabase.Skills = {
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
 			local eRoot = enemyModel:FindFirstChild("HumanoidRootPart")
-			SkillDatabase.playVFX(eRoot.Position, Color3.fromRGB(255, 100, 50), 4)
-			if enemyModel:FindFirstChild("IsPlayer") then
-				local enemyPlayer = game.Players:GetPlayerFromCharacter(enemyModel)
-				local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-				if enemyPlayer and ApplyEffect then ApplyEffect:FireClient(enemyPlayer, "Explosive Seal", "Bomba", 0, 3) end
-			end
+			SkillDatabase.playVFX(eRoot.Position, Color3.fromRGB(255, 100, 50), 5)
 			task.delay(3, function() 
 				if SkillDatabase.isValidTarget(enemyModel) then
 					SkillDatabase.playVFX(enemyModel.HumanoidRootPart.Position, Color3.fromRGB(255, 0, 0), 10)
@@ -351,15 +377,27 @@ SkillDatabase.Skills = {
 			local eHum = enemyModel:FindFirstChild("Humanoid")
 			local oldSpeed = eHum.WalkSpeed
 			eHum.WalkSpeed = 0 
-			if isPvP then
-				local enemyPlayer = game.Players:GetPlayerFromCharacter(enemyModel)
-				local ApplyEffect = Events:FindFirstChild("ApplyEffect")
-				if enemyPlayer and ApplyEffect then ApplyEffect:FireClient(enemyPlayer, "Dragon Shackles", "Lefogva", 0, rootTime) end
-			end
 			task.delay(rootTime, function() if eHum then eHum.WalkSpeed = oldSpeed end end)
 			return true
 		end
 	},
 }
+
+if RunService:IsServer() then
+	task.spawn(function()
+		while task.wait(2) do
+			for _, player in pairs(Players:GetPlayers()) do
+				local stats = player:FindFirstChild("PlayerStats")
+				if stats then
+					local mana = stats:FindFirstChild("Mana")
+					local maxMana = stats:FindFirstChild("MaxMana")
+					if mana and maxMana and mana.Value < maxMana.Value then
+						mana.Value = math.min(maxMana.Value, mana.Value + 10)
+					end
+				end
+			end
+		end
+	end)
+end
 
 return SkillDatabase

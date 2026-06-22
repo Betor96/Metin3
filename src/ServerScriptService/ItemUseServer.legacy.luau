@@ -8,7 +8,6 @@ local UseItem = Events:WaitForChild("UseItem")
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
 
--- Biztonságos RemoteEvent létrehozás, hogy a kliens tudja fogni
 local ApplyEffect = Events:FindFirstChild("ApplyEffect")
 if not ApplyEffect then
 	ApplyEffect = Instance.new("RemoteEvent")
@@ -32,7 +31,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	local stats = player:FindFirstChild("PlayerStats")
 
-	-- Biztonsági ellenőrzés: ha halott vagy nincs betöltve valami, kilép
 	if not stats or not humanoid or not root or humanoid.Health <= 0 then return end
 
 	-- ==========================================
@@ -44,24 +42,33 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 		if not playerCooldowns[player.UserId] then playerCooldowns[player.UserId] = {} end
 		local lastUsed = playerCooldowns[player.UserId][itemName] or 0
 
-		-- Cooldown (Újratöltés) ellenőrzése a szerveren (Hackerek ellen)
+		-- Közös Cooldown (Újratöltés) ellenőrzés minden skillnél
 		if tick() - lastUsed < skill.Cooldown then return end 
 
 		local manaStat = stats:FindFirstChild("Mana")
 
-		-- Toggle (Kibe/Bekapcsolós) képességek (Pl. Blade Spirit, Bloodlust)
+		-- JAVÍTÁS: Toggle (Kibe/Bekapcsolós) képességek Cooldown kezelése
 		if skill.IsToggle then
 			local currentToggleState = player:GetAttribute(skill.ToggleAttribute)
 
-			-- Végrehajtjuk a képességet a SkillDatabase-ben
+			-- Ha BE akarjuk kapcsolni, ellenőrizzük, hogy van-e elég mana
+			if not currentToggleState then
+				if not manaStat or manaStat.Value < skill.Mana then return end
+			end
+
 			local success = skill.Execute(player, character, root, mousePos, target)
 
 			if success then
+				-- JAVÍTÁS: Sikeres használat után elindítjuk a Vizuális Cooldown-t a UI-on
+				playerCooldowns[player.UserId][itemName] = tick()
+				SkillCooldown:FireClient(player, itemName, skill.Cooldown)
+
 				if not currentToggleState then
-					-- Ha most kapcsoltuk be, küldünk egy végtelen (99999) idejű Buffot a UI-nak
+					-- Bekapcsolás: Mana levonása és Végtelen Buff ikon kirakása
+					if manaStat then manaStat.Value -= skill.Mana end
 					ApplyEffect:FireClient(player, itemName, itemName, 0, 99999) 
 				else
-					-- Ha kikapcsoltuk, küldünk egy 0 másodperces jelet, amivel a UI azonnal letörli az ikont
+					-- Kikapcsolás: Nem von manát, csak letörli a Buff ikont (0 mp)
 					ApplyEffect:FireClient(player, itemName, itemName, 0, 0)
 				end
 			end
@@ -70,18 +77,13 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 
 		-- Normál aktív képességek (Mik amik Manát vonnak)
 		if manaStat and manaStat.Value >= skill.Mana then
-			-- Csak akkor indul el minden, ha az Execute SIKERES volt (pl. volt érvényes célpont)
 			local success = skill.Execute(player, character, root, mousePos, target)
 
 			if success then
-				-- Levonjuk a Manát és mentjük a Cooldown időt
 				manaStat.Value -= skill.Mana
 				playerCooldowns[player.UserId][itemName] = tick() 
-
-				-- Kliens frissítése: Jelenjen meg a fekete csúszó réteg a Hotbar gombján
 				SkillCooldown:FireClient(player, itemName, skill.Cooldown)
 
-				-- Ha a képességnek van Duration (Hatóidő) értéke (Pl. Iron Skin), tegyünk ki egy Buff ikont!
 				if skill.Duration then
 					ApplyEffect:FireClient(player, itemName, itemName, 0, skill.Duration)
 				end
@@ -91,7 +93,7 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 	end
 
 	-- ==========================================
-	-- 2. HA TÁRGY LETT HASZNÁLVA (Potik - A te régi kódod érintetlenül)
+	-- 2. HA TÁRGY LETT HASZNÁLVA (Potik)
 	-- ==========================================
 	local itemData = ItemDatabase[itemName]
 	if not itemData or itemData.Type ~= "Fogyóeszköz" then return end
@@ -130,7 +132,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 			if not activePlayerEffects[userId] then activePlayerEffects[userId] = {} end
 
 			if activePlayerEffects[userId][itemData.Effect] then
-				-- Ha már aktív, csak frissíti az időt
 				ApplyEffect:FireClient(player, itemName, itemData.Effect, itemData.Value, itemData.Duration)
 				usedSuccessfully = true
 			else
@@ -164,7 +165,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 		end
 	end
 
-	-- Mennyiség levonása a táskából
 	if usedSuccessfully then
 		local amtObj = foundSlot:FindFirstChild("Amount")
 		if amtObj then
@@ -179,7 +179,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 	end
 end)
 
--- Biztonságos takarítás, ha kilép a játékos
 Players.PlayerRemoving:Connect(function(player)
 	activePlayerEffects[player.UserId] = nil
 	playerCooldowns[player.UserId] = nil

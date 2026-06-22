@@ -1,49 +1,81 @@
+-- Fájl helye: StarterPlayer -> StarterPlayerScripts -> DamageIndicatorClient
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local ShowDamage = ReplicatedStorage.Events:WaitForChild("ShowDamage")
+local Debris = game:GetService("Debris")
 
-ShowDamage.OnClientEvent:Connect(function(amount, position, isCrit, isMiss)
+local Events = ReplicatedStorage:WaitForChild("Events")
+local ShowDamage = Events:WaitForChild("ShowDamage")
+
+-- Véletlenszerű eltolás, hogy a sok sebzés ne fedje el teljesen egymást
+local rng = Random.new()
+
+ShowDamage.OnClientEvent:Connect(function(amount, position, isCrit, isHeal)
+	-- 1. Hordozó "Part" létrehozása a megadott pozícióban
 	local part = Instance.new("Part")
-	part.Anchored = true
-	part.CanCollide = false
 	part.Transparency = 1
-	part.Position = position + Vector3.new(math.random(-1, 1), 2, math.random(-1, 1))
+	part.CanCollide = false
+	part.Anchored = true
+	part.Size = Vector3.new(1, 1, 1)
+
+	-- Kicsit eltoljuk a pozíciót, hogy a számok "szétnyíljanak" (ne pont egymáson legyenek)
+	local offsetX = rng:NextNumber(-1.5, 1.5)
+	local offsetZ = rng:NextNumber(-1.5, 1.5)
+	part.Position = position + Vector3.new(offsetX, 1, offsetZ)
 	part.Parent = workspace
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.new(0, 100, 0, 50)
-	billboard.StudsOffset = Vector3.new(0, 1, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Parent = part
+	-- 2. BillboardGui létrehozása (Ez mindig a kamera felé néz)
+	local gui = Instance.new("BillboardGui")
+	gui.AlwaysOnTop = true
+	gui.StudsOffset = Vector3.new(0, 2, 0) -- Egy picit a karakter/szörny feje fölött indul
+	gui.Parent = part
 
+	-- 3. Maga a Szöveg
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, 0, 1, 0)
 	textLabel.BackgroundTransparency = 1
+	textLabel.Text = tostring(math.floor(amount))
 	textLabel.Font = Enum.Font.GothamBlack
-	textLabel.TextStrokeTransparency = 0
+	textLabel.TextScaled = true 
+	textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+	textLabel.TextStrokeTransparency = 0 -- Erős fekete körvonal, hogy mindenhol olvasható legyen!
+	textLabel.Parent = gui
 
-	if isMiss then
-		textLabel.Text = "Mellé!"
-		textLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-		textLabel.TextSize = 20
+	-- 4. Színek és Méretek beállítása (Sima vs. Kritikus/Death Mark proc vs. Heal)
+	if isHeal then
+		textLabel.TextColor3 = Color3.fromRGB(50, 255, 50) -- Zöld szín gyógyulásnál
+		gui.Size = UDim2.new(0, 100, 0, 40)
+		textLabel.Text = "+" .. textLabel.Text
+
 	elseif isCrit then
-		textLabel.Text = amount .. "!"
-		textLabel.TextColor3 = Color3.fromRGB(255, 50, 50) -- Pirosas kritikus
-		textLabel.TextSize = 35 -- Nagyobb betű
+		-- EZ A KRITIKUS ÉS A DEATH MARK PROCKOLÁS!
+		textLabel.TextColor3 = Color3.fromRGB(255, 40, 40) -- Brutális piros szín
+		gui.Size = UDim2.new(0, 200, 0, 75) -- Jóval nagyobb méret
+		textLabel.Text = textLabel.Text .. "!"
+		gui.StudsOffset = Vector3.new(0, 3.5, 0) -- Hogy az alap sebzés fölött jelenjen meg
+
 	else
-		textLabel.Text = amount
-		textLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
-		textLabel.TextSize = 25
+		-- SIMA SEBZÉS
+		textLabel.TextColor3 = Color3.fromRGB(255, 220, 120) -- Sárgás/Fehér szín
+		gui.Size = UDim2.new(0, 120, 0, 45) -- Normál méret
 	end
 
-	textLabel.Parent = billboard
+	-- 5. ANIMÁCIÓ (Felugrás és lassan elhalványulás)
+	local targetPos = part.Position + Vector3.new(0, 3.5, 0) -- 3.5 studot úszik felfelé
 
-	local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-	local tween = TweenService:Create(billboard, tweenInfo, {StudsOffset = Vector3.new(0, 4, 0)})
-	local textTween = TweenService:Create(textLabel, tweenInfo, {TextTransparency = 1, TextStrokeTransparency = 1})
+	local moveTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+	local moveTween = TweenService:Create(part, moveTweenInfo, {Position = targetPos})
+	moveTween:Play()
 
-	tween:Play()
-	textTween:Play()
+	-- Egy kis várakozás után elkezd elhalványulni a szöveg
+	task.delay(0.5, function()
+		if textLabel then
+			local fadeTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+			local fadeText = TweenService:Create(textLabel, fadeTweenInfo, {TextTransparency = 1, TextStrokeTransparency = 1})
+			fadeText:Play()
+		end
+	end)
 
-	game:GetService("Debris"):AddItem(part, 1)
+	-- 6. Automatikus takarítás 1.5 másodperc múlva, nehogy belaggoljon a szerver!
+	Debris:AddItem(part, 1.5)
 end)

@@ -11,9 +11,7 @@ local GetCharacterList = Events:WaitForChild("GetCharacterList")
 local CreateCharacter = Events:WaitForChild("CreateCharacter")
 local SelectCharacter = Events:WaitForChild("SelectCharacter")
 
--- ==========================================
 -- TÖRLÉS EVENT LÉTREHOZÁSA ÉS BEKÖTÉSE
--- ==========================================
 local DeleteCharacter = Events:FindFirstChild("DeleteCharacter")
 if not DeleteCharacter then
 	DeleteCharacter = Instance.new("RemoteEvent")
@@ -21,11 +19,36 @@ if not DeleteCharacter then
 	DeleteCharacter.Parent = Events
 end
 
+-- ==========================================
+-- JAVÍTÁS: HOTBAR SZINKRONIZÁLÓ EVENT LÉTREHOZÁSA
+-- ==========================================
+local SyncHotbarSlot = Events:FindFirstChild("SyncHotbarSlot")
+if not SyncHotbarSlot then
+	SyncHotbarSlot = Instance.new("RemoteEvent")
+	SyncHotbarSlot.Name = "SyncHotbarSlot"
+	SyncHotbarSlot.Parent = Events
+end
+
 local savingPlayers = {} 
 local activeSlots = {} -- NYILVÁNTARTJUK: Ki melyik sloton játszik éppen!
 
--- JAVÍTÁS: Ebbe mentjük ideiglenesen a törölt slotokat, hogy a menü AZONNAL üresnek lássa őket (Késés ellen)
+-- Ebbe mentjük ideiglenesen a törölt slotokat, hogy a menü AZONNAL üresnek lássa őket
 local deletedSlotsCache = {} 
+
+-- ==========================================
+-- JAVÍTÁS: KLIENS FRISSÍTI A SZERVERT, HA RÁHÚZ VALAMIT
+-- ==========================================
+SyncHotbarSlot.OnServerEvent:Connect(function(player, slotNum, itemName)
+	if type(slotNum) == "number" and slotNum >= 1 and slotNum <= 8 then
+		local hotbar = player:FindFirstChild("Hotbar")
+		if hotbar then
+			local slotVal = hotbar:FindFirstChild("Hotbar_" .. slotNum)
+			if slotVal then
+				slotVal.Value = tostring(itemName)
+			end
+		end
+	end
+end)
 
 -- ==========================================
 -- 0. KARAKTER TÖRLÉSE
@@ -33,7 +56,6 @@ local deletedSlotsCache = {}
 DeleteCharacter.OnServerEvent:Connect(function(player, slotId)
 	if type(slotId) ~= "number" or slotId < 1 or slotId > 3 then return end
 
-	-- Azonnal bejegyezzük a memóriába, hogy törölve lett (Így a menü egyből frissül!)
 	if not deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId] = {} end
 	deletedSlotsCache[player.UserId][slotId] = true
 
@@ -48,7 +70,7 @@ DeleteCharacter.OnServerEvent:Connect(function(player, slotId)
 		end
 	else
 		warn("Hiba a karakter törlésekor: " .. tostring(errorMessage))
-		deletedSlotsCache[player.UserId][slotId] = nil -- Hiba esetén visszavonjuk a memóriából
+		deletedSlotsCache[player.UserId][slotId] = nil 
 	end
 end)
 
@@ -59,7 +81,6 @@ GetCharacterList.OnServerInvoke = function(player)
 	local charList = {}
 
 	for slot = 1, 3 do
-		-- JAVÍTÁS: Ha a slotot most törölték ki, azonnal üresnek mutatjuk a késés elkerülése végett!
 		if deletedSlotsCache[player.UserId] and deletedSlotsCache[player.UserId][slot] then
 			charList[slot] = { Exists = false }
 		else
@@ -85,22 +106,26 @@ end
 -- ==========================================
 -- 2. KARAKTER BETÖLTÉSE ÉS JÁTÉK INDÍTÁSA
 -- ==========================================
-local function setupPlayer(player, slotId)
-	local success, data = pcall(function() 
-		return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId) 
-	end)
+local function setupPlayer(player, slotId, overrideData)
+	local data = overrideData
 
-	if not success or not data then
-		warn("HIBA: A játékos megpróbált betölteni egy üres vagy hibás slotot!")
-		return
+	if not data then
+		local success, result = pcall(function() 
+			return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId) 
+		end)
+
+		if not success or not result then
+			warn("HIBA: A játékos megpróbált betölteni egy üres vagy hibás slotot!")
+			return
+		end
+		data = result
 	end
 
 	activeSlots[player.UserId] = slotId 
-
 	player:SetAttribute("Class", data.Class)
 
 	-- ==========================================
-	-- STATOK LÉTREHOZÁSA 
+	-- STATOK LÉTREHOZÁSA
 	-- ==========================================
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -136,6 +161,23 @@ local function setupPlayer(player, slotId)
 		local val = Instance.new("IntValue", stats)
 		val.Name = bStat
 		val.Value = (data.Stats and data.Stats[bStat]) or 0
+	end
+
+	-- ==========================================
+	-- JAVÍTÁS: HOTBAR TÖLTÉSE (Duplikáció elleni védelemmel)
+	-- ==========================================
+	local hotbar = player:FindFirstChild("Hotbar")
+	if not hotbar then
+		hotbar = Instance.new("Folder", player)
+		hotbar.Name = "Hotbar"
+	end
+	for i = 1, 8 do
+		local slot = hotbar:FindFirstChild("Hotbar_" .. i)
+		if not slot then
+			slot = Instance.new("StringValue", hotbar)
+			slot.Name = "Hotbar_" .. i
+		end
+		slot.Value = (data.Hotbar and data.Hotbar[tostring(i)]) or ""
 	end
 
 	-- ==========================================
@@ -208,8 +250,10 @@ local function setupPlayer(player, slotId)
 
 	player:LoadCharacter()
 end
-SelectCharacter.OnServerEvent:Connect(setupPlayer)
 
+SelectCharacter.OnServerEvent:Connect(function(player, slotId) 
+	setupPlayer(player, slotId) 
+end)
 
 -- ==========================================
 -- 3. ÚJ KARAKTER LÉTREHOZÁSA
@@ -228,7 +272,8 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 		CompletedQuests = {},
 		Bank = {},
 		BankPassword = "000000",
-		BankUnlockedPages = 1
+		BankUnlockedPages = 1,
+		Hotbar = {["1"] = "", ["2"] = "", ["3"] = "", ["4"] = "", ["5"] = "", ["6"] = "", ["7"] = "", ["8"] = ""} -- Üres hotbar kezdetben
 	}
 
 	local success, errorMessage = pcall(function() 
@@ -238,10 +283,8 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 	if success then
 		print(player.Name .. " létrehozott egy új " .. className .. " karaktert a " .. slotId .. ". sloton!")
 
-		-- JAVÍTÁS: Levesszük a törölt listáról, hiszen most hoztunk létre egy újat a helyére!
 		if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId][slotId] = nil end
-
-		setupPlayer(player, slotId)
+		setupPlayer(player, slotId, newData)
 	else
 		warn("Hiba a karakter készítésekor: " .. tostring(errorMessage))
 	end
@@ -261,7 +304,7 @@ local function savePlayerData(player)
 
 	local data = { 
 		Class = player:GetAttribute("Class") or "Ismeretlen",
-		Stats = {}, Inventory = {}, Equipment = {}, CompletedQuests = {}, Bank = {} 
+		Stats = {}, Inventory = {}, Equipment = {}, CompletedQuests = {}, Bank = {}, Hotbar = {} 
 	}
 
 	if player:FindFirstChild("PlayerStats") then
@@ -269,6 +312,16 @@ local function savePlayerData(player)
 			if stat.Name == "BankPassword" then data.BankPassword = stat.Value
 			elseif stat.Name == "BankUnlockedPages" then data.BankUnlockedPages = stat.Value
 			else data.Stats[stat.Name] = stat.Value end
+		end
+	end
+
+	-- BEÉPÍTETT ÚJÍTÁS: HOTBAR MENTÉSE ADATBÁZISBA
+	if player:FindFirstChild("Hotbar") then
+		for i = 1, 8 do
+			local slot = player.Hotbar:FindFirstChild("Hotbar_" .. i)
+			if slot then
+				data.Hotbar[tostring(i)] = slot.Value
+			end
 		end
 	end
 
@@ -313,7 +366,7 @@ local function savePlayerData(player)
 end
 
 game.Players.PlayerRemoving:Connect(function(player)
-	deletedSlotsCache[player.UserId] = nil -- Takarítás memóriaszivárgás ellen
+	if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId] = nil end
 	savePlayerData(player)
 end)
 

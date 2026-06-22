@@ -19,7 +19,7 @@ local keyMap = {
 }
 
 local isCooldown = false 
-local currentWalkConnection = nil -- Ezzel állítjuk le a sétálást, ha menet közben meggondolod magad
+local currentWalkConnection = nil 
 
 UserInputService.InputBegan:Connect(function(input, isTyping)
 	if isTyping or isCooldown then return end
@@ -32,24 +32,36 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. slotNum)
 
 		if slotVal and slotVal.Value ~= "" then
-			isCooldown = true -- Gomb lezárása a spamelés ellen
+			isCooldown = true 
 
 			local itemName = slotVal.Value
-			local target = mouse.Target
-
-			-- Pozíció biztosítása, ha az égre mutatna az egér (ne fagyjon ki!)
-			local mousePos = Vector3.zero
-			if mouse.Hit then
-				mousePos = mouse.Hit.Position
-			elseif player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-				mousePos = player.Character.HumanoidRootPart.Position + (player.Character.HumanoidRootPart.CFrame.LookVector * 10)
-			end
-
 			local char = player.Character
 			local hum = char and char:FindFirstChild("Humanoid")
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 
-			-- Ha már sétáltunk egy előző parancs miatt, azt megszakítjuk
+			-- ==========================================
+			-- 1. CÉLPONT MEGHATÁROZÁSA (Okos Kijelölés)
+			-- ==========================================
+			local finalTargetPart = mouse.Target
+			local finalTargetModel = finalTargetPart and finalTargetPart:FindFirstAncestorOfClass("Model")
+			local mousePos = Vector3.zero
+
+			-- Ha van fix KÉK kijelölt célpontunk (ezt a CombatClient fogja adni), az felülír mindent!
+			local selectedTargetVal = player:FindFirstChild("SelectedTarget")
+			if selectedTargetVal and selectedTargetVal.Value then
+				finalTargetModel = selectedTargetVal.Value
+				finalTargetPart = finalTargetModel:FindFirstChild("HumanoidRootPart") or finalTargetModel.PrimaryPart
+			end
+
+			-- Pozíció beállítása (Nem számít, hova néz az egér, a kijelölt célpont helyét veszi!)
+			if finalTargetPart then
+				mousePos = finalTargetPart.Position
+			elseif mouse.Hit then
+				mousePos = mouse.Hit.Position
+			elseif root then
+				mousePos = root.Position + (root.CFrame.LookVector * 10)
+			end
+
 			if currentWalkConnection then
 				currentWalkConnection:Disconnect()
 				currentWalkConnection = nil
@@ -59,20 +71,19 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 			local isDistantTarget = false
 
 			-- ==========================================
-			-- AUTO-APPROACH (Célpont megközelítése)
+			-- 2. AUTO-APPROACH (Sétálás a rádiuszba)
 			-- ==========================================
-			if maxRange and maxRange > 0 and target and target.Parent:FindFirstChild("Humanoid") then
-				local targetRoot = target.Parent:FindFirstChild("HumanoidRootPart")
+			if maxRange and maxRange > 0 and finalTargetModel and finalTargetModel:FindFirstChild("Humanoid") then
+				local targetRoot = finalTargetModel:FindFirstChild("HumanoidRootPart")
 
 				if root and targetRoot and hum then
-					local dist = (root.Position - targetRoot.Position).Magnitude
+					-- Csak X és Z tengelyen mérünk távolságot, hogy a hegyek/ugrás ne zavarjanak be
+					local dist = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(targetRoot.Position.X, 0, targetRoot.Position.Z)).Magnitude
 
-					-- Ha az ellenfél messzebb van, mint a hatótáv, elindulunk felé!
 					if dist > maxRange then
 						isDistantTarget = true
 						hum:MoveTo(targetRoot.Position)
 
-						-- Külön szálon (task.spawn) futtatjuk, hogy a gombok NE ragadjanak be!
 						task.spawn(function()
 							local connection
 							connection = RunService.Heartbeat:Connect(function()
@@ -81,16 +92,17 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 									return 
 								end
 
-								local currentDist = (root.Position - targetRoot.Position).Magnitude
+								local currentDist = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(targetRoot.Position.X, 0, targetRoot.Position.Z)).Magnitude
 
-								-- Beértünk a hatótávba! Megállítjuk a karaktert és elsütjük.
+								-- BEÉRTÜNK A HATÓTÁVBA! (Megállunk és lőjük a varázslatot a célpontra)
 								if currentDist <= maxRange then
-									hum:MoveTo(root.Position) 
-									UseItem:FireServer(itemName, targetRoot.Position, target)
+									hum:MoveTo(root.Position)
+									-- Itt is átadjuk a finalTargetPart-ot, ami a fixen kijelölt ellenfél!
+									UseItem:FireServer(itemName, targetRoot.Position, finalTargetPart)
 									connection:Disconnect()
 								end
 
-								-- Ha a játékos közben megnyom egy WASD gombot, megszakítjuk az automata menést
+								-- Megszakítás mozgáskor (WASD)
 								if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.D) then
 									connection:Disconnect()
 								end
@@ -102,13 +114,12 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 			end
 
 			-- ==========================================
-			-- AZONNALI ELSÜTÉS (Ha közel vagyunk, vagy poti/buff)
+			-- 3. AZONNALI ELSÜTÉS (Ha már rádiuszban vagyunk)
 			-- ==========================================
 			if not isDistantTarget then
-				UseItem:FireServer(itemName, mousePos, target) 
+				UseItem:FireServer(itemName, mousePos, finalTargetPart) 
 			end
 
-			-- Várakozás, majd gomb feloldása minden körülmények között!
 			task.wait(0.2)
 			isCooldown = false
 		end
