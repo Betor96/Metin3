@@ -9,7 +9,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
 local Events = ReplicatedStorage:WaitForChild("Events")
 
--- Hotbar mappa létrehozása, ha nem létezik
+-- 1. Hotbar mappa biztosítása
 local hotbarFolder = player:FindFirstChild("Hotbar")
 if not hotbarFolder then
 	hotbarFolder = Instance.new("Folder")
@@ -23,12 +23,14 @@ if not hotbarFolder then
 	hotbarFolder.Parent = player
 end
 
+-- 2. GUI Létrehozása (Azonnal, várakozás nélkül!)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MetinHUD"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1
 screenGui.Parent = playerGui
 
+-- HP/MP/EXP Container
 local statusContainer = Instance.new("Frame")
 statusContainer.Size = UDim2.new(0, 300, 0, 80)
 statusContainer.AnchorPoint = Vector2.new(1, 1) 
@@ -38,6 +40,7 @@ statusContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
 statusContainer.BorderSizePixel = 2
 statusContainer.Parent = screenGui
 
+-- Életerő
 local hpBg = Instance.new("Frame", statusContainer)
 hpBg.Size = UDim2.new(1, -20, 0, 20)
 hpBg.Position = UDim2.new(0, 10, 0, 10)
@@ -58,6 +61,7 @@ hpText.Font = Enum.Font.GothamBold
 hpText.TextSize = 12
 hpText.Text = "0 / 0"
 
+-- Mana
 local mpBg = Instance.new("Frame", statusContainer)
 mpBg.Size = UDim2.new(1, -20, 0, 20)
 mpBg.Position = UDim2.new(0, 10, 0, 35)
@@ -78,6 +82,7 @@ mpText.Font = Enum.Font.GothamBold
 mpText.TextSize = 12
 mpText.Text = "0 / 0"
 
+-- EXP
 local expBg = Instance.new("Frame", statusContainer)
 expBg.Size = UDim2.new(1, -20, 0, 10)
 expBg.Position = UDim2.new(0, 10, 0, 60)
@@ -89,6 +94,7 @@ expBar.Size = UDim2.new(0.5, 0, 1, 0)
 expBar.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
 expBar.BorderSizePixel = 0
 
+-- 3. Frissítő függvények (Életerő és Mana számítás)
 local currentHumanoid = nil
 
 local function updateHP()
@@ -116,7 +122,7 @@ local function updateMPXP()
 		if mana and maxMana and maxMana.Value > 0 then
 			local mPerc = math.clamp(mana.Value / maxMana.Value, 0, 1)
 			mpBar.Size = UDim2.new(mPerc, 0, 1, 0)
-			mpText.Text = mana.Value .. " / " .. maxMana.Value
+			mpText.Text = math.floor(mana.Value) .. " / " .. math.floor(maxMana.Value)
 		end
 
 		local exp = stats:FindFirstChild("Experience")
@@ -134,6 +140,7 @@ task.spawn(function()
 	while task.wait(0.5) do updateMPXP() end
 end)
 
+-- 4. Hotbar UI és Gombok
 local hotbarContainer = Instance.new("Frame")
 hotbarContainer.Size = UDim2.new(0, 440, 0, 60)
 hotbarContainer.AnchorPoint = Vector2.new(0.5, 1) 
@@ -191,6 +198,7 @@ for i = 1, 8 do
 	itemIcon.Font = Enum.Font.GothamBold
 	itemIcon.ZIndex = 2
 
+	-- Sötétítő réteg a Cooldown animációkhoz
 	local cdOverlay = Instance.new("Frame", slotFrame)
 	cdOverlay.Name = "CDOverlay"
 	cdOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -202,6 +210,9 @@ for i = 1, 8 do
 	cdOverlay.Visible = false
 end
 
+-- ==========================================
+-- Gombok frissítése (Mennyiség, Színek, Ikonok)
+-- ==========================================
 local function renderHotbar()
 	local hbFolder = player:FindFirstChild("Hotbar")
 	local invFolder = player:FindFirstChild("Inventory")
@@ -220,7 +231,9 @@ local function renderHotbar()
 					icon.Text = slotVal.Value
 					local sVal = slotVal.Value
 
+					-- ELLENŐRZÉS: Benne van-e a Képesség Adatbázisban?
 					if SkillDatabase.Ranges[sVal] then
+						-- KÉPESSÉG (Nincs darabszám)
 						icon.BackgroundTransparency = 0
 						local isActive = false
 						if sVal == "Blade Spirit" and player:GetAttribute("BladeSpirit_Active") then isActive = true end
@@ -231,12 +244,13 @@ local function renderHotbar()
 						if sVal == "Seal of Protection" and player:GetAttribute("SealOfProtection_Active") then isActive = true end
 
 						if isActive then
-							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) 
+							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) -- ARANY szín, ha aktív a Buff!
 						else
-							icon.BackgroundColor3 = Color3.fromRGB(80, 40, 120) 
+							icon.BackgroundColor3 = Color3.fromRGB(80, 40, 120) -- Alapértelmezett LILA szín
 						end
 						icon.TextTransparency = 0
 					else
+						-- TÁRGY (Poti, darabszámot számolunk)
 						local totalAmount = 0
 						for _, invSlot in pairs(invFolder:GetChildren()) do
 							if invSlot:IsA("StringValue") and invSlot.Value == sVal then
@@ -292,6 +306,9 @@ local function renderHotbar()
 	end
 end
 
+-- ==========================================
+-- Eseményfigyelők és Várakozás-mentesítés
+-- ==========================================
 local function setupHotbarConnections()
 	local invFolder = player:WaitForChild("Inventory")
 
@@ -310,6 +327,7 @@ local function setupHotbarConnections()
 		if child:IsA("ValueBase") then child.Changed:Connect(triggerUpdate) end
 	end
 
+	-- Figyeli, ha ránk kerül egy Buff (hogy arany színűre fesse az ikont)
 	player.AttributeChanged:Connect(function(attr)
 		if attr:match("_Active") then renderHotbar() end
 	end)
@@ -318,7 +336,7 @@ end
 task.spawn(setupHotbarConnections)
 task.spawn(renderHotbar)
 
--- JAVÍTÁS: A Cooldown csatlakozás NEM BLOKKOLJA a scriptet, csak ha az event létezik, akkor rácsatlakozik!
+-- JAVÍTÁS: A Cooldown csatlakozás KÜLÖN SZÁLON várja az eseményt! Nem tud kifagyni a GUI!
 task.spawn(function()
 	local SkillCooldown = Events:WaitForChild("SkillCooldown", 10) -- 10 mp után feladja a várakozást, de nem fagy ki a script
 	if SkillCooldown then

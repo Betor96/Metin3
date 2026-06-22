@@ -32,17 +32,16 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. slotNum)
 
 		if slotVal and slotVal.Value ~= "" then
-			isCooldown = true
+			isCooldown = true -- Gomb lezárása a spamelés ellen
 
 			local itemName = slotVal.Value
 			local target = mouse.Target
 
-			-- BIZTONSÁGI JAVÍTÁS: Ha az égre mutat az egér, ne fagyjon ki a script!
+			-- Pozíció biztosítása, ha az égre mutatna az egér (ne fagyjon ki!)
 			local mousePos = Vector3.zero
 			if mouse.Hit then
 				mousePos = mouse.Hit.Position
 			elseif player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-				-- Ha az égbe mutat, maga elé céloz
 				mousePos = player.Character.HumanoidRootPart.Position + (player.Character.HumanoidRootPart.CFrame.LookVector * 10)
 			end
 
@@ -50,61 +49,66 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 			local hum = char and char:FindFirstChild("Humanoid")
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 
-			-- Ha már automatikusan sétáltunk valahova egy előző skill miatt, azt most megszakítjuk
+			-- Ha már sétáltunk egy előző parancs miatt, azt megszakítjuk
 			if currentWalkConnection then
 				currentWalkConnection:Disconnect()
 				currentWalkConnection = nil
 			end
 
-			-- ==========================================
-			-- AUTO-APPROACH LOGIKA (Sétálás a célponthoz, ha messze van)
-			-- ==========================================
 			local maxRange = SkillDatabase.Ranges[itemName]
+			local isDistantTarget = false
+
+			-- ==========================================
+			-- AUTO-APPROACH (Célpont megközelítése)
+			-- ==========================================
 			if maxRange and maxRange > 0 and target and target.Parent:FindFirstChild("Humanoid") then
 				local targetRoot = target.Parent:FindFirstChild("HumanoidRootPart")
 
 				if root and targetRoot and hum then
 					local dist = (root.Position - targetRoot.Position).Magnitude
 
-					-- Ha az ellenfél messzebb van, mint a skill hatótávja, elindulunk felé!
+					-- Ha az ellenfél messzebb van, mint a hatótáv, elindulunk felé!
 					if dist > maxRange then
+						isDistantTarget = true
 						hum:MoveTo(targetRoot.Position)
 
-						currentWalkConnection = RunService.Heartbeat:Connect(function()
-							-- Biztonsági ellenőrzések (ha meghalunk vagy a célpont eltűnik)
-							if not root or not targetRoot or not hum or hum.Health <= 0 then 
-								if currentWalkConnection then currentWalkConnection:Disconnect() end
-								return 
-							end
+						-- Külön szálon (task.spawn) futtatjuk, hogy a gombok NE ragadjanak be!
+						task.spawn(function()
+							local connection
+							connection = RunService.Heartbeat:Connect(function()
+								if not root or not targetRoot or not hum or hum.Health <= 0 then 
+									connection:Disconnect()
+									return 
+								end
 
-							local currentDist = (root.Position - targetRoot.Position).Magnitude
+								local currentDist = (root.Position - targetRoot.Position).Magnitude
 
-							-- Beértünk a hatótávba! Megállunk és elsütjük a varázslatot.
-							if currentDist <= maxRange then
-								hum:MoveTo(root.Position) -- Megállítás
-								UseItem:FireServer(itemName, targetRoot.Position, target)
-								if currentWalkConnection then currentWalkConnection:Disconnect() end
-							end
+								-- Beértünk a hatótávba! Megállítjuk a karaktert és elsütjük.
+								if currentDist <= maxRange then
+									hum:MoveTo(root.Position) 
+									UseItem:FireServer(itemName, targetRoot.Position, target)
+									connection:Disconnect()
+								end
 
-							-- Ha a játékos maga elkezd mozogni (megnyomja a WASD-t), megszakítjuk az auto-sétálást
-							if hum.MoveDirection.Magnitude > 0 and (hum.WalkToPoint - targetRoot.Position).Magnitude > 2 then
-								if currentWalkConnection then currentWalkConnection:Disconnect() end
-							end
+								-- Ha a játékos közben megnyom egy WASD gombot, megszakítjuk az automata menést
+								if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.D) then
+									connection:Disconnect()
+								end
+							end)
+							currentWalkConnection = connection
 						end)
-
-						task.wait(0.2)
-						isCooldown = false
-						return
 					end
 				end
 			end
 
 			-- ==========================================
-			-- AZONNALI ELSÜTÉS (Ha közel vagyunk, vagy buffot / potit nyomtunk)
+			-- AZONNALI ELSÜTÉS (Ha közel vagyunk, vagy poti/buff)
 			-- ==========================================
-			UseItem:FireServer(itemName, mousePos, target) 
+			if not isDistantTarget then
+				UseItem:FireServer(itemName, mousePos, target) 
+			end
 
-			-- Kis várakozás, ne lehessen 1 másodperc alatt százszor elküldeni
+			-- Várakozás, majd gomb feloldása minden körülmények között!
 			task.wait(0.2)
 			isCooldown = false
 		end

@@ -8,31 +8,39 @@ local ApplyEffect = Events:WaitForChild("ApplyEffect")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local effectGui = Instance.new("ScreenGui")
-effectGui.Name = "EffectHUD"
-effectGui.ResetOnSpawn = false
-effectGui.DisplayOrder = 0
-effectGui.Parent = playerGui
+-- Megkeressük, vagy létrehozzuk a Buff tároló HUD-ot
+local effectGui = playerGui:FindFirstChild("EffectHUD")
+if not effectGui then
+	effectGui = Instance.new("ScreenGui")
+	effectGui.Name = "EffectHUD"
+	effectGui.ResetOnSpawn = false
+	effectGui.DisplayOrder = 0
+	effectGui.Parent = playerGui
+end
 
-local container = Instance.new("Frame")
-container.Size = UDim2.new(0, 300, 0, 35)
-container.AnchorPoint = Vector2.new(0.5, 1)
-container.Position = UDim2.new(0.5, 0, 1, -120) 
-container.BackgroundTransparency = 1
-container.Parent = effectGui
+local container = effectGui:FindFirstChild("Container")
+if not container then
+	container = Instance.new("Frame")
+	container.Name = "Container"
+	container.Size = UDim2.new(0, 300, 0, 35)
+	container.AnchorPoint = Vector2.new(0.5, 1)
+	container.Position = UDim2.new(0.5, 0, 1, -120) 
+	container.BackgroundTransparency = 1
+	container.Parent = effectGui
 
-local layout = Instance.new("UIListLayout")
-layout.FillDirection = Enum.FillDirection.Horizontal
-layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-layout.Padding = UDim.new(0, 5)
-layout.Parent = container
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	layout.Padding = UDim.new(0, 5)
+	layout.Parent = container
+end
 
 local activeEffects = {}
 
 -- Segédfüggvény: Idő átalakítása szebb formátumba (pl. 2:00:00 vagy 1m 30s)
 local function formatTime(seconds)
-	if seconds >= 90000 then return "∞" end -- Végtelen (Toggle) skillek jelzése (pl. Blade Spirit)
+	if seconds >= 90000 then return "∞" end -- Végtelen (Toggle) skillek jelzése
 	if seconds >= 3600 then
 		local h = math.floor(seconds / 3600)
 		local m = math.floor((seconds % 3600) / 60)
@@ -49,7 +57,7 @@ end
 
 ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration)
 
-	-- Ha az idő 0 vagy kevesebb (pl. Kikapcsolás), azonnal töröljük az ikont!
+	-- JAVÍTÁS: Ha az idő 0 vagy kevesebb (Kikapcsolás), azonnal töröljük az ikont!
 	if duration <= 0 then
 		if activeEffects[effectType] then
 			activeEffects[effectType].TimeLeft = 0
@@ -57,16 +65,25 @@ ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration
 		return
 	end
 
-	-- Ha már van ilyen buff, csak frissítjük az idejét
+	-- Ha már van ilyen buff a képernyőn, csak frissítjük az idejét
 	if activeEffects[effectType] then
 		activeEffects[effectType].TimeLeft = duration
 		return
 	end
 
+	-- Új UI Ikon létrehozása
 	local box = Instance.new("Frame")
 	box.Size = UDim2.new(0, 30, 0, 30)
-	box.BackgroundColor3 = Color3.fromRGB(20, 50, 100)
-	box.BorderColor3 = Color3.fromRGB(100, 200, 255)
+
+	-- Debuff vs Buff vizuális megkülönböztetés
+	if effectType == "Lassítás" or effectType == "Debuff" or effectType == "Időzített Bomba" or effectType == "Lefogva" then
+		box.BackgroundColor3 = Color3.fromRGB(150, 20, 20) -- Piros hátterű debuff
+		box.BorderColor3 = Color3.fromRGB(255, 100, 100)
+	else
+		box.BackgroundColor3 = Color3.fromRGB(20, 50, 100) -- Kék hátterű buff
+		box.BorderColor3 = Color3.fromRGB(100, 200, 255)
+	end
+
 	box.BorderSizePixel = 1
 	box.Parent = container
 
@@ -91,7 +108,7 @@ ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration
 	timeLabel.TextStrokeTransparency = 0
 	timeLabel.Parent = box
 
-	-- Dinamikus Tooltip (Ha a value 0, ne írja ki a "+0"-t, mert hülyén néz ki a debuffoknál/képességeknél)
+	-- Dinamikus Tooltip (Ha a value 0, ne írja ki a "+0"-t)
 	local tooltipText = itemName
 	if value and value ~= 0 then
 		tooltipText = tooltipText .. "\n+" .. tostring(value) .. " " .. effectType
@@ -118,10 +135,13 @@ ApplyEffect.OnClientEvent:Connect(function(itemName, effectType, value, duration
 
 	activeEffects[effectType] = {TimeLeft = duration, UI = box}
 
+	-- Időzítő szál indítása
 	task.spawn(function()
 		while activeEffects[effectType] and activeEffects[effectType].TimeLeft > 0 do
 			timeLabel.Text = formatTime(activeEffects[effectType].TimeLeft)
 			task.wait(1)
+
+			-- Biztosíték: hátha közben felülírták
 			if activeEffects[effectType] then
 				activeEffects[effectType].TimeLeft -= 1
 			end
