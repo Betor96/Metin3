@@ -895,10 +895,10 @@ SkillDatabase.Skills = {
 	},
 
 	-- ⛓️ SEALER
+	-- ⛓️ SEALER
 	["Seal of Power"] = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
 		Execute = function(player, char, root, mousePos, target)
-			-- Seal Mastery Töltet generálása (1 töltet)
 			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
 			player:SetAttribute("SealCharges", charges)
 			SkillDatabase.resetChargeTimer(player)
@@ -909,21 +909,25 @@ SkillDatabase.Skills = {
 			local bChar = buffTarget.Character
 			if not bChar then return false end
 
-			-- VARÁZSLÓ (Caster) INT STATJÁNAK LEKÉRÉSE
+			-- VARÁZSLÓ (Caster) STATJAINAK LEKÉRÉSE
 			local stats = player:FindFirstChild("PlayerStats")
 			local intStat = stats and stats:FindFirstChild("INT")
+			local dexStat = stats and stats:FindFirstChild("DEX")
 			local intVal = intStat and intStat.Value or 1
+			local dexVal = dexStat and dexStat.Value or 1
 
-			-- Bónusz matek: Alap 5% sebzés + INT skálázódás + Seal Mastery töltetek
+			-- BÜNTETÉS: Magas DEX rontja a buffot (Minden DEX 15 felett -1% buff erő!)
+			local dexPenalty = 0
+			if dexVal > 15 then dexPenalty = (dexVal - 15) * 1 end
+
+			-- Bónusz matek: Alap 5% + INT skálázódás + Seal Mastery töltetek - DEX büntetés
 			local masteryBonus = charges * 2
-			local bonusPercent = 5 + math.floor(intVal / 10) + masteryBonus
+			local bonusPercent = math.max(1, 5 + math.floor(intVal / 10) + masteryBonus - dexPenalty)
 			local multi = 1 + (bonusPercent / 100)
 
-			-- Pirosas Erő Aura
 			SkillDatabase.applyBuffVFX(bChar, "SealOfPower", Color3.fromRGB(255, 50, 50), 7200)
-
 			buffTarget:SetAttribute("SealOfPower_Active", true)
-			buffTarget:SetAttribute("SealOfPower_Multi", multi) -- Ezt a szorzót nézi az applyDamage!
+			buffTarget:SetAttribute("SealOfPower_Multi", multi) 
 
 			task.delay(7200, function() 
 				if buffTarget then 
@@ -937,7 +941,6 @@ SkillDatabase.Skills = {
 	["Seal of Protection"] = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
 		Execute = function(player, char, root, mousePos, target)
-			-- Seal Mastery Töltet generálása
 			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
 			player:SetAttribute("SealCharges", charges)
 			SkillDatabase.resetChargeTimer(player)
@@ -951,7 +954,13 @@ SkillDatabase.Skills = {
 
 			local stats = player:FindFirstChild("PlayerStats")
 			local intStat = stats and stats:FindFirstChild("INT")
+			local dexStat = stats and stats:FindFirstChild("DEX")
 			local intVal = intStat and intStat.Value or 1
+			local dexVal = dexStat and dexStat.Value or 1
+
+			-- BÜNTETÉS: Magas DEX rontja a védelmi buffot (Minden DEX 15 felett -1% végső szorzó)
+			local dexPenalty = 0
+			if dexVal > 15 then dexPenalty = (dexVal - 15) * 0.01 end 
 
 			SkillDatabase.applyBuffVFX(bChar, "SealOfProtection", Color3.fromRGB(255, 215, 0), 7200)
 			buffTarget:SetAttribute("SealOfProtection_Active", true)
@@ -959,12 +968,12 @@ SkillDatabase.Skills = {
 			local targetStats = buffTarget:FindFirstChild("PlayerStats")
 			local defStat = targetStats and targetStats:FindFirstChild("Defense")
 
-			-- Seal Mastery bónusz (+2% buff erősség per töltet)
 			local masteryBonus = charges * 0.02
+			local finalMultiplier = math.max(0.1, 1 + masteryBonus - dexPenalty) -- Büntetéssel módosított szorzó
 
-			-- INT x 0.15 skálázódás (10 + 0.15 INT) szorozva a mastery bónusszal
-			local addedDef = math.floor((10 + (intVal * 0.15)) * (1 + masteryBonus))
-			local hpPercent = (0.05 + (intVal * 0.001)) * (1 + masteryBonus) 
+			-- INT x 0.15 skálázódás (10 + 0.15 INT) szorozva a (mastery bónusz - dex büntetés)
+			local addedDef = math.floor((10 + (intVal * 0.15)) * finalMultiplier)
+			local hpPercent = (0.05 + (intVal * 0.001)) * finalMultiplier 
 			local addedHP = math.floor(hum.MaxHealth * hpPercent)
 
 			if defStat then defStat.Value += addedDef end

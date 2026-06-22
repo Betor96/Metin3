@@ -17,8 +17,12 @@ local function recalculateStats(player)
 	local int = stats.INT.Value
 	local dex = stats.DEX.Value
 
-	-- Kiolvassuk a játékos kasztját a menüből (Ha nincs, alapértelmezett a GUARDIAN)
-	local pClass = player:GetAttribute("Class") or "GUARDIAN"
+	-- ==========================================
+	-- JAVÍTÁS: Bolondbiztos Kaszt Lekérés!
+	-- Mindent NAGYBETŰSRE alakít, hogy a büntetések garantáltan leforgassanak.
+	-- ==========================================
+	local rawClass = player:GetAttribute("Class") or "GUARDIAN"
+	local pClass = string.upper(rawClass)
 
 	-- Alap bónuszok nullázása
 	local bDef, bMetin, bMonst, bHum, bLs, bCrit, bDD, bDG, bAs, bMs, bDodge, eqHp, eqMp = 0,0,0,0,0,0,0,0,0,0,0,0,0
@@ -46,7 +50,7 @@ local function recalculateStats(player)
 	end
 
 	-- ==========================================
-	-- ÚJ: KASZTSPECIFIKUS SZÁMOLÁSOK ÉS BÜNTETÉSEK
+	-- KASZTSPECIFIKUS SZÁMOLÁSOK ÉS BÜNTETÉSEK
 	-- ==========================================
 	local finalMaxHP = 100
 	local finalDamage = 5
@@ -56,9 +60,9 @@ local function recalculateStats(player)
 	if pClass == "GUARDIAN" then
 		finalMaxHP = 100 + (vit * 25)
 		finalDamage = 5 + (str * 2.5)
-		-- BÜNTETÉS: Magas INT csökkenti a páncélt
+		-- BÜNTETÉS: Magas INT csökkenti a páncélt (Minden 1 INT 10 felett = -2 Páncél)
 		if int > 10 then
-			local penalty = math.floor((int - 10) * 1.5)
+			local penalty = (int - 10) * 2
 			finalDefense = math.max(0, finalDefense - penalty)
 		end
 
@@ -66,36 +70,50 @@ local function recalculateStats(player)
 		finalMaxHP = 100 + (vit * 12)
 		finalDamage = 5 + (str * 1.5) + (dex * 2.5)
 		finalSpeed = finalSpeed + (dex * 0.1)
-		-- BÜNTETÉS: Túl sok páncél lassít és gyengít
+
+		-- BÜNTETÉS: Túl sok páncél (30 felett) drasztikusan lassít és gyengít!
 		if finalDefense > 30 then
-			local slowPenalty = (finalDefense - 30) * 0.2
-			finalSpeed = math.max(10, finalSpeed - slowPenalty)
-			finalDamage = finalDamage * 0.80
+			local overArmor = finalDefense - 30
+			local slowPenalty = overArmor * 0.3 -- Minden +1 extra Páncél = -0.3 Sebesség
+			local dmgPenalty = overArmor * 0.03 -- Minden +1 extra Páncél = -3% Sebzés
+
+			finalSpeed = math.max(5, finalSpeed - slowPenalty) -- Max 5-ig lassulhat (ne álljon meg teljesen)
+			finalDamage = finalDamage * math.max(0.1, (1 - dmgPenalty))
 		end
 
 	elseif pClass == "SOULWEAVER" then
 		finalMaxHP = 100 + (vit * 10) 
 		finalDamage = 5 + (int * 3.5) + (dex * 0.5)
-		-- BÜNTETÉS: Túl sok HP gyengíti a varázslatot és sebezhetőbbé tesz
+
+		-- BÜNTETÉS: Túl sok HP/VIT (20 felett) durván gyengíti a varázslatot
 		if vit > 20 then
-			finalDamage = finalDamage * 0.70
-			finalDefense = finalDefense - 15
+			local dmgPenalty = (vit - 20) * 0.05 -- Minden +1 VIT = -5% Sebzés
+			finalDamage = finalDamage * math.max(0.1, (1 - dmgPenalty))
+			finalDefense = math.max(0, finalDefense - (vit - 20)) -- Bónusz büntetés a páncélra
 		end
 
 	elseif pClass == "SEALER" then
 		finalMaxHP = 100 + (vit * 15)
 		finalDamage = 5 + (int * 2.5) + (str * 1)
-		-- BÜNTETÉS: Magas DEX rontja a képességeket
+
+		-- BÜNTETÉS: Magas DEX (15 felett) rontja az alap sebzést
 		if dex > 15 then
-			finalDamage = finalDamage * 0.75
+			local dmgPenalty = (dex - 15) * 0.05 -- Minden +1 DEX = -5% Sebzés
+			finalDamage = finalDamage * math.max(0.1, (1 - dmgPenalty))
 		end
+	end
+
+	-- GUARDIAN JAVÍTÁS: Ha az Iron Will (HP) bónuszod aktív, hozzáadjuk, hogy ruhacserekor is megmaradjon!
+	if pClass == "GUARDIAN" then
+		local currentIronWillBonus = player:GetAttribute("IronWill_DefBonus") or 0
+		finalDefense = finalDefense + currentIronWillBonus
 	end
 
 	-- Hozzáadjuk a kaszt által kapott HP-hoz a Felszerelés által adott bónuszt
 	finalMaxHP = finalMaxHP + eqHp
 	local finalMaxMana = 100 + (int * 10) + eqMp
 
-	-- Értékek beállítása (A régi rendszered alapján)
+	-- Értékek beállítása
 	stats.Defense.Value = finalDefense
 	stats.StrongVsMetin.Value = bMetin
 	stats.StrongVsMonster.Value = bMonst
