@@ -9,21 +9,15 @@ local playerGui = player:WaitForChild("PlayerGui")
 local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
 local Events = ReplicatedStorage:WaitForChild("Events")
 
--- JAVÍTÁS: A Szinkronizáló csatorna behívása
 local SyncHotbarSlot = Events:WaitForChild("SyncHotbarSlot", 5)
 
--- 1. Hotbar mappa biztosítása
-local hotbarFolder = player:FindFirstChild("Hotbar")
-if not hotbarFolder then
-	hotbarFolder = Instance.new("Folder")
-	hotbarFolder.Name = "Hotbar"
-	for i = 1, 8 do
-		local slotVal = Instance.new("StringValue")
-		slotVal.Name = "Hotbar_" .. i
-		slotVal.Value = ""
-		slotVal.Parent = hotbarFolder
-	end
-	hotbarFolder.Parent = player
+-- ==========================================
+-- JAVÍTÁS: NINCS TÖBB KAMU LOKÁLIS MAPPA!
+-- Megvárjuk, amíg a Szerver letölti az igazi adatbázist.
+-- ==========================================
+local hotbarFolder = player:WaitForChild("Hotbar", 99999)
+for i = 1, 8 do
+	hotbarFolder:WaitForChild("Hotbar_" .. i, 99999)
 end
 
 -- 2. GUI Létrehozása
@@ -310,7 +304,7 @@ local function setupHotbarConnections()
 		if descendant:IsA("ValueBase") then descendant.Changed:Connect(triggerUpdate) end
 	end
 
-	-- JAVÍTÁS: SZINKRONIZÁLÁS A SZERVERREL (Azonnal elküldi az új hotbar adatokat)
+	-- SZINKRONIZÁLÁS A SZERVERREL
 	for i = 1, 8 do
 		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
 		if slotVal then

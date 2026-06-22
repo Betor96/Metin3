@@ -74,8 +74,8 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 	if markApplier and markApplier == attacker.UserId then
 		targetModel:SetAttribute("DeathMark_Applier", nil) 
 
-		local head = targetModel:FindFirstChild("Head")
-		if head and head:FindFirstChild("DeathMarkVisual") then head.DeathMarkVisual:Destroy() end
+		local attachPart = targetModel:FindFirstChild("Head") or targetModel:FindFirstChild("HumanoidRootPart") or targetModel.PrimaryPart
+		if attachPart and attachPart:FindFirstChild("DeathMarkVisual") then attachPart.DeathMarkVisual:Destroy() end
 
 		local bonusDmg = math.floor(finalDmg * (targetModel:FindFirstChild("IsPlayer") and 0.5 or 0.8)) 
 
@@ -239,14 +239,34 @@ SkillDatabase.Skills = {
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
 			enemyModel:SetAttribute("DeathMark_Applier", player.UserId)
 
-			local head = enemyModel:FindFirstChild("Head")
-			if head then
-				local existing = head:FindFirstChild("DeathMarkVisual")
+			local attachPart = enemyModel:FindFirstChild("Head") or enemyModel:FindFirstChild("HumanoidRootPart") or enemyModel.PrimaryPart
+			if attachPart then
+				local existing = attachPart:FindFirstChild("DeathMarkVisual")
 				if existing then existing:Destroy() end
+
 				local bb = Instance.new("BillboardGui")
-				bb.Name = "DeathMarkVisual"; bb.Size = UDim2.new(0, 60, 0, 60); bb.StudsOffset = Vector3.new(0, 3.5, 0); bb.AlwaysOnTop = true; bb.Parent = head
+				bb.Name = "DeathMarkVisual"
+				bb.Size = UDim2.new(0, 60, 0, 60)
+				bb.AlwaysOnTop = true
+
+				local isMetinStone = (enemyModel.Parent and enemyModel.Parent.Name == "MetinStones") or string.match(string.lower(enemyModel.Name), "metin")
+				if isMetinStone then
+					local height = enemyModel:GetExtentsSize().Y
+					bb.StudsOffset = Vector3.new(0, (height / 2) + 2, 0)
+				else
+					bb.StudsOffset = Vector3.new(0, 3.5, 0)
+				end
+
+				bb.Parent = attachPart
+
 				local txt = Instance.new("TextLabel")
-				txt.Size = UDim2.new(1, 0, 1, 0); txt.BackgroundTransparency = 1; txt.Text = "☠️"; txt.TextColor3 = Color3.fromRGB(255, 50, 50); txt.TextScaled = true; txt.Parent = bb
+				txt.Size = UDim2.new(1, 0, 1, 0)
+				txt.BackgroundTransparency = 1
+				txt.Text = "☠️"
+				txt.TextColor3 = Color3.fromRGB(255, 50, 50)
+				txt.TextScaled = true
+				txt.Parent = bb
+
 				Debris:AddItem(bb, 5) 
 			end
 
