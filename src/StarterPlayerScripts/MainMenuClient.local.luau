@@ -13,6 +13,14 @@ local GetCharacterList = Events:WaitForChild("GetCharacterList")
 local CreateCharacter = Events:WaitForChild("CreateCharacter")
 local SelectCharacter = Events:WaitForChild("SelectCharacter")
 
+-- Törlés event (Ha még nem létezik a szerveren, létrehozzuk, hogy ne fagyjon ki)
+local DeleteCharacter = Events:FindFirstChild("DeleteCharacter")
+if not DeleteCharacter then
+	DeleteCharacter = Instance.new("RemoteEvent")
+	DeleteCharacter.Name = "DeleteCharacter"
+	DeleteCharacter.Parent = Events
+end
+
 local camera = workspace.CurrentCamera
 
 local inMenu = true 
@@ -190,8 +198,95 @@ btnRight.TextSize = 30
 btnRight.Text = ">"
 
 -- ==========================================
--- JAVÍTOTT KAMERA: Bárhol megtalálja a bábut!
+-- KARAKTER TÖRLÉSE UI ELEMEK
 -- ==========================================
+local deleteMode = false
+local deleteButtons = {}
+local targetDeleteSlot = nil
+
+local btnToggleDelete = Instance.new("TextButton", background)
+btnToggleDelete.Size = UDim2.new(0, 200, 0, 40)
+btnToggleDelete.Position = UDim2.new(1, -220, 1, -60)
+btnToggleDelete.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+btnToggleDelete.TextColor3 = Color3.new(1, 1, 1)
+btnToggleDelete.Font = Enum.Font.GothamBold
+btnToggleDelete.Text = "Karakterek Törlése"
+
+local confirmPopup = Instance.new("Frame", sg)
+confirmPopup.Size = UDim2.new(1, 0, 1, 0)
+confirmPopup.BackgroundTransparency = 1 -- JAVÍTVA: Nincs sötétítés, teljesen átlátszó a háttér
+confirmPopup.Visible = false
+confirmPopup.ZIndex = 10
+
+local popupBox = Instance.new("Frame", confirmPopup)
+popupBox.Size = UDim2.new(0, 400, 0, 200)
+popupBox.Position = UDim2.new(0.5, -200, 0.5, -100)
+popupBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+popupBox.BorderColor3 = Color3.fromRGB(200, 50, 50)
+popupBox.BorderSizePixel = 2
+
+local popupTitle = Instance.new("TextLabel", popupBox)
+popupTitle.Size = UDim2.new(1, 0, 0, 40)
+popupTitle.Text = "BIZTOSAN TÖRÖLNI AKAROD?"
+popupTitle.TextColor3 = Color3.fromRGB(255, 100, 100)
+popupTitle.BackgroundTransparency = 1
+popupTitle.Font = Enum.Font.GothamBold
+popupTitle.TextSize = 18
+
+local popupDesc = Instance.new("TextLabel", popupBox)
+popupDesc.Size = UDim2.new(1, -20, 0, 40)
+popupDesc.Position = UDim2.new(0, 10, 0, 40)
+popupDesc.Text = "Írd be a pontos neved a megerősítéshez:\n" .. player.Name
+popupDesc.TextColor3 = Color3.new(1, 1, 1)
+popupDesc.BackgroundTransparency = 1
+popupDesc.Font = Enum.Font.Gotham
+
+local inputName = Instance.new("TextBox", popupBox)
+inputName.Size = UDim2.new(0.8, 0, 0, 40)
+inputName.Position = UDim2.new(0.1, 0, 0, 90)
+inputName.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+inputName.TextColor3 = Color3.new(1, 1, 1)
+inputName.Font = Enum.Font.Gotham
+inputName.Text = ""
+inputName.PlaceholderText = player.Name
+
+local btnConfirmDelete = Instance.new("TextButton", popupBox)
+btnConfirmDelete.Size = UDim2.new(0, 120, 0, 40)
+btnConfirmDelete.Position = UDim2.new(0.5, 20, 0, 140)
+btnConfirmDelete.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+btnConfirmDelete.TextColor3 = Color3.new(1, 1, 1)
+btnConfirmDelete.Font = Enum.Font.GothamBold
+btnConfirmDelete.Text = "TÖRLÉS"
+
+local btnCancelDelete = Instance.new("TextButton", popupBox)
+btnCancelDelete.Size = UDim2.new(0, 120, 0, 40)
+btnCancelDelete.Position = UDim2.new(0.5, -140, 0, 140)
+btnCancelDelete.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+btnCancelDelete.TextColor3 = Color3.new(1, 1, 1)
+btnCancelDelete.Font = Enum.Font.GothamBold
+btnCancelDelete.Text = "MÉGSE"
+
+btnToggleDelete.MouseButton1Click:Connect(function()
+	deleteMode = not deleteMode
+	if deleteMode then
+		btnToggleDelete.BackgroundColor3 = Color3.fromRGB(200, 100, 40)
+		btnToggleDelete.Text = "Törlés Kikapcsolása"
+	else
+		btnToggleDelete.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+		btnToggleDelete.Text = "Karakterek Törlése"
+	end
+
+	for _, btn in pairs(deleteButtons) do
+		btn.Visible = deleteMode
+	end
+end)
+
+btnCancelDelete.MouseButton1Click:Connect(function()
+	confirmPopup.Visible = false
+	targetDeleteSlot = nil
+end)
+
+
 local function focusCameraOnClass(index, instant)
 	local className = classes[index].Name
 	lblName.Text = classes[index].Name
@@ -199,7 +294,6 @@ local function focusCameraOnClass(index, instant)
 	lblDesc.Text = classes[index].Desc
 	lblStats.Text = classes[index].Stats
 
-	-- Megkeressük a bábut bárhol a Workspace-ben
 	local targetDummy = nil
 	for _, obj in pairs(workspace:GetDescendants()) do
 		if obj:IsA("Model") and string.upper(obj.Name) == className then
@@ -208,21 +302,13 @@ local function focusCameraOnClass(index, instant)
 		end
 	end
 
-	if not targetDummy then
-		warn("HIBA: Nem találom a pályán ezt a bábut: " .. className)
-		return
-	end
+	if not targetDummy then return end
 
-	-- Pontosan a bábu testéhez viszonyítjuk a kamerát
 	local root = targetDummy:FindFirstChild("HumanoidRootPart") or targetDummy:FindFirstChild("Torso") or targetDummy.PrimaryPart
-	if not root then
-		warn("HIBA: A(z) " .. className .. " bábunak nincs HumanoidRootPart-ja vagy Torso-ja!")
-		return
-	end
+	if not root then return end
 
 	camera.CameraType = Enum.CameraType.Scriptable
 
-	-- Kiszámoljuk a pozíciót: 10 studdal a bábu előtt, 2 studdal feljebb
 	local camPos = root.Position + (root.CFrame.LookVector * 10) + Vector3.new(0, 2, 0)
 	local targetCamCFrame = CFrame.lookAt(camPos, root.Position + Vector3.new(0, 1, 0))
 
@@ -233,13 +319,14 @@ local function focusCameraOnClass(index, instant)
 	end
 end
 
+
 local function loadMenu()
 	inMenu = true
-
 	camera.CameraType = Enum.CameraType.Scriptable
 
 	local charList = GetCharacterList:InvokeServer()
 	slotContainer:ClearAllChildren()
+	deleteButtons = {} 
 
 	for i = 1, 3 do
 		local data = charList[i]
@@ -264,10 +351,27 @@ local function loadMenu()
 			playBtn.Text = "FOLYTATÁS"
 
 			playBtn.MouseButton1Click:Connect(function()
+				if deleteMode then return end 
 				inMenu = false 
 				sg:Destroy() 
 				camera.CameraType = Enum.CameraType.Custom 
 				SelectCharacter:FireServer(i) 
+			end)
+
+			local delBtn = Instance.new("TextButton", slotBtn)
+			delBtn.Size = UDim2.new(0, 40, 0, 40)
+			delBtn.Position = UDim2.new(1, -180, 0.5, -20)
+			delBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+			delBtn.TextColor3 = Color3.new(1, 1, 1)
+			delBtn.Font = Enum.Font.GothamBlack
+			delBtn.Text = "X"
+			delBtn.Visible = deleteMode
+			table.insert(deleteButtons, delBtn)
+
+			delBtn.MouseButton1Click:Connect(function()
+				targetDeleteSlot = i
+				inputName.Text = ""
+				confirmPopup.Visible = true
 			end)
 		else
 			slotBtn.Text = "SLOT " .. i .. "\n[ ÜRES ]"
@@ -280,18 +384,37 @@ local function loadMenu()
 			createBtn.Text = "+ ÚJ KARAKTER"
 
 			createBtn.MouseButton1Click:Connect(function()
+				if deleteMode then return end 
 				activeSlot = i
 				slotContainer.Visible = false
 				title.Visible = false
+				btnToggleDelete.Visible = false 
 				background.BackgroundTransparency = 1 
 				creatorContainer.Visible = true
 
-				-- Azonnal rápillant az első kasztra
 				focusCameraOnClass(currentClassIndex, true)
 			end)
 		end
 	end
 end
+
+-- Tényleges Törlés Elküldése a Szervernek
+btnConfirmDelete.MouseButton1Click:Connect(function()
+	if inputName.Text == player.Name and targetDeleteSlot then
+		btnConfirmDelete.Text = "TÖRLÉS..."
+		DeleteCharacter:FireServer(targetDeleteSlot)
+
+		task.wait(0.5)
+		confirmPopup.Visible = false
+		btnConfirmDelete.Text = "TÖRLÉS"
+		targetDeleteSlot = nil
+		loadMenu() -- Újratöltjük a listát, ami most már üres lesz
+	else
+		inputName.Text = "HIBÁS NÉV!"
+		task.wait(1)
+		inputName.Text = ""
+	end
+end)
 
 btnRight.MouseButton1Click:Connect(function()
 	currentClassIndex = currentClassIndex + 1
@@ -309,6 +432,7 @@ btnBack.MouseButton1Click:Connect(function()
 	creatorContainer.Visible = false
 	slotContainer.Visible = true
 	title.Visible = true
+	btnToggleDelete.Visible = true
 	background.BackgroundTransparency = 0.2
 end)
 

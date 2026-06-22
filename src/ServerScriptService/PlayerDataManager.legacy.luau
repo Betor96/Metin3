@@ -11,8 +11,46 @@ local GetCharacterList = Events:WaitForChild("GetCharacterList")
 local CreateCharacter = Events:WaitForChild("CreateCharacter")
 local SelectCharacter = Events:WaitForChild("SelectCharacter")
 
+-- ==========================================
+-- TÖRLÉS EVENT LÉTREHOZÁSA ÉS BEKÖTÉSE
+-- ==========================================
+local DeleteCharacter = Events:FindFirstChild("DeleteCharacter")
+if not DeleteCharacter then
+	DeleteCharacter = Instance.new("RemoteEvent")
+	DeleteCharacter.Name = "DeleteCharacter"
+	DeleteCharacter.Parent = Events
+end
+
 local savingPlayers = {} 
 local activeSlots = {} -- NYILVÁNTARTJUK: Ki melyik sloton játszik éppen!
+
+-- JAVÍTÁS: Ebbe mentjük ideiglenesen a törölt slotokat, hogy a menü AZONNAL üresnek lássa őket (Késés ellen)
+local deletedSlotsCache = {} 
+
+-- ==========================================
+-- 0. KARAKTER TÖRLÉSE
+-- ==========================================
+DeleteCharacter.OnServerEvent:Connect(function(player, slotId)
+	if type(slotId) ~= "number" or slotId < 1 or slotId > 3 then return end
+
+	-- Azonnal bejegyezzük a memóriába, hogy törölve lett (Így a menü egyből frissül!)
+	if not deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId] = {} end
+	deletedSlotsCache[player.UserId][slotId] = true
+
+	local success, errorMessage = pcall(function()
+		playerDataStore:RemoveAsync("Player_" .. player.UserId .. "_Slot_" .. slotId)
+	end)
+
+	if success then
+		print(player.Name .. " karakterét VÉGLEGESEN TÖRÖLTÜK a(z) " .. slotId .. ". slotról.")
+		if activeSlots[player.UserId] == slotId then
+			activeSlots[player.UserId] = nil
+		end
+	else
+		warn("Hiba a karakter törlésekor: " .. tostring(errorMessage))
+		deletedSlotsCache[player.UserId][slotId] = nil -- Hiba esetén visszavonjuk a memóriából
+	end
+end)
 
 -- ==========================================
 -- 1. KARAKTER LISTA LEKÉRÉSE A MENÜHÖZ (Kliens hívja meg)
@@ -21,28 +59,31 @@ GetCharacterList.OnServerInvoke = function(player)
 	local charList = {}
 
 	for slot = 1, 3 do
-		local success, data = pcall(function() 
-			return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slot) 
-		end)
-
-		if success and data then
-			charList[slot] = {
-				Exists = true,
-				Class = data.Class or "Ismeretlen",
-				Level = (data.Stats and data.Stats.Level) or 1
-			}
-		else
+		-- JAVÍTÁS: Ha a slotot most törölték ki, azonnal üresnek mutatjuk a késés elkerülése végett!
+		if deletedSlotsCache[player.UserId] and deletedSlotsCache[player.UserId][slot] then
 			charList[slot] = { Exists = false }
+		else
+			local success, data = pcall(function() 
+				return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slot) 
+			end)
+
+			if success and data then
+				charList[slot] = {
+					Exists = true,
+					Class = data.Class or "Ismeretlen",
+					Level = (data.Stats and data.Stats.Level) or 1
+				}
+			else
+				charList[slot] = { Exists = false }
+			end
 		end
 	end
 
 	return charList
 end
 
-
 -- ==========================================
 -- 2. KARAKTER BETÖLTÉSE ÉS JÁTÉK INDÍTÁSA
--- (Ezt feljebb hoztuk, hogy a létrehozás is meg tudja hívni!)
 -- ==========================================
 local function setupPlayer(player, slotId)
 	local success, data = pcall(function() 
@@ -54,13 +95,12 @@ local function setupPlayer(player, slotId)
 		return
 	end
 
-	activeSlots[player.UserId] = slotId -- Rögzítjük, hogy ezen a sloton játszik!
+	activeSlots[player.UserId] = slotId 
 
-	-- Ide mentjük el a játékos kasztját, hogy más scriptek (pl. StatHandler) is lássák!
 	player:SetAttribute("Class", data.Class)
 
 	-- ==========================================
-	-- STATOK LÉTREHOZÁSA (Ugyanaz mint régen)
+	-- STATOK LÉTREHOZÁSA 
 	-- ==========================================
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -91,7 +131,6 @@ local function setupPlayer(player, slotId)
 	local mana = Instance.new("IntValue", stats) mana.Name = "Mana" mana.Value = (data.Stats and data.Stats.Mana) or 100
 	local maxMana = Instance.new("IntValue", stats) maxMana.Name = "MaxMana" maxMana.Value = (data.Stats and data.Stats.MaxMana) or 100
 
-	-- Bónusz statisztikák
 	local bonusStats = {"Defense", "StrongVsMetin", "StrongVsMonster", "StrongVsPlayer", "LifeSteal", "CritChance", "DoubleDrop", "DoubleGold", "AttackSpeed", "MovementSpeed", "DodgeChance"}
 	for _, bStat in pairs(bonusStats) do
 		local val = Instance.new("IntValue", stats)
@@ -167,10 +206,8 @@ local function setupPlayer(player, slotId)
 		end
 	end
 
-	-- MIUTÁN MINDEN BETÖLTÖTT, BE TUDJUK SPAWNOLNI A JÁTÉKOST (Mert a CharacterAutoLoad ki van kapcsolva!)
 	player:LoadCharacter()
 end
--- Esemény bekötése a szerver felé
 SelectCharacter.OnServerEvent:Connect(setupPlayer)
 
 
@@ -181,14 +218,12 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 	if slotId < 1 or slotId > 3 then return end
 
 	local validClasses = {["GUARDIAN"] = true, ["SHADOWBLADE"] = true, ["SOULWEAVER"] = true, ["SEALER"] = true}
-	-- JAVÍTÁS: Biztosítjuk a nagybetűs egyezést!
 	if not validClasses[string.upper(className)] then return end
 
-	-- Alapértelmezett, szűz adatok a kiválasztott kaszttal
 	local newData = {
 		Class = string.upper(className),
 		Stats = {Level = 1, Experience = 0, Gold = 0, StatPoints = 0, STR = 1, VIT = 1, INT = 1, DEX = 1, Mana = 100, MaxMana = 100, UnlockedPages = 1},
-		Inventory = {Slot_1 = "Kezdőkard", Amount_1 = 1}, -- Mindenki kap egy kardot
+		Inventory = {Slot_1 = "Kezdőkard", Amount_1 = 1}, 
 		Equipment = {},
 		CompletedQuests = {},
 		Bank = {},
@@ -203,7 +238,9 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 	if success then
 		print(player.Name .. " létrehozott egy új " .. className .. " karaktert a " .. slotId .. ". sloton!")
 
-		-- JAVÍTÁS: Miután elkészült, azonnal meg is hívjuk a fenti betöltő függvényt!
+		-- JAVÍTÁS: Levesszük a törölt listáról, hiszen most hoztunk létre egy újat a helyére!
+		if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId][slotId] = nil end
+
 		setupPlayer(player, slotId)
 	else
 		warn("Hiba a karakter készítésekor: " .. tostring(errorMessage))
@@ -218,7 +255,7 @@ local function savePlayerData(player)
 	if savingPlayers[player.UserId] then return end
 
 	local slotId = activeSlots[player.UserId]
-	if not slotId then return end -- Ha be se lépett a menüből, nincs mit menteni!
+	if not slotId then return end 
 
 	savingPlayers[player.UserId] = true
 
@@ -275,7 +312,10 @@ local function savePlayerData(player)
 	savingPlayers[player.UserId] = nil
 end
 
-game.Players.PlayerRemoving:Connect(savePlayerData)
+game.Players.PlayerRemoving:Connect(function(player)
+	deletedSlotsCache[player.UserId] = nil -- Takarítás memóriaszivárgás ellen
+	savePlayerData(player)
+end)
 
 game:BindToClose(function()
 	for _, player in pairs(game.Players:GetPlayers()) do 
