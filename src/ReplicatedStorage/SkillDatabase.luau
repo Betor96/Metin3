@@ -77,10 +77,15 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		end
 	end
 
-	-- KASZTOK BIZTONSÁGOS LEKÉRÉSE
+	-- =======================================
+	-- KASZTOK ÉS KARAKTER BIZTONSÁGOS LEKÉRÉSE
+	-- =======================================
 	local attackerPlayer = attacker:IsA("Player") and attacker or Players:GetPlayerFromCharacter(attacker)
 	local rawPlayerClass = attackerPlayer and attackerPlayer:GetAttribute("Class") or attacker:GetAttribute("Class") or ""
 	local playerClass = string.lower(rawPlayerClass)
+
+	local attackerChar = attackerPlayer and attackerPlayer.Character or attacker
+	local attackerRoot = attackerChar and attackerChar:FindFirstChild("HumanoidRootPart")
 
 	local targetPlayer = Players:GetPlayerFromCharacter(targetModel)
 	local targetRawClass = targetPlayer and targetPlayer:GetAttribute("Class") or targetModel:GetAttribute("Class") or ""
@@ -110,19 +115,23 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		end
 	end
 
-	-- ⚔️ SHADOWBLADE: Shadow Mastery (Színkódolás előkészítése)
+	-- ⚔️ SHADOWBLADE: Shadow Mastery
 	local isBackstab = false
 	local isExecute = false
 
 	if playerClass == "shadowblade" then
-		local attackerRoot = attacker:FindFirstChild("HumanoidRootPart")
 		if attackerRoot then
-			local dirToTarget = (root.Position - attackerRoot.Position).Unit
-			local targetLook = root.CFrame.LookVector
+			-- 180 fokos félkör a szörny mögött
+			local offset = Vector3.new(root.Position.X - attackerRoot.Position.X, 0, root.Position.Z - attackerRoot.Position.Z)
+			if offset.Magnitude > 0.1 then
+				local dirToTarget = offset.Unit
+				local targetLook = root.CFrame.LookVector
+				local targetDir = Vector3.new(targetLook.X, 0, targetLook.Z).Unit
 
-			if dirToTarget:Dot(targetLook) > 0.5 then 
-				finalDmg = math.floor(finalDmg * 1.10)
-				isBackstab = true
+				if dirToTarget:Dot(targetDir) > 0 then 
+					finalDmg = math.floor(finalDmg * 1.10)
+					isBackstab = true
+				end
 			end
 		end
 
@@ -133,14 +142,13 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 	end
 
 	-- =======================================
-	-- VÉDEKEZŐ BUFFOK, PÁNCÉL ÉS PASSZÍVOK
+	-- VÉDEKEZŐ BUFFOK ÉS PÁNCÉL LEVONÁS
 	-- =======================================
 	local damageReduction = 1
 	if targetModel:GetAttribute("IronSkin_Active") then
 		damageReduction = damageReduction * 0.5
 	end
 
-	-- Alap Páncélzat (Defense) bekérése a PlayerStats-ból
 	local targetStats = targetModel:FindFirstChild("PlayerStats")
 	local targetDefense = targetStats and targetStats:FindFirstChild("Defense") and targetStats.Defense.Value or 0
 
@@ -148,20 +156,19 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 	if targetClass == "guardian" then
 		local hpPercent = hum.Health / hum.MaxHealth
 		if hpPercent <= 0.15 then
-			targetDefense = math.floor(targetDefense * 1.30) -- pl. 20-ból 26
+			targetDefense = targetDefense + math.floor(targetDefense * 0.30)
 		elseif hpPercent <= 0.30 then
-			targetDefense = math.floor(targetDefense * 1.20) -- pl. 20-ból 24
+			targetDefense = targetDefense + math.floor(targetDefense * 0.20)
 		elseif hpPercent <= 0.50 then
-			targetDefense = math.floor(targetDefense * 1.10) -- pl. 20-ból 22
+			targetDefense = targetDefense + math.floor(targetDefense * 0.10)
 		end
 	end
 
-	-- Sebzés kiszámítása: Szorzó (Iron Skin), majd mínusz Páncél
 	finalDmg = math.floor(finalDmg * damageReduction)
 	finalDmg = math.max(1, finalDmg - targetDefense)
 
 	-- =======================================
-	-- DEATH MARK BÓNUSZ ÉS LIFE STEAL
+	-- DEATH MARK ÉS LIFE STEAL
 	-- =======================================
 	local totalDamageToDeal = finalDmg
 	local bonusDmg = 0
@@ -180,12 +187,12 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 	end
 
 	if attacker:GetAttribute("BladeSpirit_Active") then
-		local attackerHum = attacker:FindFirstChild("Humanoid")
-		if attackerHum and attackerHum.Health > 0 then
+		local aHum = attackerChar and attackerChar:FindFirstChild("Humanoid")
+		if aHum and aHum.Health > 0 then
 			local lsPercent = math.min(20, baseDmg * 0.05)
 			local healAmount = math.floor(totalDamageToDeal * (lsPercent / 100))
 			if healAmount > 0 then
-				attackerHum.Health = math.min(attackerHum.MaxHealth, attackerHum.Health + healAmount)
+				aHum.Health = math.min(aHum.MaxHealth, aHum.Health + healAmount)
 			end
 		end
 	end
@@ -193,32 +200,25 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 	hum:TakeDamage(totalDamageToDeal)
 
 	-- =======================================
-	-- SEBZÉS KIOSZTÁSA ÉS UI MEGJELENÍTÉS (Shadowblade színekkel)
+	-- SHADOWBLADE EGYEDI VIZUÁLIS SEBZÉS UI
 	-- =======================================
-	local function spawnCustomDamageUI(dmg, pos, color)
+	local function spawnCustomDamageUI(dmg, pos, color, suffix)
 		local part = Instance.new("Part")
-		part.Transparency = 1
-		part.Anchored = true
-		part.CanCollide = false
+		part.Transparency = 1; part.Anchored = true; part.CanCollide = false
 		part.Position = pos + Vector3.new(math.random(-10, 10)/10, 2, math.random(-10, 10)/10)
 
 		local bb = Instance.new("BillboardGui")
-		bb.Size = UDim2.new(0, 100, 0, 50)
-		bb.AlwaysOnTop = true
+		bb.Size = UDim2.new(0, 150, 0, 50); bb.AlwaysOnTop = true
 
 		local txt = Instance.new("TextLabel")
-		txt.Size = UDim2.new(1.2, 0, 1.2, 0)
-		txt.BackgroundTransparency = 1
-		txt.Text = tostring(dmg)
-		txt.TextColor3 = color
-		txt.TextScaled = true
-		txt.Font = Enum.Font.GothamBlack
+		txt.Size = UDim2.new(1, 0, 1, 0); txt.BackgroundTransparency = 1
+		txt.Text = tostring(dmg) .. (suffix or "")
+		txt.TextColor3 = color; txt.TextScaled = true; txt.Font = Enum.Font.GothamBlack
 
 		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2
-		stroke.Color = Color3.new(0, 0, 0)
-		stroke.Parent = txt
+		stroke.Thickness = 2; stroke.Color = Color3.new(0, 0, 0)
 
+		stroke.Parent = txt
 		txt.Parent = bb
 		bb.Parent = part
 		part.Parent = workspace
@@ -227,49 +227,51 @@ function SkillDatabase.applyDamage(attacker, targetModel, skillMultiplier)
 		ts:Create(part, TweenInfo.new(0.8, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {Position = part.Position + Vector3.new(0, 3, 0)}):Play()
 		ts:Create(txt, TweenInfo.new(0.8, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {TextTransparency = 1}):Play()
 		ts:Create(stroke, TweenInfo.new(0.8, Enum.EasingStyle.Cubic, Enum.EasingDirection.In), {Transparency = 1}):Play()
-
 		Debris:AddItem(part, 1)
 	end
 
 	local customColor = nil
+	local customSuffix = ""
+
 	if isBackstab and isExecute then
-		customColor = Color3.fromRGB(255, 0, 0) -- Vérvörös
+		customColor = Color3.fromRGB(200, 0, 0)
+		customSuffix = " (KIVÉGZÉS!)"
 	elseif isExecute then
-		customColor = Color3.fromRGB(255, 100, 50) -- Narancsos-piros
+		customColor = Color3.fromRGB(255, 120, 0)
+		customSuffix = " (KIVÉGZÉS!)"
 	elseif isBackstab then
-		customColor = Color3.fromRGB(180, 50, 255) -- Lila
+		customColor = Color3.fromRGB(180, 50, 255)
+		customSuffix = " (HÁTBATÁMADÁS!)"
+	end
+
+	if customColor then
+		spawnCustomDamageUI(finalDmg, root.Position, customColor, customSuffix)
+	else
+		ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
 	end
 
 	if hasDeathMark then
-		if customColor then
-			spawnCustomDamageUI(finalDmg, root.Position, customColor)
-		else
-			ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
-		end
 		task.delay(0.15, function()
-			ShowDamage:FireAllClients(bonusDmg, root.Position + Vector3.new(0, 2, 0), true, false)
+			if customColor then
+				spawnCustomDamageUI(bonusDmg, root.Position + Vector3.new(0, 2, 0), customColor, customSuffix)
+			else
+				ShowDamage:FireAllClients(bonusDmg, root.Position + Vector3.new(0, 2, 0), true, false)
+			end
 		end)
-	else
-		if customColor then
-			spawnCustomDamageUI(finalDmg, root.Position, customColor)
-		else
-			ShowDamage:FireAllClients(finalDmg, root.Position, isCrit, false)
-		end
 	end
 
+	-- =======================================
 	-- 🔮 SOULWEAVER: Soul Echo
+	-- =======================================
 	if playerClass == "soulweaver" and skillMultiplier > 1 and not targetModel:GetAttribute("IsEchoHit") then
 		if math.random(1, 100) <= 15 then
 			task.delay(0.4, function()
 				if targetModel and targetModel:FindFirstChild("Humanoid") and targetModel.Humanoid.Health > 0 then
 					targetModel:SetAttribute("IsEchoHit", true)
-
 					local echoDmg = math.max(1, math.floor(totalDamageToDeal * 0.35))
 					targetModel.Humanoid:TakeDamage(echoDmg)
-
 					SkillDatabase.playVFX(root.Position, Color3.fromRGB(150, 50, 255), 6)
 					ShowDamage:FireAllClients(echoDmg, root.Position, false, false) 
-
 					task.delay(0.2, function() targetModel:SetAttribute("IsEchoHit", nil) end)
 				end
 			end)
@@ -1175,6 +1177,69 @@ SkillDatabase.Skills = {
 }
 
 if RunService:IsServer() then
+	-- =======================================
+	-- 🛡️ GUARDIAN: IRON WILL PÁNCÉL RENDSZER
+	-- =======================================
+	local function updateGuardianArmor(player, char, hum)
+		if not player or not char or not hum then return end
+		local rawClass = player:GetAttribute("Class") or char:GetAttribute("Class") or ""
+		if string.lower(rawClass) ~= "guardian" then return end
+
+		local stats = player:FindFirstChild("PlayerStats")
+		local defStat = stats and stats:FindFirstChild("Defense")
+		if not defStat then return end
+
+		local hpPercent = hum.Health / hum.MaxHealth
+		local currentBonus = player:GetAttribute("IronWill_DefBonus") or 0
+
+		-- 1. Kiszámoljuk a tiszta (bónusz nélküli) alap páncélt
+		local baseDef = defStat.Value - currentBonus
+
+		-- 2. Kiszámoljuk az új bónuszt a HP alapján
+		local newBonus = 0
+		if hpPercent <= 0.15 then
+			newBonus = math.floor(baseDef * 0.30)
+		elseif hpPercent <= 0.30 then
+			newBonus = math.floor(baseDef * 0.20)
+		elseif hpPercent <= 0.50 then
+			newBonus = math.floor(baseDef * 0.10)
+		end
+
+		-- 3. Ha változott a bónusz (pl. lement a HP vagy visszatöltött)
+		if newBonus ~= currentBonus then
+			defStat.Value = baseDef + newBonus
+			player:SetAttribute("IronWill_DefBonus", newBonus)
+		end
+	end
+
+	local function setupPlayer(player)
+		player.CharacterAdded:Connect(function(char)
+			local hum = char:WaitForChild("Humanoid", 10)
+			if hum then
+				hum.HealthChanged:Connect(function()
+					updateGuardianArmor(player, char, hum)
+				end)
+			end
+		end)
+
+		if player.Character then
+			local hum = player.Character:FindFirstChild("Humanoid")
+			if hum then
+				hum.HealthChanged:Connect(function()
+					updateGuardianArmor(player, player.Character, hum)
+				end)
+			end
+		end
+	end
+
+	for _, p in pairs(Players:GetPlayers()) do
+		setupPlayer(p)
+	end
+	Players.PlayerAdded:Connect(setupPlayer)
+
+	-- =======================================
+	-- ALAP MANA REGEN
+	-- =======================================
 	task.spawn(function()
 		while task.wait(2) do
 			for _, player in pairs(Players:GetPlayers()) do

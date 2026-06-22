@@ -82,27 +82,31 @@ slotContainer.BackgroundTransparency = 1
 local classes = {
 	{
 		Name = "GUARDIAN",
-		Role = "Szerep: Tank / Bruiser\nStílus: Lassú, tankos, frontline harcos",
-		Desc = "1. Shield Charge: Előrerohan és lök (CC)\n2. Earthbreaker: Erős AOE földcsapás\n3. Blade Spirit: +25% Sebzés, +10% Véd. (Buff)\n4. Iron Skin: 50% Sebzéscsökkentés (6 mp)",
-		Stats = "FONTOS: A HP és Sebzés húzása javasolt.\nNEGATÍVUM: Ha sok az INT, a páncélod csökken!"
+		Role = "<b>Szerep:</b> Tank / Bruiser\n<b>Erősség:</b> Hatalmas túlélés, Tömegkontroll (CC)\n<b>Hátrány:</b> Lassú mozgás, Alacsony burst sebzés",
+		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Iron Will:</b></font>\nAhogy csökken a HP-d, úgy leszel egyre keményebb. 50% HP alatt +10%, 30% alatt +20%, 15% HP alatt +30% bónusz Páncélzatot (Defense) kapsz valós időben.",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Shield Charge:</b> Előrerohan, fellöki és sebzi az útjába esőket.\n<b>2. Earthbreaker:</b> Területi (AOE) földcsapás, 3 másodpercre 50%-kal lassít.\n<b>3. Blade Spirit (Aura):</b> Kiosztott sebzésből (Life Steal) HP-t tölt vissza.\n<b>4. Iron Skin (Aura):</b> 6 másodpercig 50%-kal kevesebb sebzést kapsz.",
+		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: VIT (Élet) és STR (Erő).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] Ha túl sok az INT (Mágia), a páncélzatod csökken!</b></font>"
 	},
 	{
 		Name = "SHADOWBLADE",
-		Role = "Szerep: Burst DPS / Assassin\nStílus: Gyors, mobil, magas sebzés",
-		Desc = "1. Shadow Strike: Teleport és Burst sebzés\n2. Whirling Blades: Körkörös AOE támadás\n3. Bloodlust: +30% ATK SPD, +15% Mozgás\n4. Death Mark: Megjelöli a célt extra sebzésre",
-		Stats = "FONTOS: Ügyesség (DEX) és Sebzés (STR) a fő.\nNEGATÍVUM: Túl sok páncél esetén lelassulsz!"
+		Role = "<b>Szerep:</b> Burst DPS / Assassin\n<b>Erősség:</b> Extrém mobilitás, Brutális egycélpontos sebzés\n<b>Hátrány:</b> Üvegágyú, Gyenge védelem",
+		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Shadow Mastery:</b></font>\nPozicionálás és kivégzés. Ha a célpontod mögül támadsz (180 fok), +10% sebzést kapsz. Ha a célpont HP-ja 30% alatt van, további +10% sebzést kapsz (A kettő halmozódik!).",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Shadow Strike:</b> A célpont mögé teleportál és hatalmasat sebez.\n<b>2. Whirling Blades:</b> 3 ütésből álló, pörgő területi (AOE) vágás.\n<b>3. Bloodlust (Aura):</b> Megnöveli a Támadási- és Mozgási sebességedet.\n<b>4. Death Mark:</b> Megjelöli a célt, majd a következő ütés bónuszt sebez.",
+		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: DEX (Ügyesség) és STR (Erő).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] A nehéz vértezet (sok Páncél) drasztikusan lelassít!</b></font>"
 	},
 	{
 		Name = "SOULWEAVER",
-		Role = "Szerep: AOE DPS / Mage\nStílus: Távolsági, területi sebzés",
-		Desc = "1. Soul Orb: Távolsági varázslövedék\n2. Spirit Chain: Célpontok közt ugró sebzés\n3. Spirit Blessing: +25% Sebzés, +10% Mana regen\n4. Soul Explosion: Hatalmas AOE robbanás",
-		Stats = "FONTOS: Intelligencia (INT) és Ügyesség (DEX).\nNEGATÍVUM: A túl sok HP csökkenti a sebzésed!"
+		Role = "<b>Szerep:</b> AOE DPS / Mage\n<b>Erősség:</b> Pusztító területi mágiák, Távolsági harc\n<b>Hátrány:</b> Nagyon kevés életerő, Közelharcban sebezhető",
+		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Soul Echo:</b></font>\nMinden elsütött sebző varázslatodnak 15% esélye van, hogy egy lila energiarobbanással az eredeti sebzés 35%-át bevigye még egyszer a célpontnak.",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Soul Orb:</b> Célkövető lila energiagömböt lő az ellenségre.\n<b>2. Spirit Chain:</b> Villámsugár, ami célpontról célpontra ugrik (Max 5).\n<b>3. Spirit Blessing (Aura):</b> Megnöveli az alap sebzésedet és a gyorsaságod.\n<b>4. Soul Explosion:</b> Késleltetett, hatalmas és pusztító AOE robbanás.",
+		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: INT (Mágia) és DEX (Ügyesség).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] Ha túl sok a VIT (Életerő), a varázslataid gyengülnek!</b></font>"
 	},
 	{
 		Name = "SEALER",
-		Role = "Szerep: Support / Control\nStílus: Csapatbuff + boss kontroll",
-		Desc = "1. Seal of Power: +20% Sebzés mindenkinek\n2. Seal of Protection: +20% DEF, +15% HP\n3. Explosive Seal: Késleltetett erős robbanás\n4. Dragon Shackles: Célpont lefogása (Root)",
-		Stats = "FONTOS: Főleg Intelligencia (INT) és Sebzés.\nNEGATÍVUM: A magas DEX rontja a képességeid!"
+		Role = "<b>Szerep:</b> Support / Control\n<b>Erősség:</b> Csapat erősítése, Láncreakciós tömegkontroll\n<b>Hátrány:</b> Alacsony alap sebzés, Csapattársak nélkül gyengébb",
+		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Seal Mastery:</b></font>\nAktivált képességenként kapsz egy töltetet (Max 5). Minden töltet +2% Sebzést és +2% Buff erőt ad. Ha 10 másodpercig nem használsz skillt, a töltetek elvesznek.",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Seal of Power (Buff):</b> Megnöveli a saját vagy társad támadóerejét.\n<b>2. Seal of Protection (Buff):</b> Extra Páncélt és Max HP-t ad a célpontnak.\n<b>3. Explosive Seal:</b> Időzített bombát tesz a célpontra (AOE sebzés).\n<b>4. Dragon Shackles:</b> Lekötözi (Root) a célt, majd ugrálva terjed tovább.",
+		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: INT (Mágia) és STR (Erő).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] A kapkodás (magas DEX) rontja a buffjaid erejét!</b></font>"
 	}
 }
 
@@ -115,61 +119,88 @@ creatorContainer.BackgroundTransparency = 1
 creatorContainer.Visible = false
 
 local classInfoPanel = Instance.new("Frame", creatorContainer)
-classInfoPanel.Size = UDim2.new(0, 350, 1, -100)
-classInfoPanel.Position = UDim2.new(0, 50, 0, 50)
-classInfoPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-classInfoPanel.BackgroundTransparency = 0.4
+classInfoPanel.Size = UDim2.new(0, 480, 1, -120) -- Szélesebb panel
+classInfoPanel.Position = UDim2.new(0, 40, 0, 60)
+classInfoPanel.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Sötétebb, elegánsabb háttér
+classInfoPanel.BackgroundTransparency = 0.15
 classInfoPanel.BorderSizePixel = 2
-classInfoPanel.BorderColor3 = Color3.fromRGB(150, 110, 50)
+classInfoPanel.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
+
+-- Automatikus elrendezés (nem lóg egymásba a szöveg)
+local listLayout = Instance.new("UIListLayout", classInfoPanel)
+listLayout.Padding = UDim.new(0, 10)
+listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local padding = Instance.new("UIPadding", classInfoPanel)
+padding.PaddingTop = UDim.new(0, 15)
+padding.PaddingBottom = UDim.new(0, 15)
+padding.PaddingLeft = UDim.new(0, 15)
+padding.PaddingRight = UDim.new(0, 15)
 
 local lblName = Instance.new("TextLabel", classInfoPanel)
-lblName.Size = UDim2.new(1, -20, 0, 50)
-lblName.Position = UDim2.new(0, 10, 0, 10)
+lblName.Size = UDim2.new(1, 0, 0, 40)
 lblName.Font = Enum.Font.GothamBlack
-lblName.TextSize = 28
-lblName.TextColor3 = Color3.fromRGB(255, 255, 255)
+lblName.TextSize = 34
+lblName.TextColor3 = Color3.fromRGB(255, 215, 0)
 lblName.BackgroundTransparency = 1
-lblName.TextXAlignment = Enum.TextXAlignment.Left
+lblName.LayoutOrder = 1
 
 local lblRole = Instance.new("TextLabel", classInfoPanel)
-lblRole.Size = UDim2.new(1, -20, 0, 40)
-lblRole.Position = UDim2.new(0, 10, 0, 60)
-lblRole.Font = Enum.Font.GothamBold
+lblRole.Size = UDim2.new(1, 0, 0, 60)
+lblRole.Font = Enum.Font.Gotham
 lblRole.TextSize = 14
-lblRole.TextColor3 = Color3.fromRGB(150, 200, 255)
+lblRole.TextColor3 = Color3.fromRGB(220, 220, 220)
 lblRole.BackgroundTransparency = 1
 lblRole.TextXAlignment = Enum.TextXAlignment.Left
+lblRole.TextYAlignment = Enum.TextYAlignment.Top
+lblRole.RichText = true
+lblRole.LayoutOrder = 2
 
-local lblDesc = Instance.new("TextLabel", classInfoPanel)
-lblDesc.Size = UDim2.new(1, -20, 0, 150)
-lblDesc.Position = UDim2.new(0, 10, 0, 110)
-lblDesc.Font = Enum.Font.Gotham
-lblDesc.TextSize = 14
-lblDesc.TextColor3 = Color3.fromRGB(220, 220, 220)
-lblDesc.BackgroundTransparency = 1
-lblDesc.TextXAlignment = Enum.TextXAlignment.Left
-lblDesc.TextYAlignment = Enum.TextYAlignment.Top
-lblDesc.TextWrapped = true
+local lblPassives = Instance.new("TextLabel", classInfoPanel)
+lblPassives.Size = UDim2.new(1, 0, 0, 70)
+lblPassives.Font = Enum.Font.Gotham
+lblPassives.TextSize = 13
+lblPassives.TextColor3 = Color3.fromRGB(200, 255, 200)
+lblPassives.BackgroundTransparency = 1
+lblPassives.TextXAlignment = Enum.TextXAlignment.Left
+lblPassives.TextYAlignment = Enum.TextYAlignment.Top
+lblPassives.TextWrapped = true
+lblPassives.RichText = true
+lblPassives.LayoutOrder = 3
+
+local lblActives = Instance.new("TextLabel", classInfoPanel)
+lblActives.Size = UDim2.new(1, 0, 0, 110)
+lblActives.Font = Enum.Font.Gotham
+lblActives.TextSize = 13
+lblActives.TextColor3 = Color3.fromRGB(230, 230, 230)
+lblActives.BackgroundTransparency = 1
+lblActives.TextXAlignment = Enum.TextXAlignment.Left
+lblActives.TextYAlignment = Enum.TextYAlignment.Top
+lblActives.TextWrapped = true
+lblActives.RichText = true
+lblActives.LayoutOrder = 4
 
 local lblStats = Instance.new("TextLabel", classInfoPanel)
-lblStats.Size = UDim2.new(1, -20, 0, 100)
-lblStats.Position = UDim2.new(0, 10, 0, 270)
-lblStats.Font = Enum.Font.GothamBold
-lblStats.TextSize = 14
-lblStats.TextColor3 = Color3.fromRGB(255, 100, 100)
+lblStats.Size = UDim2.new(1, 0, 0, 60)
+lblStats.Font = Enum.Font.Gotham
+lblStats.TextSize = 13
+lblStats.TextColor3 = Color3.fromRGB(255, 255, 255)
 lblStats.BackgroundTransparency = 1
 lblStats.TextXAlignment = Enum.TextXAlignment.Left
 lblStats.TextYAlignment = Enum.TextYAlignment.Top
 lblStats.TextWrapped = true
+lblStats.RichText = true
+lblStats.LayoutOrder = 5
 
 local btnCreate = Instance.new("TextButton", classInfoPanel)
-btnCreate.Size = UDim2.new(1, -40, 0, 50)
-btnCreate.Position = UDim2.new(0, 20, 1, -70)
+btnCreate.Size = UDim2.new(1, 0, 0, 45)
 btnCreate.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
 btnCreate.TextColor3 = Color3.new(1,1,1)
 btnCreate.Font = Enum.Font.GothamBlack
 btnCreate.TextSize = 20
 btnCreate.Text = "KARAKTER LÉTREHOZÁSA"
+btnCreate.LayoutOrder = 6
 
 local btnBack = Instance.new("TextButton", creatorContainer)
 btnBack.Size = UDim2.new(0, 100, 0, 40)
@@ -289,9 +320,12 @@ end)
 
 local function focusCameraOnClass(index, instant)
 	local className = classes[index].Name
+
+	-- Az új RichText elemek betöltése
 	lblName.Text = classes[index].Name
 	lblRole.Text = classes[index].Role
-	lblDesc.Text = classes[index].Desc
+	lblPassives.Text = classes[index].Passive
+	lblActives.Text = classes[index].Actives
 	lblStats.Text = classes[index].Stats
 
 	local targetDummy = nil
