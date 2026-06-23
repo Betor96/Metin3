@@ -217,7 +217,7 @@ createBonusRow("StrongVsPlayer", "Ember elleni erő:", "%")
 createBonusRow("CritChance", "Kritikus találat esélye:", "%")
 createBonusRow("LifeSteal", "Életvarázs (Life Steal):", "%")
 createBonusRow("AttackSpeed", "Támadási sebesség:", "%")
-createBonusRow("MovementSpeed", "Mozgási sebesség:", "%")
+createBonusRow("MovementSpeed", "Valós mozgási sebesség:", "") -- JAVÍTÁS: Nincs %
 createBonusRow("DodgeChance", "Kitérési esély:", "%")
 createBonusRow("DoubleDrop", "Dupla tárgydobás esélye:", "%")
 createBonusRow("DoubleGold", "Dupla pénz esélye:", "%")
@@ -254,12 +254,11 @@ local function renderSkills()
 
 	for _, skillName in ipairs(skills) do
 		local sFrame = Instance.new("Frame", skillContainer)
-		-- EZ A NÉV KULCSFONTOSSÁGÚ A DRAG & DRPONAK! (SkillUI_Nev)
 		sFrame.Name = "SkillUI_" .. skillName 
 		sFrame.BackgroundColor3 = Color3.fromRGB(60, 30, 90)
 		sFrame.BorderColor3 = Color3.fromRGB(150, 100, 255)
 		sFrame.BorderSizePixel = 2
-		sFrame.Active = true -- Hogy a Drag & Drop fel tudja venni
+		sFrame.Active = true 
 
 		local sLabel = Instance.new("TextLabel", sFrame)
 		sLabel.Size = UDim2.new(1, -4, 1, -4)
@@ -272,7 +271,6 @@ local function renderSkills()
 	end
 end
 
--- Amikor betölt a játékos, rendereljük a képességeit
 player:GetAttributeChangedSignal("Class"):Connect(renderSkills)
 renderSkills()
 
@@ -288,10 +286,19 @@ local function updateUI()
 	if stats:FindFirstChild("DEX") then dexValue.Text = tostring(stats.DEX.Value) end
 
 	for statName, data in pairs(bonusLabels) do
-		local st = stats:FindFirstChild(statName)
-		if st then data.Label.Text = tostring(st.Value) .. data.Suffix end
+		if statName == "MovementSpeed" then
+			-- JAVÍTÁS: A szerver által kiszámolt valós sebességet olvassuk le!
+			local trueMs = player:GetAttribute("TrueWalkSpeed") or 16
+			-- Csak akkor ír tizedesjegyet, ha nem egész szám
+			local formattedMs = (trueMs % 1 == 0) and tostring(trueMs) or string.format("%.1f", trueMs)
+			data.Label.Text = formattedMs
+		else
+			local st = stats:FindFirstChild(statName)
+			if st then data.Label.Text = tostring(st.Value) .. data.Suffix end
+		end
 	end
 end
 
 for _, child in pairs(stats:GetChildren()) do child.Changed:Connect(updateUI) end
+player:GetAttributeChangedSignal("TrueWalkSpeed"):Connect(updateUI) -- Figyeli a valós sebesség változását!
 updateUI()

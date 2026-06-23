@@ -12,19 +12,28 @@ local function getNextLevelXP(level)
 	return (level ^ 2) * 100 + (level * 500)
 end
 
--- HP frissítése a statok (Szint és VIT) alapján
-local function updateCharacterStats(player)
+-- ==========================================
+-- JAVÍTÁS: A HP számolást átadtuk a StatHandlernek!
+-- Ez a függvény most már csak megvárja, amíg a StatHandler lefut,
+-- majd felgyógyítja a játékost a maximális HP-ra és Manára.
+-- ==========================================
+local function healCharacter(player)
+	task.wait(0.1) -- Várunk egy picit, hogy a StatHandler beállítsa az új maximumokat
 	local character = player.Character
 	local stats = player:FindFirstChild("PlayerStats")
-	if character and stats then
+
+	if character then
 		local humanoid = character:FindFirstChild("Humanoid")
 		if humanoid then
-			local level = stats.Level.Value
-			local vit = stats.VIT.Value
-			-- Metin2 stílusú HP számítás
-			local maxHp = 200 + (level * 30) + (vit * 40)
-			humanoid.MaxHealth = maxHp
-			humanoid.Health = maxHp -- Teljesre tölti
+			humanoid.Health = humanoid.MaxHealth -- Teljes HP gyógyítás
+		end
+	end
+
+	if stats then
+		local mana = stats:FindFirstChild("Mana")
+		local maxMana = stats:FindFirstChild("MaxMana")
+		if mana and maxMana then
+			mana.Value = maxMana.Value -- Teljes Mana töltés
 		end
 	end
 end
@@ -74,12 +83,12 @@ Players.PlayerAdded:Connect(function(player)
 
 	player.CharacterAdded:Connect(function(char)
 		createOverhead(char)
-		updateCharacterStats(player) -- Újraéledéskor frissíti a HP-t
+		healCharacter(player) -- Újraéledéskor felgyógyít
 	end)
 
 	if player.Character then 
 		createOverhead(player.Character) 
-		updateCharacterStats(player)
+		healCharacter(player)
 	end
 
 	-- ==========================================
@@ -109,10 +118,7 @@ Players.PlayerAdded:Connect(function(player)
 			maxExp.Value = getNextLevelXP(level.Value)
 
 			-- Feltöltjük a HP-t és a Manát szintlépéskor
-			updateCharacterStats(player)
-			if mana and maxMana then
-				mana.Value = maxMana.Value
-			end
+			healCharacter(player)
 
 			print(player.Name .. " szintet lépett! Új szint: " .. level.Value)
 		end

@@ -113,10 +113,9 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 	end
 end)
 
--- Dinamikus mozgási sebesség lekérő (Kiszámolja a buffjaidat is)
+-- Dinamikus mozgási sebesség lekérő (A SZERVERRŐL kéri le a pontos, büntetett értéket!)
 local function getCalculatedWalkSpeed()
-	local msBonus = player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("MovementSpeed") and player.PlayerStats.MovementSpeed.Value or 0
-	return 16 * (1 + (msBonus / 100))
+	return player:GetAttribute("TrueWalkSpeed") or 16
 end
 
 -- ==========================================

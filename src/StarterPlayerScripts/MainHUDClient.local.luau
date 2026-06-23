@@ -14,9 +14,6 @@ local SyncHotbarSlot = Events:WaitForChild("SyncHotbarSlot", 5)
 -- ==================================================
 -- PASSZÍV KÉPESSÉG INDIKÁTOROK (ESZKÖZTÁR FÖLÖTT)
 -- ==================================================
--- ==================================================
--- PASSZÍV KÉPESSÉG INDIKÁTOROK (ESZKÖZTÁR FÖLÖTT)
--- ==================================================
 task.spawn(function()
 	local Players = game:GetService("Players")
 	local localPlayer = Players.LocalPlayer
@@ -55,7 +52,6 @@ task.spawn(function()
 		local char = localPlayer.Character
 		local hum = char and char:FindFirstChild("Humanoid")
 
-		-- JAVÍTÁS: Kisbetűssé alakítjuk a kaszt nevét, hogy a "SEALER" is "sealer" legyen a kódnak!
 		local rawClass = localPlayer:GetAttribute("Class") or (char and char:GetAttribute("Class")) or ""
 		local pClass = string.lower(rawClass)
 
@@ -111,15 +107,13 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- NINCS TÖBB KAMU LOKÁLIS MAPPA!
--- Megvárjuk, amíg a Szerver letölti az igazi adatbázist.
+-- HOTBAR MAINSTREAM
 -- ==========================================
 local hotbarFolder = player:WaitForChild("Hotbar", 99999)
 for i = 1, 8 do
 	hotbarFolder:WaitForChild("Hotbar_" .. i, 99999)
 end
 
--- 2. GUI Létrehozása
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MetinHUD"
 screenGui.ResetOnSpawn = false
@@ -199,36 +193,48 @@ end
 local function setupCharacter(char)
 	currentHumanoid = char:WaitForChild("Humanoid")
 	currentHumanoid.HealthChanged:Connect(updateHP)
+	-- MaxHealth is lekezelve
+	currentHumanoid:GetPropertyChangedSignal("MaxHealth"):Connect(updateHP)
 	updateHP()
 end
 
 player.CharacterAdded:Connect(setupCharacter)
 if player.Character then setupCharacter(player.Character) end
 
-local function updateMPXP()
-	local stats = player:FindFirstChild("PlayerStats")
-	if stats then
-		local mana = stats:FindFirstChild("Mana")
-		local maxMana = stats:FindFirstChild("MaxMana")
-		if mana and maxMana and maxMana.Value > 0 then
+-- ==========================================
+-- JAVÍTÁS: Dinamikus Mana és XP csík frissítés! (Nincs több while ciklus)
+-- ==========================================
+task.spawn(function()
+	local stats = player:WaitForChild("PlayerStats")
+	local mana = stats:WaitForChild("Mana")
+	local maxMana = stats:WaitForChild("MaxMana")
+	local exp = stats:WaitForChild("Experience")
+	local maxExp = stats:WaitForChild("MaxExperience", 10) -- Megvárjuk míg a LevelHandler legenerálja
+
+	local function updateMana()
+		if maxMana and maxMana.Value > 0 then
 			local mPerc = math.clamp(mana.Value / maxMana.Value, 0, 1)
 			mpBar.Size = UDim2.new(mPerc, 0, 1, 0)
 			mpText.Text = math.floor(mana.Value) .. " / " .. math.floor(maxMana.Value)
 		end
+	end
 
-		local exp = stats:FindFirstChild("Experience")
-		local maxExp = stats:FindFirstChild("MaxExperience")
-		if exp and maxExp and maxExp.Value > 0 then
+	local function updateXP()
+		if maxExp and maxExp.Value > 0 then
 			local ePerc = math.clamp(exp.Value / maxExp.Value, 0, 1)
 			expBar.Size = UDim2.new(ePerc, 0, 1, 0)
 		end
 	end
-end
 
-task.spawn(function()
-	task.wait(0.5)
-	updateMPXP()
-	while task.wait(0.5) do updateMPXP() end
+	-- Események bekötése
+	mana.Changed:Connect(updateMana)
+	maxMana.Changed:Connect(updateMana)
+	exp.Changed:Connect(updateXP)
+	if maxExp then maxExp.Changed:Connect(updateXP) end
+
+	-- Alap értékek beállítása
+	updateMana()
+	updateXP()
 end)
 
 local hotbarContainer = Instance.new("Frame")
