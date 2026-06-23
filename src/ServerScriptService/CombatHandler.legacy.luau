@@ -5,8 +5,21 @@ local Events = ReplicatedStorage:WaitForChild("Events")
 local MeleeAttack = Events:WaitForChild("MeleeAttack")
 local ShowDamage = Events:WaitForChild("ShowDamage")
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
+local Players = game:GetService("Players")
+
+-- ==========================================
+-- BIZTONSÁG: Anti-Spam (Makró és Auto-clicker védelem)
+-- ==========================================
+local attackLocks = {}
+Players.PlayerRemoving:Connect(function(player)
+	attackLocks[player.UserId] = nil
+end)
 
 MeleeAttack.OnServerEvent:Connect(function(player)
+	-- Max 4 ütés / másodperc (0.25 mp cooldown az ütések között)
+	if attackLocks[player.UserId] and tick() - attackLocks[player.UserId] < 0.25 then return end
+	attackLocks[player.UserId] = tick()
+
 	local character = player.Character
 	-- ==========================================
 	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A PAJZSÁT!
@@ -21,6 +34,8 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	if not character or not stats or not equipment then return end
 
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then return end
+
 	local weaponName = equipment:FindFirstChild("Fegyver") and equipment.Fegyver.Value or ""
 
 	local minDmg, maxDmg = 1, 5 
@@ -29,10 +44,6 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		maxDmg = ItemDatabase[weaponName].MaxDmg or 5
 	end
 
-	-- ==========================================
-	-- JAVÍTÁS: KASZT-SPECIFIKUS SEBZÉS BEKÖTÉSE!
-	-- (A StatHandler számolja ki a kaszt büntetéseit/bónuszait)
-	-- ==========================================
 	local classDamage = player:GetAttribute("AttackDamage") or 5
 	local baseDamage = classDamage + math.random(minDmg, maxDmg)
 
@@ -46,36 +57,42 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		["Raktaros"] = true
 	}
 
+	-- ==========================================
+	-- OPTIMALIZÁLÁS: A workspace:GetChildren() helyett
+	-- Csak a játékosokat és a specifikus mappákat nézzük át (O(N) gyorsítás)
+	-- ==========================================
 	local possibleTargets = {}
 
-	for _, obj in pairs(workspace:GetChildren()) do
-		table.insert(possibleTargets, obj)
+	-- 1. Másik játékosok
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr.Character and plr ~= player then
+			table.insert(possibleTargets, plr.Character)
+		end
 	end
 
+	-- 2. Metinkövek
 	local mFolder = workspace:FindFirstChild("MetinStones")
 	if mFolder then
-		for _, stone in pairs(mFolder:GetChildren()) do
-			table.insert(possibleTargets, stone)
-		end
+		for _, stone in pairs(mFolder:GetChildren()) do table.insert(possibleTargets, stone) end
 	end
 
+	-- 3. Szörnyek
 	local monFolder = workspace:FindFirstChild("Monsters")
 	if monFolder then
-		for _, monster in pairs(monFolder:GetChildren()) do
-			table.insert(possibleTargets, monster)
-		end
+		for _, monster in pairs(monFolder:GetChildren()) do table.insert(possibleTargets, monster) end
 	end
 
-	-- ÉRCEK BEOLVASÁSA
+	-- 4. Ércek
 	local oFolder = workspace:FindFirstChild("Ores")
 	if oFolder then
-		for _, ore in pairs(oFolder:GetChildren()) do
-			table.insert(possibleTargets, ore)
-		end
+		for _, ore in pairs(oFolder:GetChildren()) do table.insert(possibleTargets, ore) end
 	end
 
 	local oreHitCount = 0 -- Számláló, hogy csak 1 ércet üthess egyszerre!
 
+	-- ==========================================
+	-- A TE EREDETI HIBÁTLAN MATEKOD:
+	-- ==========================================
 	for _, obj in pairs(possibleTargets) do
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
@@ -99,14 +116,13 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 					local isOre = (obj.Parent and obj.Parent.Name == "Ores") or obj:GetAttribute("IsOre")
 
 					if isOre then
-						if oreHitCount >= 1 then continue end -- Ha már ütöttünk egyet, a többit átugorjuk!
+						if oreHitCount >= 1 then continue end
 
 						local isPickaxe = false
 						if weaponName ~= "" and ItemDatabase[weaponName] and ItemDatabase[weaponName].IsPickaxe then
 							isPickaxe = true
 						end
 
-						-- Ha nincs csákány, átugorjuk (FONTOS: continue kell, nem return!)
 						if not isPickaxe then continue end 
 
 						finalDamage = 1 
@@ -139,7 +155,6 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 						end
 					end
 
-					-- Sebzés kiosztása és kliens értesítése
 					targetHum:TakeDamage(finalDamage)
 					ShowDamage:FireAllClients(finalDamage, targetRoot.Position, isCrit, false)
 				end

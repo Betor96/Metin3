@@ -39,21 +39,30 @@ end
 function SkillDatabase.getEnemiesInRadius(centerPos, radius, excludeChar)
 	local enemies = {}
 
-	-- Segédfüggvény, hogy könnyen átnézzünk több mappát is
-	local function scanFolder(folder)
-		if not folder then return end
-		for _, obj in pairs(folder:GetChildren()) do
-			-- Itt hívjuk meg az isValidTarget-et, ami megvéd minden NPC-t és Ércet!
-			if obj ~= excludeChar and SkillDatabase.isValidTarget(obj) then
-				if (obj.HumanoidRootPart.Position - centerPos).Magnitude <= radius then 
-					table.insert(enemies, obj) 
-				end
+	-- Segédfüggvény, hogy egy entitást leellenőrizzünk
+	local function checkObj(obj)
+		if obj and obj ~= excludeChar and SkillDatabase.isValidTarget(obj) then
+			local root = obj:FindFirstChild("HumanoidRootPart")
+			if root and (root.Position - centerPos).Magnitude <= radius then 
+				table.insert(enemies, obj) 
 			end
 		end
 	end
 
-	-- Átnézzük a fő mappákat
-	scanFolder(workspace)
+	-- Segédfüggvény, hogy könnyen átnézzünk több mappát is
+	local function scanFolder(folder)
+		if not folder then return end
+		for _, obj in pairs(folder:GetChildren()) do
+			checkObj(obj)
+		end
+	end
+
+	-- 1. Átnézzük a játékosokat a hatalmas workspace mappa helyett (LAG MENTES)
+	for _, plr in pairs(game:GetService("Players"):GetPlayers()) do
+		checkObj(plr.Character)
+	end
+
+	-- 2. Átnézzük a fő mappákat
 	scanFolder(workspace:FindFirstChild("Monsters"))
 	scanFolder(workspace:FindFirstChild("MetinStones")) 
 
