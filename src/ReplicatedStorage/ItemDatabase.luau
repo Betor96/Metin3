@@ -31,7 +31,7 @@ local ItemDatabase = {
 		UpgradeTo = "Vadfarkas Páncél +2", UpgradeCost = 300, UpgradeChance = 70, ReqItem = "Kutya Fog", ReqCount = 1
 	},
 	["Vas Páncél"] = {
-		Type = "Páncél", Level = 5, Defense = 20, Price = 500,
+		Type = "Páncél", Level = 5, Defense = 2000, Price = 500,
 		UpgradeTo = "Vas Páncél +1", UpgradeCost = 400, UpgradeChance = 80
 	},
 	["Vadfarkas Páncél +2"] = {
