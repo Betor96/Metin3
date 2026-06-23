@@ -12,8 +12,11 @@ local CompleteQuest = Events:FindFirstChild("CompleteQuest") or Instance.new("Re
 CompleteQuest.Name = "CompleteQuest"
 
 -- ==========================================
--- JÁTÉKOS MAPPÁINAK LÉTREHOZÁSA (EZ HIÁNYZOTT!)
+-- BIZTONSÁG 1: ANTI-SPAM (Race Condition védelem)
+-- Megakadályozza, hogy egy exploiter 1 sec alatt 50x kérje ki a jutalmat!
 -- ==========================================
+local playerLocks = {}
+
 local function onPlayerAdded(player)
 	if not player:FindFirstChild("Quests") then
 		local qFolder = Instance.new("Folder")
@@ -28,27 +31,55 @@ local function onPlayerAdded(player)
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
-for _, p in pairs(Players:GetPlayers()) do
-	onPlayerAdded(p)
+for _, p in pairs(Players:GetPlayers()) do onPlayerAdded(p) end
+
+Players.PlayerRemoving:Connect(function(player)
+	playerLocks[player.UserId] = nil -- Takarítjuk a memóriát kilépéskor
+end)
+
+-- ==========================================
+-- BIZTONSÁG 2: NPC TÁVOLSÁG ELLENŐRZÉS
+-- ==========================================
+local function isNearNPC(player, npcName)
+	if not npcName then return true end -- Ha a küldetés nem kér specifikus NPC-t, engedjük
+	local char = player.Character
+	if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+	local root = char.HumanoidRootPart
+
+	for _, obj in pairs(workspace:GetChildren()) do
+		if obj.Name == npcName and obj:FindFirstChild("HumanoidRootPart") then
+			local dist = (root.Position - obj.HumanoidRootPart.Position).Magnitude
+			if dist <= 20 then
+				return true
+			end
+		end
+	end
+	return false
 end
 
 -- ==========================================
 -- KÜLDETÉS FELVÉTELE
 -- ==========================================
 AcceptQuest.OnServerEvent:Connect(function(player, questName)
+	-- Anti-Spam (0.5 sec)
+	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < 0.5 then return end
+	playerLocks[player.UserId] = tick()
+
 	local questData = QuestDatabase[questName]
 	local questsFolder = player:FindFirstChild("Quests")
 	if not questData or not questsFolder then return end
 
-	if questsFolder:FindFirstChild(questName) then return end -- Már felvette
+	-- Ha van StartNPC (Küldetést adó) a DB-ben, ellenőrizzük, hogy ott áll-e mellette!
+	if questData.StartNPC and not isNearNPC(player, questData.StartNPC) then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " messziről próbált felvenni egy küldetést!")
+		return
+	end
 
-	-- ==========================================
-	-- JAVÍTÁS: Végleges tiltás szerver oldalon, ha már kész van!
-	-- ==========================================
+	if questsFolder:FindFirstChild(questName) then return end 
+
 	local completedFolder = player:FindFirstChild("CompletedQuests")
 	if completedFolder and completedFolder:FindFirstChild(questName) then return end 
 
-	-- SZINT ELLENŐRZÉS (+10 SZABÁLY)
 	local playerLevel = 1
 	if player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("Level") then
 		playerLevel = player.PlayerStats.Level.Value
@@ -57,14 +88,11 @@ AcceptQuest.OnServerEvent:Connect(function(player, questName)
 	end
 
 	local reqLevel = questData.MinLevel or 1
-	local maxLevel = reqLevel + 10 -- SZINT KORLÁT: Minimum szint + 10!
-
+	local maxLevel = reqLevel + 10 
 	if playerLevel < reqLevel or playerLevel > maxLevel then
-		print(player.Name .. " szintje nem jó ehhez: " .. questName)
 		return 
 	end
 
-	-- Sikeres felvétel!
 	local qVal = Instance.new("IntValue")
 	qVal.Name = questName
 	qVal.Value = 0 
@@ -75,6 +103,10 @@ end)
 -- KÜLDETÉS LEADÁSA
 -- ==========================================
 CompleteQuest.OnServerEvent:Connect(function(player, questName)
+	-- Anti-Spam (0.5 sec)
+	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < 0.5 then return end
+	playerLocks[player.UserId] = tick()
+
 	local questData = QuestDatabase[questName]
 	local questsFolder = player:FindFirstChild("Quests")
 	if not questData or not questsFolder then return end
@@ -82,7 +114,14 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 	local qVal = questsFolder:FindFirstChild(questName)
 	if not qVal then return end 
 
+	-- Ha van TargetNPC (Akinek le kell adni), ellenőrizzük a távolságot!
+	if questData.TargetNPC and not isNearNPC(player, questData.TargetNPC) then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " messziről próbálta leadni a küldetést!")
+		return
+	end
+
 	local canComplete = false
+	local itemsToTakeList = {} -- Ide gyűjtjük, miket kell majd levonni a Gathernél
 
 	if questData.Type == "Kill" then
 		if qVal.Value >= questData.Count then canComplete = true end
@@ -90,30 +129,26 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 	elseif questData.Type == "Gather" then
 		local inv = player:FindFirstChild("Inventory")
 		local itemCount = 0
+		local foundSlots = {}
+
 		for _, slot in pairs(inv:GetChildren()) do
 			if slot.Value == questData.TargetItem then
 				local amt = slot:FindFirstChild("Amount") and slot.Amount.Value or 1
 				itemCount += amt
+				table.insert(foundSlots, {slot = slot, amt = amt, amtObj = slot:FindFirstChild("Amount")})
 			end
 		end
 
 		if itemCount >= questData.Count then
 			canComplete = true
 			local itemsToTake = questData.Count
-			for _, slot in pairs(inv:GetChildren()) do
+
+			-- Elmentjük, miket kell levonni, de Még NEM vonjuk le (Biztonság!)
+			for _, data in ipairs(foundSlots) do
 				if itemsToTake <= 0 then break end
-				if slot.Value == questData.TargetItem then
-					local amtObj = slot:FindFirstChild("Amount")
-					local amt = amtObj and amtObj.Value or 1
-					if amt <= itemsToTake then
-						itemsToTake -= amt
-						slot.Value = ""
-						if amtObj then amtObj.Value = 0 end
-					else
-						amtObj.Value -= itemsToTake
-						itemsToTake = 0
-					end
-				end
+				local takeAmt = math.min(data.amt, itemsToTake)
+				table.insert(itemsToTakeList, {slot = data.slot, amtObj = data.amtObj, take = takeAmt})
+				itemsToTake -= takeAmt
 			end
 		end
 
@@ -121,8 +156,31 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 		canComplete = true
 	end
 
-	-- JUTALMAK
 	if canComplete then
+		-- BIZTONSÁG 3: AZONNAL letöröljük a questet, MIELŐTT bármit adnánk!
+		qVal:Destroy()
+
+		local completedFolder = player:FindFirstChild("CompletedQuests")
+		if completedFolder and not completedFolder:FindFirstChild(questName) then
+			local doneMark = Instance.new("StringValue")
+			doneMark.Name = questName
+			doneMark.Parent = completedFolder
+		end
+
+		-- Most vonjuk le a tárgyakat (Gather quest)
+		for _, data in ipairs(itemsToTakeList) do
+			if data.amtObj then
+				data.amtObj.Value -= data.take
+				if data.amtObj.Value <= 0 then
+					data.slot.Value = ""
+					data.amtObj.Value = 0
+				end
+			else
+				data.slot.Value = ""
+			end
+		end
+
+		-- BIZTONSÁG 4: Csak most adjuk meg a jutalmakat, amikor már 100% tiszta a terep!
 		local stats = player:FindFirstChild("PlayerStats")
 		if stats then
 			if questData.RewardExp and stats:FindFirstChild("Experience") then
@@ -148,20 +206,6 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 					end
 				end
 			end
-		end
-
-		qVal:Destroy()
-
-		qVal:Destroy()
-
-		-- ==========================================
-		-- JAVÍTÁS: Küldetés mentése a befejezettek közé (Minden küldetés csak 1x csinálható)
-		-- ==========================================
-		local completedFolder = player:FindFirstChild("CompletedQuests")
-		if completedFolder and not completedFolder:FindFirstChild(questName) then
-			local doneMark = Instance.new("StringValue")
-			doneMark.Name = questName
-			doneMark.Parent = completedFolder
 		end
 	end
 end)

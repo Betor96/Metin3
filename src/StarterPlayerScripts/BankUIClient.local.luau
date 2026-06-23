@@ -304,7 +304,7 @@ local bankCurrentPage = 1
 
 local function renderBankItems()
 	local bankFolder = player:WaitForChild("Bank")
-	local stats = player:WaitForChild("PlayerStats")
+	local stats = player:WaitForChild("PlayerStats",99999)
 	local unlockedPages = stats:WaitForChild("BankUnlockedPages")
 
 	pageLabel.Text = "Oldal: " .. bankCurrentPage .. " / 4"

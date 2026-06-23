@@ -3,7 +3,7 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local player = Players.LocalPlayer
-local stats = player:WaitForChild("PlayerStats")
+local stats = player:WaitForChild("PlayerStats", 99999)
 local goldStat = stats:WaitForChild("Gold")
 
 local previousGold = goldStat.Value

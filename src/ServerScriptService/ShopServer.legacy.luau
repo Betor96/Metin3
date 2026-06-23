@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local BuyItem = Events:WaitForChild("BuyItem")
 
--- ÚJ: Eladás Event létrehozása automatikusan
+-- Eladás Event létrehozása automatikusan
 local SellItem = Events:FindFirstChild("SellItem")
 if not SellItem then
 	SellItem = Instance.new("RemoteEvent")
@@ -15,9 +15,51 @@ end
 
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
+-- ==========================================
+-- BIZTONSÁGI ELLENŐRZÉS: Közel van a játékos egy boltoshoz?
+-- (A kliens nem hazudhatja azt, hogy boltban van!)
+-- ==========================================
+local validMerchants = {
+	["Fegyverkereskedo"] = true,
+	["Pancelkereskedo"] = true,
+	["Vegyesbolt"] = true
+}
+
+local function isNearMerchant(player)
+	local char = player.Character
+	if not char then return false end
+
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return false end
+
+	-- Megnézzük a Workspace-ben, van-e boltos NPC a közelében (20 stud)
+	for _, obj in pairs(workspace:GetChildren()) do
+		if validMerchants[obj.Name] and obj:FindFirstChild("HumanoidRootPart") then
+			local distance = (root.Position - obj.HumanoidRootPart.Position).Magnitude
+			if distance <= 20 then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+-- ==========================================
+-- TÁRGY VÁSÁRLÁSA
+-- ==========================================
 BuyItem.OnServerEvent:Connect(function(player, itemName)
+	-- 1. SZIGORÚ VÉDELEM: NPC Távolság ellenőrzése
+	if not isNearMerchant(player) then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " távolról, NPC nélkül próbált vásárolni!")
+		return 
+	end
+
 	local itemData = ItemDatabase[itemName]
 	if not itemData then return end
+
+	-- Biztosítás, hogy az itemnek van ára (ne vegyenek ingyen dolgokat)
+	if not itemData.Price or itemData.Price <= 0 then return end
 
 	local stats = player:FindFirstChild("PlayerStats")
 	local gold = stats and stats:FindFirstChild("Gold")
@@ -28,21 +70,9 @@ BuyItem.OnServerEvent:Connect(function(player, itemName)
 	if gold.Value >= itemData.Price then
 		local targetSlot = nil
 		local maxStack = itemData.MaxStack or 1
-
-		-- Keresünk nem teli stacket (az 1, 8 helyett maxUnlockedSlots legyen!)
-		-- Keresés az összes elérhető slotban
 		local maxUnlockedSlots = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
 
-		if not targetSlot then
-			for i = 1, maxUnlockedSlots do -- A 8 helyett a maxUnlockedSlots változót használjuk
-				local slot = inv:FindFirstChild("Slot_" .. i)
-				if slot and slot.Value == "" then
-					targetSlot = slot
-					break
-				end
-			end
-		end
-
+		-- Ha stackelhető, keresünk egy félig teli stacket
 		if maxStack > 1 then
 			for i = 1, maxUnlockedSlots do
 				local slot = inv:FindFirstChild("Slot_" .. i)
@@ -53,8 +83,9 @@ BuyItem.OnServerEvent:Connect(function(player, itemName)
 			end
 		end
 
+		-- Ha nem találtunk stacket (vagy nem stackelhető), keresünk egy üres helyet
 		if not targetSlot then
-			for i = 1, 8 do
+			for i = 1, maxUnlockedSlots do
 				local slot = inv:FindFirstChild("Slot_" .. i)
 				if slot and slot.Value == "" then
 					targetSlot = slot
@@ -63,6 +94,7 @@ BuyItem.OnServerEvent:Connect(function(player, itemName)
 			end
 		end
 
+		-- Sikeres tranzakció (Nincs Race Condition, mert nem szakítjuk meg a folyamatot task.wait-tel)
 		if targetSlot then
 			gold.Value = gold.Value - itemData.Price
 			if targetSlot.Value == itemName then
@@ -76,9 +108,15 @@ BuyItem.OnServerEvent:Connect(function(player, itemName)
 end)
 
 -- ==========================================
--- ÚJ: TÁRGY ELADÁSA
+-- TÁRGY ELADÁSA
 -- ==========================================
 SellItem.OnServerEvent:Connect(function(player, slotName)
+	-- 1. SZIGORÚ VÉDELEM: NPC Távolság ellenőrzése
+	if not isNearMerchant(player) then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " távolról, NPC nélkül próbált eladni!")
+		return 
+	end
+
 	local inv = player:FindFirstChild("Inventory")
 	local stats = player:FindFirstChild("PlayerStats")
 	local gold = stats and stats:FindFirstChild("Gold")
@@ -95,7 +133,7 @@ SellItem.OnServerEvent:Connect(function(player, slotName)
 	local sellPrice = math.floor((itemData.Price or 0) / 2)
 	if sellPrice <= 0 then return end
 
-	-- Ha stackelve van, megszorozzuk az árat a darabszámmal
+	-- A szerver mondja meg mennyi van belőle, nem a kliens! (Dupe védelem)
 	local amount = slot:FindFirstChild("Amount") and slot.Amount.Value or 1
 	local totalValue = sellPrice * amount
 

@@ -4,6 +4,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService") 
 local Events = ReplicatedStorage:WaitForChild("Events")
+local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
+
 local MoveItem = Events:WaitForChild("MoveItem")
 local DropItem = Events:WaitForChild("DropItem")
 local AutoStack = Events:FindFirstChild("AutoStack") or Instance.new("RemoteEvent", Events)
@@ -25,7 +27,43 @@ local typeToSlot = {
 	["Pajzs"] = "Pajzs", ["Karkötő"] = "Karkoto"
 }
 
+-- ==========================================
+-- BIZTONSÁG 1: ANTI-SPAM ÉS MEMÓRIA TAKARÍTÁS
+-- ==========================================
+local playerLocks = {}
+
+local function checkSpam(player, cooldown)
+	cooldown = cooldown or 0.1
+	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < cooldown then
+		return true -- Túl gyors, blokkoljuk!
+	end
+	playerLocks[player.UserId] = tick()
+	return false
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	playerLocks[player.UserId] = nil
+end)
+
+-- ==========================================
+-- BIZTONSÁG 2: BEMENETI ADATOK TISZTÍTÁSA (Sanitization)
+-- Megakadályozza a negatív (-50) és tört (0.5) szám exploitokat!
+-- ==========================================
+local function sanitizeAmount(amt)
+	if amt == nil then return nil end
+	if type(amt) ~= "number" then return nil end
+	if amt <= 0 then return nil end -- Nem lehet 0 vagy negatív!
+	if amt ~= math.floor(amt) then return nil end -- Csak egész szám lehet!
+	return amt
+end
+
+-- ==========================================
+-- INVENTORY LOGIKA
+-- ==========================================
+
 UnlockPageGold.OnServerEvent:Connect(function(player)
+	if checkSpam(player, 0.5) then return end
+
 	local stats = player:FindFirstChild("PlayerStats")
 	if not stats then return end
 	local gold = stats:FindFirstChild("Gold")
@@ -41,10 +79,14 @@ UnlockPageGold.OnServerEvent:Connect(function(player)
 end)
 
 PromptRobuxUnlock.OnServerEvent:Connect(function(player)
+	if checkSpam(player, 1) then return end
 	MarketplaceService:PromptProductPurchase(player, PAGE_UNLOCK_PRODUCT_ID)
 end)
 
 MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName, splitAmount)
+	if checkSpam(player, 0.05) then return end
+	splitAmount = sanitizeAmount(splitAmount) -- Letisztítjuk a bejövő számot!
+
 	local inv = player:FindFirstChild("Inventory")
 	local eq = player:FindFirstChild("Equipment")
 	local bank = player:FindFirstChild("Bank")
@@ -69,7 +111,6 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 	if fromSlot and toSlot and fromSlot.Value ~= "" then
 		local itemName = fromSlot.Value
 		local targetItemName = toSlot.Value
-		local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 		local itemData = ItemDatabase[itemName]
 		if not itemData then return end
 		local maxStack = itemData.MaxStack or 1
@@ -85,7 +126,7 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 			if typeToSlot[targetItemData.Type] ~= fromSlotName then return end 
 		end
 
-		if splitAmount and splitAmount > 0 and (fromFolderStr == "Inventory" or fromFolderStr == "Bank") and (toFolderStr == "Inventory" or toFolderStr == "Bank") then
+		if splitAmount and (fromFolderStr == "Inventory" or fromFolderStr == "Bank") and (toFolderStr == "Inventory" or toFolderStr == "Bank") then
 			local fromAmtObj = fromSlot:FindFirstChild("Amount")
 			if not fromAmtObj or fromAmtObj.Value < splitAmount then return end
 
@@ -138,23 +179,28 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 end)
 
 -- ==========================================
--- JAVÍTÁS: TÁRGY ELDOBÁSA (Nincs rajta tulajdonos)
--- ==========================================
--- ==========================================
--- JAVÍTÁS: TÁRGY ELDOBÁSA (Név elmentése törlés előtt!)
+-- TÁRGY ELDOBÁSA (Nincs rajta tulajdonos)
 -- ==========================================
 DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
+	-- Szigorúbb cooldown az eldobásra, hogy ne laggoltassák be a szervert
+	if checkSpam(player, 0.2) then return end
+	splitAmount = sanitizeAmount(splitAmount)
+
 	if folderStr == "Bank" then return end 
 	local folder = (folderStr == "Inventory") and player:FindFirstChild("Inventory") or player:FindFirstChild("Equipment")
+
 	if folder then
 		local slot = folder:FindFirstChild(slotName)
 		if slot and slot.Value ~= "" then
-			-- JAVÍTÁS: Mielőtt töröljük a táskából, mentsük el a nevét!
 			local itemName = slot.Value 
 
 			local dropQty = 1
 			if slot:FindFirstChild("Amount") then
-				dropQty = (splitAmount and splitAmount > 0 and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
+				dropQty = (splitAmount and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
+
+				-- Biztonsági dupla ellenőrzés
+				if dropQty <= 0 then return end
+
 				slot.Amount.Value = slot.Amount.Value - dropQty
 				if slot.Amount.Value <= 0 then slot.Value = "" end
 			else
@@ -195,11 +241,14 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 				itemTag.Name = "ItemName"
 				itemTag.Value = itemName
 
+				-- JAVÍTÁS: A földre dobott tárgy el is tűnik magától (Memory Leak védelem!)
+				game.Debris:AddItem(droppedItem, 300) -- 5 perc múlva automatikusan törlődik a földről
+
 				local textBillboard = Instance.new("BillboardGui")
 				textBillboard.Size = UDim2.new(0, 150, 0, 25)
 				textBillboard.StudsOffset = Vector3.new(0, 1.5, 0) 
 				textBillboard.AlwaysOnTop = true 
-				textBillboard.MaxDistance = 60 -- JAVÍTÁS: Földre dobott tárgy eltűnik
+				textBillboard.MaxDistance = 60 
 				textBillboard.Adornee = droppedItem
 				textBillboard.Parent = droppedItem
 
@@ -219,9 +268,12 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 end)
 
 -- ==========================================
--- ÚJ: TÁRGY VÉGLEGES MEGSEMMISÍTÉSE
+-- TÁRGY VÉGLEGES MEGSEMMISÍTÉSE
 -- ==========================================
 DestroyItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
+	if checkSpam(player, 0.1) then return end
+	splitAmount = sanitizeAmount(splitAmount)
+
 	local folder = nil
 	if folderStr == "Inventory" then folder = player:FindFirstChild("Inventory")
 	elseif folderStr == "Equipment" then folder = player:FindFirstChild("Equipment")
@@ -232,7 +284,9 @@ DestroyItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmo
 		if slot and slot.Value ~= "" then
 			local dropQty = 1
 			if slot:FindFirstChild("Amount") then
-				dropQty = (splitAmount and splitAmount > 0 and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
+				dropQty = (splitAmount and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
+				if dropQty <= 0 then return end
+
 				slot.Amount.Value = slot.Amount.Value - dropQty
 				if slot.Amount.Value <= 0 then slot.Value = "" end
 			else
@@ -243,13 +297,14 @@ DestroyItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmo
 end)
 
 AutoStack.OnServerEvent:Connect(function(player, targetSlotName, isBank)
+	if checkSpam(player, 0.2) then return end
+
 	local folder = isBank and player:FindFirstChild("Bank") or player:FindFirstChild("Inventory")
 	if not folder then return end
 
 	local targetSlot = folder:FindFirstChild(targetSlotName)
 	if not targetSlot or targetSlot.Value == "" then return end
 
-	local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 	local itemData = ItemDatabase[targetSlot.Value]
 	if not itemData or not itemData.MaxStack or itemData.MaxStack <= 1 then return end
 

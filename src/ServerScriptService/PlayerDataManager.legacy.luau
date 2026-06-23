@@ -1,9 +1,9 @@
 -- Fájl helye: ServerScriptService -> PlayerDataManager
 
 local DataStoreService = game:GetService("DataStoreService")
--- Új adatbázis név a 3 slotos rendszer miatt, hogy tiszta lappal induljunk!
 local playerDataStore = DataStoreService:GetDataStore("Metin3_PlayerData_V1") 
-
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 
@@ -11,41 +11,31 @@ local GetCharacterList = Events:WaitForChild("GetCharacterList")
 local CreateCharacter = Events:WaitForChild("CreateCharacter")
 local SelectCharacter = Events:WaitForChild("SelectCharacter")
 
--- TÖRLÉS EVENT LÉTREHOZÁSA ÉS BEKÖTÉSE
-local DeleteCharacter = Events:FindFirstChild("DeleteCharacter")
-if not DeleteCharacter then
-	DeleteCharacter = Instance.new("RemoteEvent")
-	DeleteCharacter.Name = "DeleteCharacter"
-	DeleteCharacter.Parent = Events
-end
+local DeleteCharacter = Events:FindFirstChild("DeleteCharacter") or Instance.new("RemoteEvent", Events)
+DeleteCharacter.Name = "DeleteCharacter"
 
--- ==========================================
--- JAVÍTÁS: HOTBAR SZINKRONIZÁLÓ EVENT LÉTREHOZÁSA
--- ==========================================
-local SyncHotbarSlot = Events:FindFirstChild("SyncHotbarSlot")
-if not SyncHotbarSlot then
-	SyncHotbarSlot = Instance.new("RemoteEvent")
-	SyncHotbarSlot.Name = "SyncHotbarSlot"
-	SyncHotbarSlot.Parent = Events
-end
+local SyncHotbarSlot = Events:FindFirstChild("SyncHotbarSlot") or Instance.new("RemoteEvent", Events)
+SyncHotbarSlot.Name = "SyncHotbarSlot"
 
 local savingPlayers = {} 
-local activeSlots = {} -- NYILVÁNTARTJUK: Ki melyik sloton játszik éppen!
-
--- Ebbe mentjük ideiglenesen a törölt slotokat, hogy a menü AZONNAL üresnek lássa őket
+local activeSlots = {} 
 local deletedSlotsCache = {} 
 
 -- ==========================================
--- JAVÍTÁS: KLIENS FRISSÍTI A SZERVERT, HA RÁHÚZ VALAMIT
+-- BIZTONSÁG 1: SESSION LOCK AZONOSÍTÓ
 -- ==========================================
+local SESSION_ID = game.JobId
+if RunService:IsStudio() then
+	SESSION_ID = "STUDIO_TEST_" .. tostring(math.random(1000, 9999))
+end
+
+-- Hotbar szinkron
 SyncHotbarSlot.OnServerEvent:Connect(function(player, slotNum, itemName)
 	if type(slotNum) == "number" and slotNum >= 1 and slotNum <= 8 then
 		local hotbar = player:FindFirstChild("Hotbar")
 		if hotbar then
 			local slotVal = hotbar:FindFirstChild("Hotbar_" .. slotNum)
-			if slotVal then
-				slotVal.Value = tostring(itemName)
-			end
+			if slotVal then slotVal.Value = tostring(itemName) end
 		end
 	end
 end)
@@ -54,7 +44,7 @@ end)
 -- 0. KARAKTER TÖRLÉSE
 -- ==========================================
 DeleteCharacter.OnServerEvent:Connect(function(player, slotId)
-	if type(slotId) ~= "number" or slotId < 1 or slotId > 3 then return end
+	if type(slotId) ~= "number" or math.floor(slotId) ~= slotId or slotId < 1 or slotId > 3 then return end
 
 	if not deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId] = {} end
 	deletedSlotsCache[player.UserId][slotId] = true
@@ -64,10 +54,7 @@ DeleteCharacter.OnServerEvent:Connect(function(player, slotId)
 	end)
 
 	if success then
-		print(player.Name .. " karakterét VÉGLEGESEN TÖRÖLTÜK a(z) " .. slotId .. ". slotról.")
-		if activeSlots[player.UserId] == slotId then
-			activeSlots[player.UserId] = nil
-		end
+		if activeSlots[player.UserId] == slotId then activeSlots[player.UserId] = nil end
 	else
 		warn("Hiba a karakter törlésekor: " .. tostring(errorMessage))
 		deletedSlotsCache[player.UserId][slotId] = nil 
@@ -75,7 +62,7 @@ DeleteCharacter.OnServerEvent:Connect(function(player, slotId)
 end)
 
 -- ==========================================
--- 1. KARAKTER LISTA LEKÉRÉSE A MENÜHÖZ (Kliens hívja meg)
+-- 1. KARAKTER LISTA LEKÉRÉSE A MENÜHÖZ
 -- ==========================================
 GetCharacterList.OnServerInvoke = function(player)
 	local charList = {}
@@ -104,15 +91,43 @@ GetCharacterList.OnServerInvoke = function(player)
 end
 
 -- ==========================================
--- 2. KARAKTER BETÖLTÉSE ÉS JÁTÉK INDÍTÁSA
+-- 2. KARAKTER BETÖLTÉSE (SESSION LOCKKAL)
 -- ==========================================
 local function setupPlayer(player, slotId, overrideData)
+	if type(slotId) ~= "number" or math.floor(slotId) ~= slotId or slotId < 1 or slotId > 3 then return end
+
+	-- BIZTONSÁG 2: Race Condition védelem (Dupla gombnyomás)
+	if activeSlots[player.UserId] then return end 
+
 	local data = overrideData
 
 	if not data then
+		local locked = false
 		local success, result = pcall(function() 
-			return playerDataStore:GetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId) 
+			-- UpdateAsync a sima GetAsync helyett, hogy rátegyük a zárat (Session Lock)
+			return playerDataStore:UpdateAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, function(oldData)
+				if oldData then
+					-- SESSION LOCK ELLENŐRZÉS:
+					if oldData.SessionId and oldData.SessionId ~= SESSION_ID then
+						-- Ha a régi zár nem régebbi mint 10 perc, kibasszuk (még használatban van a kari)
+						if oldData.LastSaveTime and os.time() - oldData.LastSaveTime < 600 then
+							locked = true
+							return oldData -- Nem módosítjuk
+						end
+					end
+					-- Rárakjuk a mi saját zárunkat
+					oldData.SessionId = SESSION_ID
+					oldData.LastSaveTime = os.time()
+					return oldData
+				end
+				return nil
+			end) 
 		end)
+
+		if locked then
+			player:Kick("\n🛡️ ADATBÁZIS VÉDELEM 🛡️\nEzt a karaktert jelenleg egy másik szerver menti.\nKérlek várj 1 percet a szerverváltás után, hogy elkerüljük az item duplikációt!")
+			return
+		end
 
 		if not success or not result then
 			warn("HIBA: A játékos megpróbált betölteni egy üres vagy hibás slotot!")
@@ -125,7 +140,7 @@ local function setupPlayer(player, slotId, overrideData)
 	player:SetAttribute("Class", data.Class)
 
 	-- ==========================================
-	-- STATOK LÉTREHOZÁSA
+	-- STATOK ÉS MAPPÁK LÉTREHOZÁSA
 	-- ==========================================
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -163,26 +178,14 @@ local function setupPlayer(player, slotId, overrideData)
 		val.Value = (data.Stats and data.Stats[bStat]) or 0
 	end
 
-	-- ==========================================
-	-- JAVÍTÁS: HOTBAR TÖLTÉSE (Duplikáció elleni védelemmel)
-	-- ==========================================
-	local hotbar = player:FindFirstChild("Hotbar")
-	if not hotbar then
-		hotbar = Instance.new("Folder", player)
-		hotbar.Name = "Hotbar"
-	end
+	local hotbar = player:FindFirstChild("Hotbar") or Instance.new("Folder", player)
+	hotbar.Name = "Hotbar"
 	for i = 1, 8 do
-		local slot = hotbar:FindFirstChild("Hotbar_" .. i)
-		if not slot then
-			slot = Instance.new("StringValue", hotbar)
-			slot.Name = "Hotbar_" .. i
-		end
+		local slot = hotbar:FindFirstChild("Hotbar_" .. i) or Instance.new("StringValue", hotbar)
+		slot.Name = "Hotbar_" .. i
 		slot.Value = (data.Hotbar and data.Hotbar[tostring(i)]) or ""
 	end
 
-	-- ==========================================
-	-- TÁSKA, BANK, FELSZERELÉS, KÜLDETÉS BETÖLTÉSE
-	-- ==========================================
 	local inv = Instance.new("Folder", player)
 	inv.Name = "Inventory"
 	for i = 1, 128 do 
@@ -256,10 +259,11 @@ SelectCharacter.OnServerEvent:Connect(function(player, slotId)
 end)
 
 -- ==========================================
--- 3. ÚJ KARAKTER LÉTREHOZÁSA
+-- 3. ÚJ KARAKTER LÉTREHOZÁSA (ZÁROLÁSSAL)
 -- ==========================================
 CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
-	if slotId < 1 or slotId > 3 then return end
+	if type(slotId) ~= "number" or math.floor(slotId) ~= slotId or slotId < 1 or slotId > 3 then return end
+	if activeSlots[player.UserId] then return end 
 
 	local validClasses = {["GUARDIAN"] = true, ["SHADOWBLADE"] = true, ["SOULWEAVER"] = true, ["SEALER"] = true}
 	if not validClasses[string.upper(className)] then return end
@@ -273,16 +277,30 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 		Bank = {},
 		BankPassword = "000000",
 		BankUnlockedPages = 1,
-		Hotbar = {["1"] = "", ["2"] = "", ["3"] = "", ["4"] = "", ["5"] = "", ["6"] = "", ["7"] = "", ["8"] = ""} -- Üres hotbar kezdetben
+		Hotbar = {["1"] = "", ["2"] = "", ["3"] = "", ["4"] = "", ["5"] = "", ["6"] = "", ["7"] = "", ["8"] = ""} 
 	}
 
+	local locked = false
 	local success, errorMessage = pcall(function() 
-		playerDataStore:SetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, newData) 
+		playerDataStore:UpdateAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, function(oldData)
+			if oldData and oldData.SessionId and oldData.SessionId ~= SESSION_ID then
+				if oldData.LastSaveTime and os.time() - oldData.LastSaveTime < 600 then
+					locked = true
+					return oldData 
+				end
+			end
+			newData.SessionId = SESSION_ID
+			newData.LastSaveTime = os.time()
+			return newData
+		end) 
 	end)
 
-	if success then
-		print(player.Name .. " létrehozott egy új " .. className .. " karaktert a " .. slotId .. ". sloton!")
+	if locked then
+		player:Kick("\n🛡️ ADATBÁZIS VÉDELEM 🛡️\nEzt a slotot jelenleg egy másik szerver használja!")
+		return
+	end
 
+	if success then
 		if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId][slotId] = nil end
 		setupPlayer(player, slotId, newData)
 	else
@@ -292,9 +310,9 @@ end)
 
 
 -- ==========================================
--- 4. ADATOK MENTÉSE AZ AKTÍV SLOTRA
+-- 4. ADATOK MENTÉSE ÉS LOCK FELSZABADÍTÁS
 -- ==========================================
-local function savePlayerData(player)
+local function savePlayerData(player, isLeaving)
 	if savingPlayers[player.UserId] then return end
 
 	local slotId = activeSlots[player.UserId]
@@ -315,13 +333,10 @@ local function savePlayerData(player)
 		end
 	end
 
-	-- BEÉPÍTETT ÚJÍTÁS: HOTBAR MENTÉSE ADATBÁZISBA
 	if player:FindFirstChild("Hotbar") then
 		for i = 1, 8 do
 			local slot = player.Hotbar:FindFirstChild("Hotbar_" .. i)
-			if slot then
-				data.Hotbar[tostring(i)] = slot.Value
-			end
+			if slot then data.Hotbar[tostring(i)] = slot.Value end
 		end
 	end
 
@@ -353,26 +368,51 @@ local function savePlayerData(player)
 	end
 
 	local success, errorMessage = pcall(function() 
-		playerDataStore:SetAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, data) 
-	end)
+		playerDataStore:UpdateAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, function(oldData)
+			-- BIZTONSÁG 3: Ha közben más szerver ellopta a lockot, nem mentünk rá!
+			if oldData and oldData.SessionId and oldData.SessionId ~= SESSION_ID then
+				warn(player.Name .. " adatait nem lehet menteni, elvesztette a Session Lock-ot!")
+				return oldData 
+			end
 
-	if success then 
-		print(player.Name .. " (" .. data.Class .. ") adatai elmentve a " .. slotId .. ". slotra!") 
-	else 
-		warn("Nem sikerült menteni! " .. tostring(errorMessage)) 
-	end
+			-- Ha kilép, töröljük a lockot, hogy egyből be tudjon lépni máshol!
+			if isLeaving then
+				data.SessionId = nil 
+			else
+				data.SessionId = SESSION_ID
+			end
+			data.LastSaveTime = os.time()
+
+			return data
+		end) 
+	end)
 
 	savingPlayers[player.UserId] = nil
 end
 
-game.Players.PlayerRemoving:Connect(function(player)
+-- ==========================================
+-- AUTOSAVE 2 PERCENKÉNT (Crash Rollback védelem)
+-- ==========================================
+task.spawn(function()
+	while task.wait(120) do
+		for _, player in pairs(Players:GetPlayers()) do
+			if activeSlots[player.UserId] then
+				savePlayerData(player, false)
+			end
+		end
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	savePlayerData(player, true)
+	-- MEMORY LEAK TAKARÍTÁS
 	if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId] = nil end
-	savePlayerData(player)
+	if activeSlots[player.UserId] then activeSlots[player.UserId] = nil end
 end)
 
 game:BindToClose(function()
-	for _, player in pairs(game.Players:GetPlayers()) do 
-		task.spawn(function() savePlayerData(player) end) 
+	for _, player in pairs(Players:GetPlayers()) do 
+		task.spawn(function() savePlayerData(player, true) end) 
 	end
 	task.wait(2) 
 end)

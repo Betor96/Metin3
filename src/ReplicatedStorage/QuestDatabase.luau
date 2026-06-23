@@ -29,7 +29,7 @@ local QuestDatabase = {
 	["Falu Őse hívat"] = {
 		Type = "Talk", TargetNPC = "Faluose", 
 		RewardExp = 50, RewardGold = 100, 
-		GiverNPC = "Varosor", MinLevel = 10,
+		GiverNPC = "Varosor", MinLevel = 40,
 		Description = "Menj el a Falu Őséhez, beszélni akar veled!",
 		AcceptText = "Hé, te ott! A Falu Őse már napok óta téged keres. Valami nagyon fontos és sürgős ügyben akar beszélni veled. Keresd meg őt azonnal!",
 		CompleteText = "Ah, te lennél az az ifjú hős, akiről a Városőr beszélt? Örülök, hogy eljöttél, nagy feladatok várnak még rád...",

@@ -546,7 +546,7 @@ for _, child in pairs(invFolder:GetChildren()) do child.Changed:Connect(renderIt
 for _, child in pairs(eqFolder:GetChildren()) do child.Changed:Connect(renderItems) end
 
 task.delay(1, function()
-	local stats = player:WaitForChild("PlayerStats")
+	local stats = player:WaitForChild("PlayerStats", 99999)
 	if stats:FindFirstChild("UnlockedPages") then stats.UnlockedPages.Changed:Connect(renderItems) end
 	renderItems()
 end)

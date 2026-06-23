@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local stats = player:WaitForChild("PlayerStats")
+local stats = player:WaitForChild("PlayerStats", 99999)
 local Events = ReplicatedStorage:WaitForChild("Events")
 local AddStatPoint = Events:WaitForChild("AddStatPoint")
 

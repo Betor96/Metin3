@@ -14,10 +14,14 @@ local function updateWalkSpeed(player)
 	if not hum then return end
 
 	local rawClass = player:GetAttribute("Class") or "GUARDIAN"
-	local pClass = string.upper(rawClass)
+	local pClass = string.upper(tostring(rawClass))
 
-	local ms = stats:FindFirstChild("MovementSpeed") and stats.MovementSpeed.Value or 0
-	local def = stats:FindFirstChild("Defense") and stats.Defense.Value or 0
+	-- Szigorú szám konverzió a Roblox Typechecker megnyugtatására
+	local msStat = stats:FindFirstChild("MovementSpeed")
+	local ms = msStat and tonumber(msStat.Value) or 0
+
+	local defStat = stats:FindFirstChild("Defense")
+	local def = defStat and tonumber(defStat.Value) or 0
 
 	local baseSpeed = 16
 	local activeSpeed = baseSpeed * (1 + (ms / 100))
@@ -36,7 +40,13 @@ local function updateWalkSpeed(player)
 		activeSpeed = activeSpeed - 3.2
 	end
 
-	hum.WalkSpeed = math.max(baseSpeed * 0.25, activeSpeed)
+	-- BIZTONSÁG: Ha bármilyen matematikai baki miatt nem szám lenne az eredmény, visszaáll alapra
+	if type(activeSpeed) ~= "number" or activeSpeed ~= activeSpeed then
+		activeSpeed = 16
+	end
+
+	-- 4-es minimum határ (baseSpeed * 0.25)
+	hum.WalkSpeed = math.max(4, activeSpeed)
 	player:SetAttribute("TrueWalkSpeed", hum.WalkSpeed)
 end
 
@@ -204,8 +214,8 @@ local function recalculateStats(player)
 end
 
 local function setupPlayer(player)
-	local stats = player:WaitForChild("PlayerStats")
-	local eq = player:WaitForChild("Equipment")
+	local stats = player:WaitForChild("PlayerStats", 99999)
+	local eq = player:WaitForChild("Equipment", 99999)
 
 	-- JAVÍTÁS: Figyeljük a szintlépést, és azonnal frissítjük a statokat!
 	local leaderstats = player:WaitForChild("leaderstats", 10)

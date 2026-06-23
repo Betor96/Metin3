@@ -25,7 +25,17 @@ end
 local activePlayerEffects = {}
 local playerCooldowns = {} 
 
+-- ==========================================
+-- BIZTONSÁG 1: ANTI-SPAM (Race Condition védelem)
+-- Megakadályozza, hogy egy macro ezredmásodpercenként 100x használjon valamit
+-- ==========================================
+local playerLocks = {}
+
 UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
+	-- Anti-Spam: Max 10 kérés másodpercenként (0.1 sec limit)
+	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < 0.1 then return end
+	playerLocks[player.UserId] = tick()
+
 	local character = player.Character
 	local humanoid = character and character:FindFirstChild("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -42,12 +52,12 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 		if not playerCooldowns[player.UserId] then playerCooldowns[player.UserId] = {} end
 		local lastUsed = playerCooldowns[player.UserId][itemName] or 0
 
-		-- Közös Cooldown (Újratöltés) ellenőrzés minden skillnél
+		-- Közös Cooldown (Újratöltés) ellenőrzés szerver oldalon
 		if tick() - lastUsed < skill.Cooldown then return end 
 
 		local manaStat = stats:FindFirstChild("Mana")
 
-		-- JAVÍTÁS: Toggle (Kibe/Bekapcsolós) képességek Cooldown kezelése
+		-- Toggle (Kibe/Bekapcsolós) képességek Cooldown kezelése
 		if skill.IsToggle then
 			local currentToggleState = player:GetAttribute(skill.ToggleAttribute)
 
@@ -56,44 +66,51 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 				if not manaStat or manaStat.Value < skill.Mana then return end
 			end
 
+			-- BIZTONSÁG 2: Azonnal beállítjuk a cooldownt, Még MIELŐTT a skill lefutna!
+			-- Így ha a skill yieldel (vár), akkor sem lehet duplán elindítani.
+			playerCooldowns[player.UserId][itemName] = tick()
+
 			local success = skill.Execute(player, character, root, mousePos, target)
 
 			if success then
-				-- JAVÍTÁS: Sikeres használat után elindítjuk a Vizuális Cooldown-t a UI-on
-				playerCooldowns[player.UserId][itemName] = tick()
 				SkillCooldown:FireClient(player, itemName, skill.Cooldown)
 
 				if not currentToggleState then
-					-- Bekapcsolás: Mana levonása és Végtelen Buff ikon kirakása
 					if manaStat then manaStat.Value -= skill.Mana end
 					ApplyEffect:FireClient(player, itemName, itemName, 0, 99999) 
 				else
-					-- Kikapcsolás: Nem von manát, csak letörli a Buff ikont (0 mp)
 					ApplyEffect:FireClient(player, itemName, itemName, 0, 0)
 				end
+			else
+				-- Ha valamiért mégsem sikerült (pl. rossz target), visszaadjuk a cooldownt
+				playerCooldowns[player.UserId][itemName] = 0
 			end
 			return
 		end
 
-		-- Normál aktív képességek (Mik amik Manát vonnak)
+		-- Normál aktív képességek
 		if manaStat and manaStat.Value >= skill.Mana then
+			-- BIZTONSÁG 2: Cooldown előre rögzítve!
+			playerCooldowns[player.UserId][itemName] = tick() 
+
 			local success = skill.Execute(player, character, root, mousePos, target)
 
 			if success then
 				manaStat.Value -= skill.Mana
-				playerCooldowns[player.UserId][itemName] = tick() 
 				SkillCooldown:FireClient(player, itemName, skill.Cooldown)
 
 				if skill.Duration then
 					ApplyEffect:FireClient(player, itemName, itemName, 0, skill.Duration)
 				end
+			else
+				playerCooldowns[player.UserId][itemName] = 0
 			end
 		end
 		return
 	end
 
 	-- ==========================================
-	-- 2. HA TÁRGY LETT HASZNÁLVA (Potik)
+	-- 2. HA TÁRGY LETT HASZNÁLVA (Potik, Buffok)
 	-- ==========================================
 	local itemData = ItemDatabase[itemName]
 	if not itemData or itemData.Type ~= "Fogyóeszköz" then return end
@@ -113,15 +130,29 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 	end
 
 	if not foundSlot then return end
-	local usedSuccessfully = false
 
+	-- BIZTONSÁG 3: Ellenőrizzük, hogy van-e még belőle (Race Condition védelem)
+	local amtObj = foundSlot:FindFirstChild("Amount")
+	local currentAmt = amtObj and amtObj.Value or 1
+	if currentAmt <= 0 then return end
+
+	-- BIZTONSÁG 4: AZONNAL vonjuk le a tárgyat! (Ne utólag!)
+	if amtObj then
+		amtObj.Value -= 1
+		if amtObj.Value <= 0 then
+			foundSlot.Value = ""
+			amtObj.Value = 0
+		end
+	else
+		foundSlot.Value = ""
+	end
+
+	-- EFFEKTEK ALKALMAZÁSA (Miután a tárgy már biztonságosan el is tűnt a táskából)
 	if itemName == "Életerő Ital" and humanoid then
 		humanoid.Health = math.min(humanoid.Health + (itemData.HealAmount or 0), humanoid.MaxHealth)
-		usedSuccessfully = true
 
 	elseif itemName == "Mana Ital" and stats:FindFirstChild("Mana") and stats:FindFirstChild("MaxMana") then
 		stats.Mana.Value = math.min(stats.Mana.Value + (itemData.HealAmount or 0), stats.MaxMana.Value)
-		usedSuccessfully = true
 
 	elseif itemData.Effect then
 		if not itemData.Value or not itemData.Duration then return end
@@ -133,7 +164,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 
 			if activePlayerEffects[userId][itemData.Effect] then
 				ApplyEffect:FireClient(player, itemName, itemData.Effect, itemData.Value, itemData.Duration)
-				usedSuccessfully = true
 			else
 				statObj.Value = statObj.Value + itemData.Value
 				activePlayerEffects[userId][itemData.Effect] = true
@@ -143,7 +173,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 				end
 
 				ApplyEffect:FireClient(player, itemName, itemData.Effect, itemData.Value, itemData.Duration)
-				usedSuccessfully = true
 
 				task.spawn(function()
 					task.wait(itemData.Duration)
@@ -164,22 +193,10 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 			end
 		end
 	end
-
-	if usedSuccessfully then
-		local amtObj = foundSlot:FindFirstChild("Amount")
-		if amtObj then
-			amtObj.Value -= 1
-			if amtObj.Value <= 0 then
-				foundSlot.Value = ""
-				amtObj.Value = 0
-			end
-		else
-			foundSlot.Value = ""
-		end
-	end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
 	activePlayerEffects[player.UserId] = nil
 	playerCooldowns[player.UserId] = nil
+	playerLocks[player.UserId] = nil -- Takarítjuk a memóriát kilépéskor
 end)

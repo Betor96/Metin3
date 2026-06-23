@@ -76,7 +76,7 @@ goldLabel.TextSize = 14
 goldLabel.TextXAlignment = Enum.TextXAlignment.Right
 goldLabel.Parent = goldContainer
 
-local stats = player:WaitForChild("PlayerStats")
+local stats = player:WaitForChild("PlayerStats", 99999)
 local goldStat = stats:WaitForChild("Gold")
 
 local function updateGold()

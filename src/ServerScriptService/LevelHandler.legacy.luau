@@ -39,14 +39,14 @@ local function healCharacter(player)
 end
 
 Players.PlayerAdded:Connect(function(player)
-	local stats = player:WaitForChild("PlayerStats")
-	local exp = stats:WaitForChild("Experience")
-	local level = stats:WaitForChild("Level")
-	local statPoints = stats:WaitForChild("StatPoints")
-	local mana = stats:WaitForChild("Mana")
-	local maxMana = stats:WaitForChild("MaxMana")
-	local leaderstats = player:WaitForChild("leaderstats")
-	local leaderLevel = leaderstats:WaitForChild("Level")
+	local stats = player:WaitForChild("PlayerStats", 99999)
+	local exp = stats:WaitForChild("Experience", 99999)
+	local level = stats:WaitForChild("Level", 99999)
+	local statPoints = stats:WaitForChild("StatPoints", 99999)
+	local mana = stats:WaitForChild("Mana", 99999)
+	local maxMana = stats:WaitForChild("MaxMana", 99999)
+	local leaderstats = player:WaitForChild("leaderstats", 99999)
+	local leaderLevel = leaderstats:WaitForChild("Level", 99999)
 
 	local maxExp = stats:FindFirstChild("MaxExperience") or Instance.new("IntValue", stats)
 	maxExp.Name = "MaxExperience"
