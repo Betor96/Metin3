@@ -3,10 +3,11 @@
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SpawnDatabase = require(ReplicatedStorage:WaitForChild("SpawnDatabase"))
+local HttpService = game:GetService("HttpService")
 
 local spawnZonesFolder = Workspace:WaitForChild("SpawnZones")
 
-local function getFolder(folderName)
+local function ensureFolder(folderName)
 	local folder = Workspace:FindFirstChild(folderName)
 	if not folder then
 		folder = Instance.new("Folder")
@@ -16,12 +17,8 @@ local function getFolder(folderName)
 	return folder
 end
 
-task.wait(1) 
-local monstersFolder = getFolder("Monsters")
-local metinFolder = getFolder("MetinStones")
-local oresFolder = getFolder("Ores") -- ÚJ: Ércek mappája
-
 local function getRandomGroundPosition(zonePart)
+	if not zonePart or not zonePart.Parent then return Vector3.new(0, 50, 0) end
 	local rx = zonePart.Position.X + (math.random() - 0.5) * zonePart.Size.X
 	local rz = zonePart.Position.Z + (math.random() - 0.5) * zonePart.Size.Z
 	local startY = zonePart.Position.Y + (zonePart.Size.Y / 2) + 20 
@@ -31,8 +28,12 @@ local function getRandomGroundPosition(zonePart)
 
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
-	-- ÚJ: Az Ores mappát is kihagyjuk a Raycastból
-	rayParams.FilterDescendantsInstances = {spawnZonesFolder, monstersFolder, metinFolder, oresFolder}
+	rayParams.FilterDescendantsInstances = {
+		spawnZonesFolder, 
+		ensureFolder("Monsters"), 
+		ensureFolder("MetinStones"), 
+		ensureFolder("Ores")
+	}
 
 	local result = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
 	if result then
@@ -42,15 +43,17 @@ local function getRandomGroundPosition(zonePart)
 	end
 end
 
-local HttpService = game:GetService("HttpService")
-
 local function spawnPack(zoneName, zoneData, zonePart)
-	local centerPos = getRandomGroundPosition(zonePart)
-	local aliveCount = #zoneData.Pack
-	local spawnedEntities = {}
+	if not zonePart then 
+		warn("❌ [" .. zoneName .. "] A Spawn Zóna (kocka) eltűnt a pályáról!")
+		return 
+	end
 
+	local centerPos = getRandomGroundPosition(zonePart)
 	local packID = HttpService:GenerateGUID(false)
 	local MonsterDatabase = require(ReplicatedStorage:WaitForChild("MonsterDatabase"))
+
+	local packEntities = {}
 
 	for i, entityName in ipairs(zoneData.Pack) do
 		local template = ReplicatedStorage:FindFirstChild(entityName)
@@ -58,7 +61,7 @@ local function spawnPack(zoneName, zoneData, zonePart)
 			local newEntity = template:Clone()
 			newEntity:SetAttribute("PackID", packID)
 
-			local angle = (i / aliveCount) * math.pi * 2
+			local angle = (i / #zoneData.Pack) * math.pi * 2
 			local offset = Vector3.new(math.cos(angle) * 4, 3, math.sin(angle) * 4)
 
 			if newEntity:FindFirstChild("HumanoidRootPart") then
@@ -67,65 +70,87 @@ local function spawnPack(zoneName, zoneData, zonePart)
 				newEntity:PivotTo(CFrame.new(centerPos + offset))
 			end
 
-			-- ==========================================
-			-- ÚJ: ÉRCEK KÜLÖNVÁLASZTÁSA ÉS HORGONYZÁSA
-			-- ==========================================
 			local dbData = MonsterDatabase[entityName]
 
 			if dbData and dbData.Type == "Ore" then
 				newEntity:SetAttribute("IsOre", true)
-				newEntity.Parent = oresFolder
-				if newEntity:FindFirstChild("HumanoidRootPart") then
-					newEntity.HumanoidRootPart.Anchored = true 
-				end
+				newEntity.Parent = ensureFolder("Ores")
+				if newEntity:FindFirstChild("HumanoidRootPart") then newEntity.HumanoidRootPart.Anchored = true end
 			elseif zoneData.Type == "MetinStone" then
-				newEntity.Parent = metinFolder
-				if newEntity:FindFirstChild("HumanoidRootPart") then
-					newEntity.HumanoidRootPart.Anchored = true 
-				end
+				newEntity.Parent = ensureFolder("MetinStones")
+				if newEntity:FindFirstChild("HumanoidRootPart") then newEntity.HumanoidRootPart.Anchored = true end
 			else
-				newEntity.Parent = monstersFolder
-				if newEntity:FindFirstChild("HumanoidRootPart") then
-					newEntity.HumanoidRootPart.Anchored = false 
-				end
+				newEntity.Parent = ensureFolder("Monsters")
+				if newEntity:FindFirstChild("HumanoidRootPart") then newEntity.HumanoidRootPart.Anchored = false end
 			end
 
-			table.insert(spawnedEntities, newEntity)
-
-			local humanoid = newEntity:WaitForChild("Humanoid", 3)
-			if humanoid then
-				local isDead = false
-				humanoid.Died:Connect(function()
-					if isDead then return end
-					isDead = true
-					aliveCount -= 1
-
-					if aliveCount <= 0 then
-						task.spawn(function()
-							task.wait(zoneData.RespawnTime)
-							spawnPack(zoneName, zoneData, zonePart)
-						end)
-					end
-				end)
-			end
+			table.insert(packEntities, newEntity)
 		else
-			warn("SPAWN HIBA: Nem talalhato a(z) " .. entityName .. " nevu modell a ReplicatedStorage-ben!")
+			warn("❌ SPAWN HIBA: Nem talalhato a(z) " .. tostring(entityName) .. " nevu modell a ReplicatedStorage-ben!")
 		end
 	end
+
+	print("✅ [" .. zoneName .. "] Sikeresen leidézve " .. #packEntities .. " szörny!")
+
+	-- ==========================================
+	-- AGRESSZÍV RESPAWN FIGYELŐ
+	-- ==========================================
+	task.spawn(function()
+		if #packEntities == 0 then return end
+		local waitTime = zoneData.RespawnTime or 15
+
+		while true do
+			task.wait(2) 
+			local aliveCount = 0
+
+			-- Ezt a részt cseréld ki a while ciklus belsejében:
+			for _, entity in ipairs(packEntities) do
+				-- Szigorú ellenőrzés:
+				-- 1. Van-e még Parentje (ha törölted, a Parent nil lesz)
+				-- 2. Benne van-e még a Workspace-ben?
+				-- 3. Ha a Humanoid még ott van és él?
+				if entity and entity.Parent ~= nil and entity:IsDescendantOf(Workspace) then
+					local hum = entity:FindFirstChild("Humanoid")
+					if hum and hum.Health > 0 then
+						aliveCount = aliveCount + 1
+					end
+				end
+			end
+
+			-- Ha a szám nulla lett, akkor kitörölted őket vagy meghaltak!
+			if aliveCount == 0 then
+				print("💀 [" .. zoneName .. "] A falka teljesen eltűnt/meghalt! Várunk " .. waitTime .. " másodpercet...")
+
+				-- Várunk
+				task.wait(waitTime)
+
+				print("✨ [" .. zoneName .. "] Az idő letelt, újraélesztés indítása!")
+				spawnPack(zoneName, zoneData, zonePart)
+
+				break -- Leállítjuk Ezt a ciklust, mert az új falkának már új ciklus kell
+			end
+		end
+	end)
 end
 
+-- ==========================================
+-- JÁTÉK INDULÁSA
+-- ==========================================
 task.spawn(function()
 	task.wait(2) 
+	print("🚀 SpawnManager elindult, zónák betöltése...")
+
 	for zoneName, zoneData in pairs(SpawnDatabase) do
 		local zonePart = spawnZonesFolder:FindFirstChild(zoneName)
 		if zonePart then
-			-- BIZTONSÁGI JAVÍTÁS: Ha a MaxPacks nil, akkor alapból 1-et használunk, hogy ne fagyjon le!
 			local maxPacks = zoneData.MaxPacks or 1 
-
+			print("📌 [" .. zoneName .. "] Zóna megtalálva! " .. maxPacks .. " falka fog spawnolni.")
 			for i = 1, maxPacks do
 				task.wait(0.2) 
 				spawnPack(zoneName, zoneData, zonePart)
 			end
+		else
+			warn("❌ Hiba: Nem létezik '" .. zoneName .. "' nevű zóna a Workspace.SpawnZones mappában!")
 		end
 	end
 end)
