@@ -28,8 +28,12 @@ layout.Parent = menuContainer
 local function createMenuButton(title, hotkeyStr, action)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(0, 80, 0, 35)
-	btn.BackgroundColor3 = Color3.fromRGB(20, 15, 15)
-	btn.BorderColor3 = Color3.fromRGB(100, 30, 30)
+
+	-- ==========================================
+	-- METINESÍTÉS (Színek és Keretek)
+	-- ==========================================
+	btn.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Sötét, rusztikus háttér
+	btn.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
 	btn.BorderSizePixel = 2
 	btn.Text = title
 	btn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -42,12 +46,20 @@ local function createMenuButton(title, hotkeyStr, action)
 	hotkeyLabel.Position = UDim2.new(0, 2, 0, 2)
 	hotkeyLabel.BackgroundTransparency = 1
 	hotkeyLabel.Text = hotkeyStr
-	hotkeyLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+	hotkeyLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Élénkebb arany a gyorsgomb betűnek
 	hotkeyLabel.Font = Enum.Font.GothamBlack
 	hotkeyLabel.TextSize = 10
 	hotkeyLabel.TextXAlignment = Enum.TextXAlignment.Left
 	hotkeyLabel.TextYAlignment = Enum.TextYAlignment.Top
 	hotkeyLabel.Parent = btn
+
+	-- Rámutatás (Hover) effekt a gombokra!
+	btn.MouseEnter:Connect(function()
+		btn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+	end)
+	btn.MouseLeave:Connect(function()
+		btn.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+	end)
 
 	btn.MouseButton1Click:Connect(action)
 	return btn

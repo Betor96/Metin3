@@ -15,6 +15,12 @@ local UpgradeResult = Events:WaitForChild("UpgradeResult")
 
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
+-- ==========================================
+-- ÚJ: TOOLTIP MANAGER ÉS SKILL DATABASE
+-- ==========================================
+local TooltipManager = require(ReplicatedStorage:WaitForChild("TooltipManager"))
+local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local mouse = player:GetMouse()
@@ -30,11 +36,14 @@ local eqNameToServer = {
 	["Pajzs"] = "Pajzs", ["Karkötő"] = "Karkoto"
 }
 
+-- ==========================================
+-- KOVÁCS ABLAK (METINESÍTVE)
+-- ==========================================
 local bsFrame = Instance.new("Frame")
 bsFrame.Size = UDim2.new(0, 250, 0, 200)
 bsFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
-bsFrame.BackgroundColor3 = Color3.fromRGB(30, 20, 20)
-bsFrame.BorderColor3 = Color3.fromRGB(150, 100, 50)
+bsFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Metines háttér
+bsFrame.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
 bsFrame.BorderSizePixel = 3
 bsFrame.Active = true
 bsFrame.Visible = false
@@ -43,8 +52,10 @@ bsFrame.Parent = invHud
 
 local bsTitle = Instance.new("TextLabel", bsFrame)
 bsTitle.Size = UDim2.new(1, 0, 0, 30)
-bsTitle.BackgroundColor3 = Color3.fromRGB(50, 30, 30)
-bsTitle.TextColor3 = Color3.new(1, 1, 1)
+bsTitle.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+bsTitle.BorderColor3 = Color3.fromRGB(180, 140, 50)
+bsTitle.BorderSizePixel = 1
+bsTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 bsTitle.Text = "KOVÁCS"
 bsTitle.Font = Enum.Font.GothamBold
 bsTitle.ZIndex = 51
@@ -62,6 +73,7 @@ local bsYesBtn = Instance.new("TextButton", bsFrame)
 bsYesBtn.Size = UDim2.new(0, 100, 0, 30)
 bsYesBtn.Position = UDim2.new(0, 15, 1, -40)
 bsYesBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+bsYesBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 bsYesBtn.TextColor3 = Color3.new(1, 1, 1)
 bsYesBtn.Text = "Fejlesztés"
 bsYesBtn.Font = Enum.Font.GothamBold
@@ -71,6 +83,7 @@ local bsNoBtn = Instance.new("TextButton", bsFrame)
 bsNoBtn.Size = UDim2.new(0, 100, 0, 30)
 bsNoBtn.Position = UDim2.new(1, -115, 1, -40)
 bsNoBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+bsNoBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 bsNoBtn.TextColor3 = Color3.new(1, 1, 1)
 bsNoBtn.Text = "Mégse"
 bsNoBtn.Font = Enum.Font.GothamBold
@@ -98,11 +111,14 @@ UpgradeResult.OnClientEvent:Connect(function(msg)
 	bsNoBtn.Text = "Mégse"
 end)
 
+-- ==========================================
+-- ELADÁS ABLAK (METINESÍTVE)
+-- ==========================================
 local sellFrame = Instance.new("Frame")
 sellFrame.Size = UDim2.new(0, 250, 0, 150)
 sellFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
-sellFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
-sellFrame.BorderColor3 = Color3.fromRGB(50, 100, 150)
+sellFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+sellFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
 sellFrame.BorderSizePixel = 3
 sellFrame.Active = true
 sellFrame.Visible = false
@@ -111,8 +127,10 @@ sellFrame.Parent = invHud
 
 local sellTitle = Instance.new("TextLabel", sellFrame)
 sellTitle.Size = UDim2.new(1, 0, 0, 30)
-sellTitle.BackgroundColor3 = Color3.fromRGB(30, 50, 70)
-sellTitle.TextColor3 = Color3.new(1, 1, 1)
+sellTitle.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+sellTitle.BorderColor3 = Color3.fromRGB(180, 140, 50)
+sellTitle.BorderSizePixel = 1
+sellTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 sellTitle.Text = "ELADÁS"
 sellTitle.Font = Enum.Font.GothamBold
 sellTitle.ZIndex = 61
@@ -130,6 +148,7 @@ local sellYesBtn = Instance.new("TextButton", sellFrame)
 sellYesBtn.Size = UDim2.new(0, 100, 0, 30)
 sellYesBtn.Position = UDim2.new(0, 15, 1, -40)
 sellYesBtn.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+sellYesBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 sellYesBtn.TextColor3 = Color3.new(1, 1, 1)
 sellYesBtn.Text = "Eladás"
 sellYesBtn.Font = Enum.Font.GothamBold
@@ -139,6 +158,7 @@ local sellNoBtn = Instance.new("TextButton", sellFrame)
 sellNoBtn.Size = UDim2.new(0, 100, 0, 30)
 sellNoBtn.Position = UDim2.new(1, -115, 1, -40)
 sellNoBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+sellNoBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 sellNoBtn.TextColor3 = Color3.new(1, 1, 1)
 sellNoBtn.Text = "Mégse"
 sellNoBtn.Font = Enum.Font.GothamBold
@@ -176,12 +196,14 @@ local function promptSell(slotName, itemName)
 	sellFrame.Visible = true
 end
 
--- ELDOBÁS / MEGSEMMISÍTÉS ABLAK
+-- ==========================================
+-- ELDOBÁS / MEGSEMMISÍTÉS ABLAK (METINESÍTVE)
+-- ==========================================
 local discardFrame = Instance.new("Frame")
 discardFrame.Size = UDim2.new(0, 300, 0, 150)
 discardFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-discardFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
-discardFrame.BorderColor3 = Color3.fromRGB(150, 50, 50)
+discardFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+discardFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
 discardFrame.BorderSizePixel = 3
 discardFrame.Active = true
 discardFrame.Visible = false
@@ -190,8 +212,10 @@ discardFrame.Parent = invHud
 
 local discardTitle = Instance.new("TextLabel", discardFrame)
 discardTitle.Size = UDim2.new(1, 0, 0, 30)
-discardTitle.BackgroundColor3 = Color3.fromRGB(70, 30, 30)
-discardTitle.TextColor3 = Color3.new(1, 1, 1)
+discardTitle.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+discardTitle.BorderColor3 = Color3.fromRGB(180, 140, 50)
+discardTitle.BorderSizePixel = 1
+discardTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 discardTitle.Text = "TÁRGY KEZELÉSE"
 discardTitle.Font = Enum.Font.GothamBold
 discardTitle.ZIndex = 61
@@ -209,6 +233,7 @@ local btnDrop = Instance.new("TextButton", discardFrame)
 btnDrop.Size = UDim2.new(0, 85, 0, 30)
 btnDrop.Position = UDim2.new(0, 10, 1, -40)
 btnDrop.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
+btnDrop.BorderColor3 = Color3.fromRGB(180, 140, 50)
 btnDrop.TextColor3 = Color3.new(1, 1, 1)
 btnDrop.Text = "Eldobás"
 btnDrop.Font = Enum.Font.GothamBold
@@ -218,6 +243,7 @@ local btnDestroy = Instance.new("TextButton", discardFrame)
 btnDestroy.Size = UDim2.new(0, 100, 0, 30)
 btnDestroy.Position = UDim2.new(0, 100, 1, -40)
 btnDestroy.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+btnDestroy.BorderColor3 = Color3.fromRGB(180, 140, 50)
 btnDestroy.TextColor3 = Color3.new(1, 1, 1)
 btnDestroy.Text = "Megsemmisítés"
 btnDestroy.Font = Enum.Font.GothamBold
@@ -226,7 +252,8 @@ btnDestroy.ZIndex = 61
 local btnCancel = Instance.new("TextButton", discardFrame)
 btnCancel.Size = UDim2.new(0, 85, 0, 30)
 btnCancel.Position = UDim2.new(1, -95, 1, -40)
-btnCancel.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+btnCancel.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+btnCancel.BorderColor3 = Color3.fromRGB(180, 140, 50)
 btnCancel.TextColor3 = Color3.new(1, 1, 1)
 btnCancel.Text = "Mégse"
 btnCancel.Font = Enum.Font.GothamBold
@@ -258,59 +285,42 @@ btnDestroy.MouseButton1Click:Connect(function()
 	end
 end)
 
--- TOOLTIP RENDSZER
-local tooltipGui = Instance.new("ScreenGui")
-tooltipGui.Name = "TooltipHUD"
-tooltipGui.DisplayOrder = 99999
-tooltipGui.ResetOnSpawn = false
-tooltipGui.Parent = player:WaitForChild("PlayerGui")
 
-local tooltip = Instance.new("Frame")
-tooltip.Size = UDim2.new(0, 200, 0, 100)
-tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-tooltip.BorderColor3 = Color3.fromRGB(100, 80, 50)
-tooltip.BorderSizePixel = 2
-tooltip.Visible = false
-tooltip.Parent = tooltipGui
-
-local tooltipTitle = Instance.new("TextLabel", tooltip)
-tooltipTitle.Size = UDim2.new(1, 0, 0, 25)
-tooltipTitle.BackgroundTransparency = 1
-tooltipTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
-tooltipTitle.Font = Enum.Font.GothamBold
-tooltipTitle.ZIndex = 1000
-
-local tooltipDesc = Instance.new("TextLabel", tooltip)
-tooltipDesc.Size = UDim2.new(1, -10, 1, -30)
-tooltipDesc.Position = UDim2.new(0, 5, 0, 30)
-tooltipDesc.BackgroundTransparency = 1
-tooltipDesc.TextColor3 = Color3.new(1, 1, 1)
-tooltipDesc.Font = Enum.Font.Gotham
-tooltipDesc.TextSize = 12
-tooltipDesc.TextWrapped = true
-tooltipDesc.TextYAlignment = Enum.TextYAlignment.Top
-
-local function updateTooltipPosition()
-	if not tooltip.Visible then return end
-	local mousePos = UserInputService:GetMouseLocation()
-	local viewportSize = Camera.ViewportSize
-	local inset = GuiService:GetGuiInset()
-	local tipWidth, tipHeight = 200, 100 
-	local xPos, yPos = mousePos.X + 15, mousePos.Y - inset.Y + 15
-
-	if xPos + tipWidth > viewportSize.X then xPos = mousePos.X - tipWidth - 15 end
-	if yPos + tipHeight > viewportSize.Y then yPos = mousePos.Y - inset.Y - tipHeight - 15 end
-	tooltip.Position = UDim2.new(0, xPos, 0, yPos)
-end
-RunService.RenderStepped:Connect(updateTooltipPosition)
-
-local function getTooltipText(itemName)
+-- ==========================================
+-- JAVÍTÁS: A TÁRGYAKHOZ HASZNÁLJUK AZ ÚJ TOOLTIP MANAGERT!
+-- ==========================================
+local function getTooltipDataForItem(itemName, isEquipped)
 	local data = ItemDatabase[itemName]
-	if not data then return "A képességeidet behúzhatod a Hotbarba a használathoz!" end
-	local text = ""
-	if data.Type == "Fegyver" then text = "Szint: " .. (data.Level or 1) .. "\nSebzés: " .. (data.MinDmg or 0) .. " - " .. (data.MaxDmg or 0) .. "\n\n"
-	elseif data.Type == "Páncél" then text = "Szint: " .. (data.Level or 1) .. "\nVédelem: " .. (data.Defense or 0) .. "\n\n" end
-	return text .. (data.Description or "")
+	if not data then return nil end
+
+	local toolData = {
+		Name = itemName,
+		Icon = "rbxassetid://0",
+	}
+
+	if data.Type == "Fegyver" then
+		toolData.Active = "Szintkövetelmény: " .. (data.Level or 1)
+		toolData.Passive = string.format("Sebzés: <font color='rgb(255,100,50)'>%d - %d</font>", data.MinDmg or 0, data.MaxDmg or 0)
+
+	elseif data.Type == "Páncél" then
+		toolData.Active = "Szintkövetelmény: " .. (data.Level or 1)
+		toolData.Passive = string.format("Védelem: <font color='rgb(50,150,255)'>+%d Páncél</font>", data.Defense or 0)
+
+	elseif data.Type == "Fogyóeszköz" then
+		toolData.Active = "Nyomd meg a gombot vagy kattints duplán a használathoz."
+	end
+
+	if data.Description then
+		toolData.Passive = (toolData.Passive and (toolData.Passive .. "\n\n") or "") .. "<i>" .. data.Description .. "</i>"
+	end
+
+	if isEquipped then
+		toolData.BottomStats = {{"Állapot", "Felszerelve"}}
+	elseif data.Price then
+		toolData.BottomStats = {{"Érték", (data.Price) .. " Pénz"}}
+	end
+
+	return toolData
 end
 
 -- TAKARÍTÁS ÉS UI GENERÁLÁS
@@ -329,20 +339,24 @@ end
 
 local slotContainer = Instance.new("Frame", invMainFrame)
 slotContainer.Name = "SlotContainer"
-slotContainer.Size = UDim2.new(0, 195, 0, 395)
-slotContainer.Position = UDim2.new(0.5, -97.5, 0, 40)
+-- JAVÍTÁS: Kicsit nagyobbra vettük a keretet (195 -> 205, 395 -> 405), hogy legyen "levegője" a kockáknak
+slotContainer.Size = UDim2.new(0, 205, 0, 405)
+slotContainer.Position = UDim2.new(0.5, -102.5, 0, 38) -- Középre igazítva
 slotContainer.BackgroundTransparency = 1
 
 local invGrid = Instance.new("UIGridLayout", slotContainer)
 invGrid.CellSize = UDim2.new(0, 45, 0, 45)
 invGrid.CellPadding = UDim2.new(0, 5, 0, 5)
-invGrid.SortOrder = Enum.SortOrder.LayoutOrder 
+invGrid.SortOrder = Enum.SortOrder.LayoutOrder
+-- JAVÍTÁS: Kényszerítjük, hogy a nagyobb kereten belül tökéletesen középre rendezze a kockákat
+invGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+invGrid.VerticalAlignment = Enum.VerticalAlignment.Center 
 
 for i = 1, 32 do
 	local uiSlot = Instance.new("Frame", slotContainer)
 	uiSlot.Name = "InvSlot_" .. i
-	uiSlot.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	uiSlot.BorderColor3 = Color3.fromRGB(80, 80, 80)
+	uiSlot.BackgroundColor3 = Color3.fromRGB(20, 18, 15) -- Metines
+	uiSlot.BorderColor3 = Color3.fromRGB(180, 140, 50)
 	uiSlot.BorderSizePixel = 1
 	uiSlot.LayoutOrder = i 
 end
@@ -356,8 +370,9 @@ pageNav.BackgroundTransparency = 1
 local prevBtn = Instance.new("TextButton", pageNav)
 prevBtn.Name = "PrevBtn"
 prevBtn.Size = UDim2.new(0, 30, 1, 0)
-prevBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-prevBtn.TextColor3 = Color3.new(1,1,1)
+prevBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+prevBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+prevBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 prevBtn.Text = "<"
 prevBtn.Font = Enum.Font.GothamBold
 
@@ -365,8 +380,9 @@ local nextBtn = Instance.new("TextButton", pageNav)
 nextBtn.Name = "NextBtn"
 nextBtn.Size = UDim2.new(0, 30, 1, 0)
 nextBtn.Position = UDim2.new(1, -30, 0, 0)
-nextBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-nextBtn.TextColor3 = Color3.new(1,1,1)
+nextBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+nextBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+nextBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 nextBtn.Text = ">"
 nextBtn.Font = Enum.Font.GothamBold
 
@@ -402,8 +418,9 @@ local buyGoldBtn = Instance.new("TextButton", lockOverlay)
 buyGoldBtn.Name = "BuyGoldBtn"
 buyGoldBtn.Size = UDim2.new(0.8, 0, 0, 40)
 buyGoldBtn.Position = UDim2.new(0.1, 0, 0, 160)
-buyGoldBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
-buyGoldBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+buyGoldBtn.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
+buyGoldBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+buyGoldBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 buyGoldBtn.Font = Enum.Font.GothamBold
 buyGoldBtn.ZIndex = 21
 
@@ -412,6 +429,7 @@ buyRobuxBtn.Name = "BuyRobuxBtn"
 buyRobuxBtn.Size = UDim2.new(0.8, 0, 0, 40)
 buyRobuxBtn.Position = UDim2.new(0.1, 0, 0, 210)
 buyRobuxBtn.BackgroundColor3 = Color3.fromRGB(30, 150, 30)
+buyRobuxBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 buyRobuxBtn.TextColor3 = Color3.new(1, 1, 1)
 buyRobuxBtn.Text = "Feloldás: 55 Robux"
 buyRobuxBtn.Font = Enum.Font.GothamBold
@@ -464,7 +482,7 @@ local function renderItems()
 				itemIcon.Name = "ItemIcon"
 				itemIcon.Size = UDim2.new(1, -4, 1, -4)
 				itemIcon.Position = UDim2.new(0, 2, 0, 2)
-				itemIcon.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+				itemIcon.BackgroundColor3 = Color3.fromRGB(40, 30, 20) -- Metines Slot
 				itemIcon.TextColor3 = Color3.new(1, 1, 1)
 				itemIcon.Text = slotVal.Value
 				itemIcon.TextScaled = true
@@ -483,12 +501,12 @@ local function renderItems()
 					amtLabel.TextSize = 12
 				end
 
+				-- HOVER TOOLTIP AZ INVENTORYBAN
 				itemIcon.MouseEnter:Connect(function()
-					tooltipTitle.Text = slotVal.Value
-					tooltipDesc.Text = getTooltipText(slotVal.Value)
-					tooltip.Visible = true
+					local tData = getTooltipDataForItem(slotVal.Value, false)
+					if tData then TooltipManager.show(tData) end
 				end)
-				itemIcon.MouseLeave:Connect(function() tooltip.Visible = false end)
+				itemIcon.MouseLeave:Connect(function() TooltipManager.hide() end)
 			end
 		end
 	end
@@ -505,19 +523,19 @@ local function renderItems()
 				itemIcon.Name = "ItemIcon"
 				itemIcon.Size = UDim2.new(1, -4, 1, -4)
 				itemIcon.Position = UDim2.new(0, 2, 0, 2)
-				itemIcon.BackgroundColor3 = Color3.fromRGB(100, 80, 80)
+				itemIcon.BackgroundColor3 = Color3.fromRGB(40, 20, 20)
 				itemIcon.TextColor3 = Color3.new(1, 1, 1)
 				itemIcon.Text = slotVal.Value
 				itemIcon.TextScaled = true
 				itemIcon.Font = Enum.Font.GothamBold
 				itemIcon.ZIndex = 2
 
+				-- HOVER TOOLTIP AZ EQUIPMENTBEN (FELSZERELVE)
 				itemIcon.MouseEnter:Connect(function()
-					tooltipTitle.Text = slotVal.Value
-					tooltipDesc.Text = getTooltipText(slotVal.Value) .. "\n\n[Felszerelve]"
-					tooltip.Visible = true
+					local tData = getTooltipDataForItem(slotVal.Value, true)
+					if tData then TooltipManager.show(tData) end
 				end)
-				itemIcon.MouseLeave:Connect(function() tooltip.Visible = false end)
+				itemIcon.MouseLeave:Connect(function() TooltipManager.hide() end)
 			end
 		end
 	end
@@ -581,10 +599,9 @@ local function getSlotData(guiObject)
 		local num = guiObject.Name:match("%d+")
 		local hotbarFolder = player:FindFirstChild("Hotbar")
 		if hotbarFolder then return "Hotbar", "Hotbar_" .. num, hotbarFolder:FindFirstChild("Hotbar_" .. num) end
-		-- KÉPESSÉG (SKILL) FELISMERÉSE A KARAKTER ABLAKBÓL
 	elseif guiObject.Name:match("SkillUI_") then
-		local skillName = guiObject.Name:sub(9) -- Levágja a "SkillUI_" előtagot
-		return "Skill", skillName, {Value = skillName} -- Hamis SlotVal, hogy a Drag&Drop működjön!
+		local skillName = guiObject.Name:sub(9)
+		return "Skill", skillName, {Value = skillName} 
 	end
 	return nil, nil, nil
 end
@@ -657,13 +674,10 @@ UserInputService.InputBegan:Connect(function(input)
 				dragging = true
 				dragOriginFolder = folderStr
 				dragOriginSlot = slotName
-				tooltip.Visible = false
+				TooltipManager.hide() -- JAVÍTÁS: Ha megfogod az itemet, eltűnik a tooltip
 
 				local isShiftDown = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 
-				-- ==========================================
-				-- JAVÍTÁS ITT: CSAK AKKOR KERESSÜK AZ "Amount"-ot HA IGAZI PÁLYA-ELEM (Instance)!
-				-- ==========================================
 				local currentAmt = 1
 				if typeof(slotVal) == "Instance" then
 					local currentAmtObj = slotVal:FindFirstChild("Amount")
@@ -681,9 +695,13 @@ UserInputService.InputBegan:Connect(function(input)
 				dragClone.Size = UDim2.new(0, 40, 0, 40)
 
 				if folderStr == "Skill" then
-					dragClone.BackgroundColor3 = Color3.fromRGB(80, 40, 120)
+					dragClone.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+					dragClone.BorderColor3 = Color3.fromRGB(180, 140, 50)
+					dragClone.BorderSizePixel = 1
 				else
-					dragClone.BackgroundColor3 = Color3.fromRGB(150, 150, 50)
+					dragClone.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
+					dragClone.BorderColor3 = Color3.fromRGB(180, 140, 50)
+					dragClone.BorderSizePixel = 1
 				end
 
 				dragClone.Text = slotVal.Value

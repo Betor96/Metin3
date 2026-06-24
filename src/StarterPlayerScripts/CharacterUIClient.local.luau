@@ -4,6 +4,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
+-- ==========================================
+-- ÚJ: TOOLTIP ÉS SKILL ADATBÁZIS BEHÍVÁSA
+-- ==========================================
+local TooltipManager = require(ReplicatedStorage:WaitForChild("TooltipManager"))
+local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
+
 local player = Players.LocalPlayer
 local stats = player:WaitForChild("PlayerStats", 99999)
 local Events = ReplicatedStorage:WaitForChild("Events")
@@ -24,11 +30,13 @@ screenGui.Name = "CharacterWindow"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
+-- METINES FŐ ABLAK DIZÁJN
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 250, 0, 400)
 mainFrame.AnchorPoint = Vector2.new(0, 0.5) 
 mainFrame.Position = UDim2.new(0.05, 0, 0.5, 0) 
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Sötét, rusztikus háttér
+mainFrame.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
 mainFrame.BorderSizePixel = 2
 mainFrame.Active = true 
 mainFrame.Visible = false
@@ -36,8 +44,10 @@ mainFrame.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 40)
-titleLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-titleLabel.TextColor3 = Color3.new(1, 1, 1)
+titleLabel.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+titleLabel.BorderColor3 = Color3.fromRGB(180, 140, 50)
+titleLabel.BorderSizePixel = 1
+titleLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Arany szöveg
 titleLabel.Text = "KARAKTER (C)"
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
@@ -49,6 +59,7 @@ charCloseBtn.Size = UDim2.new(0, 30, 0, 30)
 charCloseBtn.Position = UDim2.new(1, -5, 0, 5) 
 charCloseBtn.AnchorPoint = Vector2.new(1, 0)
 charCloseBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30) 
+charCloseBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 charCloseBtn.TextColor3 = Color3.new(1, 1, 1)
 charCloseBtn.Text = "X"
 charCloseBtn.Font = Enum.Font.GothamBold
@@ -111,8 +122,9 @@ page3.Visible = false
 local togglePageBtn = Instance.new("TextButton", mainFrame)
 togglePageBtn.Size = UDim2.new(1, 0, 0, 30)
 togglePageBtn.Position = UDim2.new(0, 0, 1, -30)
-togglePageBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-togglePageBtn.TextColor3 = Color3.new(1, 1, 1)
+togglePageBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+togglePageBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+togglePageBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 togglePageBtn.Text = "Bónuszok mutatása >>>"
 togglePageBtn.Font = Enum.Font.GothamBold
 
@@ -163,8 +175,9 @@ local function createBaseStatRow(statId, displayName, yPos)
 	local plusBtn = Instance.new("TextButton", row)
 	plusBtn.Size = UDim2.new(0, 30, 0, 30)
 	plusBtn.Position = UDim2.new(0.85, 0, 0.5, -15)
-	plusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	plusBtn.TextColor3 = Color3.new(1, 1, 1)
+	plusBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 30)
+	plusBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+	plusBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 	plusBtn.Text = "+"
 	plusBtn.Font = Enum.Font.GothamBold
 
@@ -217,18 +230,18 @@ createBonusRow("StrongVsPlayer", "Ember elleni erő:", "%")
 createBonusRow("CritChance", "Kritikus találat esélye:", "%")
 createBonusRow("LifeSteal", "Életvarázs (Life Steal):", "%")
 createBonusRow("AttackSpeed", "Támadási sebesség:", "%")
-createBonusRow("MovementSpeed", "Valós mozgási sebesség:", "") -- JAVÍTÁS: Nincs %
+createBonusRow("MovementSpeed", "Valós mozgási sebesség:", "") 
 createBonusRow("DodgeChance", "Kitérési esély:", "%")
 createBonusRow("DoubleDrop", "Dupla tárgydobás esélye:", "%")
 createBonusRow("DoubleGold", "Dupla pénz esélye:", "%")
 
 -- ==========================================
--- 3. OLDAL (KÉPESSÉGEK HÚZÁSA)
+-- 3. OLDAL (KÉPESSÉGEK HÚZÁSA ÉS TOOLTIP)
 -- ==========================================
 local skillTitle = Instance.new("TextLabel", page3)
 skillTitle.Size = UDim2.new(1, 0, 0, 40)
 skillTitle.BackgroundTransparency = 1
-skillTitle.TextColor3 = Color3.fromRGB(200, 150, 255)
+skillTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 skillTitle.Text = "KÉPESSÉGEK\n(Húzd le őket a Hotbarba!)"
 skillTitle.Font = Enum.Font.GothamBold
 skillTitle.TextSize = 14
@@ -255,8 +268,9 @@ local function renderSkills()
 	for _, skillName in ipairs(skills) do
 		local sFrame = Instance.new("Frame", skillContainer)
 		sFrame.Name = "SkillUI_" .. skillName 
-		sFrame.BackgroundColor3 = Color3.fromRGB(60, 30, 90)
-		sFrame.BorderColor3 = Color3.fromRGB(150, 100, 255)
+		-- METIN STÍLUSÚ KÉPESSÉG GOMBOK
+		sFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 15)
+		sFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
 		sFrame.BorderSizePixel = 2
 		sFrame.Active = true 
 
@@ -268,6 +282,22 @@ local function renderSkills()
 		sLabel.TextScaled = true
 		sLabel.TextColor3 = Color3.new(1, 1, 1)
 		sLabel.Font = Enum.Font.GothamBold
+
+		-- ==========================================
+		-- ÚJ: TOOLTIP MEGJELENÍTÉSE RÁMUTATÁSKOR
+		-- ==========================================
+		sFrame.MouseEnter:Connect(function()
+			local skillData = SkillDatabase.Skills[skillName]
+			if skillData and skillData.GetTooltipData then
+				-- Dinamikusan legeneráljuk az adatokat az aktuális statokkal
+				local tData = skillData.GetTooltipData(player)
+				TooltipManager.show(tData)
+			end
+		end)
+
+		sFrame.MouseLeave:Connect(function()
+			TooltipManager.hide()
+		end)
 	end
 end
 
@@ -287,9 +317,7 @@ local function updateUI()
 
 	for statName, data in pairs(bonusLabels) do
 		if statName == "MovementSpeed" then
-			-- JAVÍTÁS: A szerver által kiszámolt valós sebességet olvassuk le!
 			local trueMs = player:GetAttribute("TrueWalkSpeed") or 16
-			-- Csak akkor ír tizedesjegyet, ha nem egész szám
 			local formattedMs = (trueMs % 1 == 0) and tostring(trueMs) or string.format("%.1f", trueMs)
 			data.Label.Text = formattedMs
 		else
@@ -297,8 +325,15 @@ local function updateUI()
 			if st then data.Label.Text = tostring(st.Value) .. data.Suffix end
 		end
 	end
+
+	-- Ha a Tooltip jelenleg látható, és épp nyomkodjuk a stat pontokat, 
+	-- akkor érdemes újra-renderelni a képességeket, hogy azonnal frissüljön a Tooltipben a matek!
+	if mainFrame.Visible and currentPage == 3 then
+		-- Ezt kikommentelve hagyom, ha zavaró, de elvileg jó lehet
+		-- renderSkills() 
+	end
 end
 
 for _, child in pairs(stats:GetChildren()) do child.Changed:Connect(updateUI) end
-player:GetAttributeChangedSignal("TrueWalkSpeed"):Connect(updateUI) -- Figyeli a valós sebesség változását!
+player:GetAttributeChangedSignal("TrueWalkSpeed"):Connect(updateUI) 
 updateUI()

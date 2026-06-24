@@ -355,6 +355,27 @@ SkillDatabase.Skills = {
 	-- 🛡️ GUARDIAN
 	["Shield Charge"] = {
 		Mana = 15, Cooldown = 8,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dashDmg = math.floor(classDamage * 0.5)
+			local impactDmg = math.floor(classDamage * 1.5)
+
+			return {
+				Name = "Shield Charge",
+				Icon = "rbxassetid://0",
+				Cooldown = 8,
+				Mana = 15,
+				Active = "Előrerohansz a célpontod felé, magaddal rántva a beütköző ellenfeleket.",
+				Passive = string.format("A roham közben <font color='rgb(255,100,50)'>%d</font> sebzést okozol, majd a megérkezéskor egy lökéshullámmal <font color='rgb(255,50,50)'>%d</font> sebzést osztasz ki területi (AOE) robbanás formájában.", dashDmg, impactDmg),
+				BottomStats = {
+					{"Hatótáv", "25"},
+					{"Típus", "Célzott / AOE"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			local dashDir = root.CFrame.LookVector
@@ -456,6 +477,26 @@ SkillDatabase.Skills = {
 	},
 	["Earthbreaker"] = {
 		Mana = 25, Cooldown = 12,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmg = math.floor(classDamage * 2.5)
+
+			return {
+				Name = "Earthbreaker",
+				Icon = "rbxassetid://0",
+				Cooldown = 12,
+				Mana = 25,
+				Active = "Hatalmasat csapsz a földre, ami megrengeti a talajt körülötted, sebzést kiosztva és <font color='rgb(100,200,255)'>kábítva (Stun)</font> a környező ellenségeket.",
+				Passive = string.format("A földrengés <font color='rgb(255,100,50)'>%d</font> sebzést okoz, és 1.5 másodpercre a földbe gyökerezi az eltalált célpontokat.", dmg),
+				BottomStats = {
+					{"Kábítás", "1.5s"},
+					{"Hatótáv", "15"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local range = 15
 			local pos = root.Position - Vector3.new(0, 2.5, 0)
@@ -504,6 +545,27 @@ SkillDatabase.Skills = {
 	},
 	["Blade Spirit"] = {
 		Mana = 30, Cooldown = 2, IsToggle = true, ToggleAttribute = "BladeSpirit_Active",
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmgBonus = math.floor(classDamage * 0.25)
+			if dmgBonus < 5 then dmgBonus = 5 end
+
+			return {
+				Name = "Blade Spirit",
+				Icon = "rbxassetid://0",
+				Cooldown = 2,
+				Mana = 30,
+				Active = "Felébreszted a pengédben lakozó szellemet. Ez egy fenntartott aura (ki/be kapcsolható).",
+				Passive = string.format("Amíg aktív, minden támadásodhoz <font color='rgb(255,100,50)'>+%d Bázis Sebzést</font> kapsz, és a statjaidhoz <font color='rgb(50,255,50)'>+20%% Életlopás (Life Steal)</font> adódik.", dmgBonus),
+				BottomStats = {
+					{"Típus", "Aura (Toggle)"},
+					{"Életlopás", "+20%"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local isActive = player:GetAttribute("BladeSpirit_Active")
 			local stats = player:FindFirstChild("PlayerStats")
@@ -552,6 +614,26 @@ SkillDatabase.Skills = {
 	},
 	["Iron Skin"] = {
 		Mana = 40, Cooldown = 20, Duration = 6,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local explosionDmg = math.floor(classDamage * 1.5)
+
+			return {
+				Name = "Iron Skin",
+				Icon = "rbxassetid://0",
+				Cooldown = 20,
+				Mana = 40,
+				Active = "Egy áthatolhatatlan barna energiapajzzsal veszed körül magad 6 másodpercre. Ezalatt <font color='rgb(255,215,0)'>50%-kal kevesebb sebzést kapsz</font>.",
+				Passive = string.format("Amikor a pajzs lejár, felrobban! A robbanás <font color='rgb(255,100,50)'>%d</font> sebzést okoz a közeledben lévőknek, és 2 másodpercre <font color='rgb(100,200,255)'>50%%-kal lelassítja</font> őket.", explosionDmg),
+				BottomStats = {
+					{"Időtartam", "6s"},
+					{"Sebzéscsökkentés", "50%"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			-- Vasbőr bekapcsolása (a passzív védelem bónuszt a háttérrendszer kezeli)
 			player:SetAttribute("IronSkin_Active", true)
@@ -654,6 +736,26 @@ SkillDatabase.Skills = {
 	-- ⚔️ SHADOWBLADE
 	["Shadow Strike"] = {
 		Mana = 20, Cooldown = 10,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmg = math.floor(classDamage * 2.5)
+
+			return {
+				Name = "Shadow Strike",
+				Icon = "rbxassetid://0",
+				Cooldown = 10,
+				Mana = 20,
+				Active = "A célpontod mögé ugrasz az árnyékokon keresztül, és egy brutális, meglepetésszerű csapást mérsz rá.",
+				Passive = string.format("A támadás <font color='rgb(255,100,50)'>%d</font> sebzést okoz a célpontnak.", dmg),
+				BottomStats = {
+					{"Hatótáv", "35"},
+					{"Típus", "Teleport / Single Target"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
@@ -668,6 +770,27 @@ SkillDatabase.Skills = {
 	},
 	["Whirling Blades"] = {
 		Mana = 25, Cooldown = 8,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmgPerHit = math.floor(classDamage * 0.6)
+			local totalDmg = dmgPerHit * 3
+
+			return {
+				Name = "Whirling Blades",
+				Icon = "rbxassetid://0",
+				Cooldown = 8,
+				Mana = 25,
+				Active = "Körbepörögsz a fegyveriddel, és 3 egymást követő hullámban megsebzed a közeledben lévő összes ellenséget.",
+				Passive = string.format("Minden hullám <font color='rgb(255,100,50)'>%d</font> sebzést okoz (Összesen: <font color='rgb(255,50,50)'>%d</font>). Minden találat <font color='rgb(100,200,255)'>40%%-kal lelassítja</font> a célpontokat 3 másodpercre.", dmgPerHit, totalDmg),
+				BottomStats = {
+					{"Hatótáv", "12"},
+					{"Találatok", "3 hullám"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local hum = char:FindFirstChild("Humanoid")
 			if not hum then return false end
@@ -723,6 +846,24 @@ SkillDatabase.Skills = {
 	},
 	["Bloodlust"] = {
 		Mana = 35, Cooldown = 5, IsToggle = true, ToggleAttribute = "Bloodlust_Active",
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			return {
+				Name = "Bloodlust",
+				Icon = "rbxassetid://0",
+				Cooldown = 5,
+				Mana = 35,
+				Active = "Átadod magad a vérszomjnak. Ez egy fenntartott aura (ki/be kapcsolható).",
+				Passive = "Amíg az aura aktív, <font color='rgb(100,255,100)'>+15 Mozgási sebességet</font> és <font color='rgb(255,215,0)'>+30% Támadási sebességet</font> kapsz, így gyorsabban mozogsz és ütsz.",
+				BottomStats = {
+					{"Típus", "Aura (Toggle)"},
+					{"Mozgási sebesség", "+15"},
+					{"Támadási sebesség", "+30%"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local stats = player:FindFirstChild("PlayerStats")
 			if not stats then return false end
@@ -752,6 +893,26 @@ SkillDatabase.Skills = {
 	},
 	["Death Mark"] = {
 		Mana = 30, Cooldown = 15,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local bonusDmg = classDamage * 3 -- A CombatHandlerben is ennyit ad hozzá
+
+			return {
+				Name = "Death Mark",
+				Icon = "rbxassetid://0",
+				Cooldown = 15,
+				Mana = 30,
+				Active = "Egy halálos koponya-jelet (Death Mark) helyezel a célpontodra, amely 5 másodpercig marad rajta.",
+				Passive = string.format("A következő sima ütésed (Auto-Attack) berobbantja a jelet, ami az ütéseden felül egy extrém, <font color='rgb(255,50,50)'>+%d Bónusz Sebzést</font> okoz a célpontnak.", bonusDmg),
+				BottomStats = {
+					{"Hatótáv", "70"},
+					{"Jel időtartama", "5s"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
@@ -799,6 +960,26 @@ SkillDatabase.Skills = {
 	-- 🔮 SOULWEAVER
 	["Soul Orb"] = {
 		Mana = 10, Cooldown = 3,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmg = math.floor(classDamage * 1.5)
+
+			return {
+				Name = "Soul Orb",
+				Icon = "rbxassetid://0",
+				Cooldown = 3,
+				Mana = 10,
+				Active = "Egy célkövető lila energiagömböt lősz ki, amely könyörtelenül üldözi a célpontot a becsapódásig.",
+				Passive = string.format("A robbanás <font color='rgb(255,100,50)'>%d</font> sebzést okoz az ellenségnek.", dmg),
+				BottomStats = {
+					{"Hatótáv", "60"},
+					{"Típus", "Célkövető lövedék"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
@@ -859,6 +1040,26 @@ SkillDatabase.Skills = {
 	},
 	["Spirit Chain"] = {
 		Mana = 30, Cooldown = 12,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmg = math.floor(classDamage * 1.3)
+
+			return {
+				Name = "Spirit Chain",
+				Icon = "rbxassetid://0",
+				Cooldown = 12,
+				Mana = 30,
+				Active = "Egy pusztító villámsugarat lősz ki, amely láncreakcióként átugrik a célpont körül lévő további ellenségekre.",
+				Passive = string.format("Minden egyes találat <font color='rgb(255,100,50)'>%d</font> sebzést okoz. A lánc maximum 5 célpontot képes eltalálni.", dmg),
+				BottomStats = {
+					{"Hatótáv", "45"},
+					{"Max ugrás", "4 további célpont"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
@@ -919,6 +1120,23 @@ SkillDatabase.Skills = {
 	},
 	["Spirit Blessing"] = {
 		Mana = 50, Cooldown = 2, IsToggle = true, ToggleAttribute = "SpiritBlessing_Active",
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			return {
+				Name = "Spirit Blessing",
+				Icon = "rbxassetid://0",
+				Cooldown = 2,
+				Mana = 50,
+				Active = "Megáldanak a szellemek, drasztikusan megnövelve a sebességed és az erődet. Ez egy fenntartott aura (ki/be kapcsolható).",
+				Passive = "Amíg aktív, <font color='rgb(100,255,100)'>+15 Mozgási sebességet</font> kapsz, és minden kiosztott sebzésed (auto-attack és skillek is) <font color='rgb(255,215,0)'>15%-kal megnő</font>.",
+				BottomStats = {
+					{"Típus", "Aura (Toggle)"},
+					{"Bónusz Sebzés", "+15% (Végső sebzésből)"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local isActive = player:GetAttribute("SpiritBlessing_Active")
 			local stats = player:FindFirstChild("PlayerStats")
@@ -944,6 +1162,26 @@ SkillDatabase.Skills = {
 	},
 	["Soul Explosion"] = {
 		Mana = 60, Cooldown = 20,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local dmg = math.floor(classDamage * 2.0)
+
+			return {
+				Name = "Soul Explosion",
+				Icon = "rbxassetid://0",
+				Cooldown = 20,
+				Mana = 60,
+				Active = "Koncentrálod a lelki energiádat, majd egy hatalmas, táguló pusztító robbanást hozol létre magad körül.",
+				Passive = string.format("A lila energiahullám mindenkit elér egy nagy területen, és <font color='rgb(255,100,50)'>%d</font> sebzést okoz.", dmg),
+				BottomStats = {
+					{"Hatótáv", "25 (AOE)"},
+					{"Típus", "Területi Robbanás"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local range = 25
 			local pos = root.Position - Vector3.new(0, 2.5, 0)
@@ -1000,6 +1238,45 @@ SkillDatabase.Skills = {
 	-- ⛓️ SEALER
 	["Seal of Power"] = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
+		-- ==========================================
+		-- ÚJ: LOL-STÍLUSÚ DINAMIKUS TOOLTIP ADATOK
+		-- ==========================================
+		GetTooltipData = function(player)
+			-- 1. Jelenlegi statok lekérése a dinamikus matekhoz
+			local stats = player:FindFirstChild("PlayerStats")
+			local intVal = stats and stats:FindFirstChild("INT") and stats.INT.Value or 1
+			local dexVal = stats and stats:FindFirstChild("DEX") and stats.DEX.Value or 1
+			local charges = player:GetAttribute("SealCharges") or 0
+
+			-- 2. Aktuális bónuszok kiszámolása (ugyanaz a matek, mint az Execute-ban!)
+			local dexPenalty = (dexVal > 15) and (dexVal - 15) * 1 or 0
+			local masteryBonus = charges * 2
+			local intBonus = math.floor(intVal / 10)
+			local totalBonusPercent = math.max(1, 5 + intBonus + masteryBonus - dexPenalty)
+
+			-- 3. Visszaadjuk a strukturált adatot a UI-nak
+			return {
+				Name = "Seal of Power",
+				Icon = "rbxassetid://0", -- Ide jöhet majd a képesség ikonjának ID-je
+				Cooldown = 5,
+				Mana = 40,
+
+				-- Aktív képesség leírása (Alap szín)
+				Active = "Megáldod magad vagy a kijelölt csapattársadat, hatalmas erővel felvértezve a fegyverét. A pecsét addig marad aktív, amíg újra el nem nyomod.",
+
+				-- Passzív / Hatás leírása dinamikus számokkal (Zöld/Kék/Piros kiemelésekkel, mint a LOL-ban)
+				Passive = string.format("Jelenlegi bónusz: a célpont <font color='rgb(255,215,0)'>%d%%</font> bónusz Támadóerőt kap.\n\n<i>(Alap 5%% + <font color='rgb(100,200,255)'>%d%% INT</font> + <font color='rgb(100,255,100)'>%d%% Mastery</font> - <font color='rgb(255,100,100)'>%d%% DEX</font>)</i>", 
+					totalBonusPercent, intBonus, masteryBonus, dexPenalty),
+
+				-- Alsó táblázat (Opcionális adatok a vonal alá)
+				BottomStats = {
+					{"Időtartam", "Kikapcsolásig"},
+					{"Max Töltet", "5"}
+				}
+			}
+		end,
+		
+		
 		Execute = function(player, char, root, mousePos, target)
 			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
 			player:SetAttribute("SealCharges", charges)
@@ -1053,6 +1330,35 @@ SkillDatabase.Skills = {
 	},
 	["Seal of Protection"] = {
 		Mana = 40, Cooldown = 5, Duration = 7200,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local stats = player:FindFirstChild("PlayerStats")
+			local intVal = stats and stats:FindFirstChild("INT") and stats.INT.Value or 1
+			local dexVal = stats and stats:FindFirstChild("DEX") and stats.DEX.Value or 1
+			local charges = player:GetAttribute("SealCharges") or 0
+
+			local dexPenalty = (dexVal > 15) and (dexVal - 15) * 0.01 or 0
+			local masteryBonus = charges * 0.02
+			local finalMultiplier = math.max(0.1, 1 + masteryBonus - dexPenalty)
+
+			local addedDef = math.floor((10 + (intVal * 0.15)) * finalMultiplier)
+			local hpPercent = (0.05 + (intVal * 0.001)) * finalMultiplier 
+
+			return {
+				Name = "Seal of Protection",
+				Icon = "rbxassetid://0",
+				Cooldown = 5,
+				Mana = 40,
+				Active = "Megáldod magad vagy a kijelölt csapattársadat egy védelmező pecséttel, ami növeli a Páncélt és a Maximum Életerőt.",
+				Passive = string.format("Jelenlegi bónusz: <font color='rgb(255,215,0)'>+%d Páncél</font> és <font color='rgb(50,255,50)'>+%.1f%% Max HP</font>.\n\n<i>(Az érték az INT-ből és a Seal Mastery-ből skálázódik. Magas DEX esetén csökken!)</i>", addedDef, hpPercent * 100),
+				BottomStats = {
+					{"Időtartam", "Kikapcsolásig"},
+					{"Max Töltet", "5"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
 			player:SetAttribute("SealCharges", charges)
@@ -1119,6 +1425,30 @@ SkillDatabase.Skills = {
 	},
 	["Explosive Seal"] = {
 		Mana = 30, Cooldown = 7, -- JAVÍTVA: 15-ről 7 másodpercre felezve
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local charges = player:GetAttribute("SealCharges") or 0
+			local masteryMulti = 1 + (charges * 0.02)
+
+			local mainDmg = math.floor((classDamage * 1.2) * masteryMulti)
+			local aoeDmg = math.floor((classDamage * 0.6) * masteryMulti)
+
+			return {
+				Name = "Explosive Seal",
+				Icon = "rbxassetid://0",
+				Cooldown = 7,
+				Mana = 30,
+				Active = "Egy időzített bombát helyezel a célpontra. A pecsét 3 másodpercig ketyeg, miközben <font color='rgb(100,200,255)'>50%-kal lassítja</font> a célpontot, majd felrobban.",
+				Passive = string.format("A robbanás <font color='rgb(255,100,50)'>%d</font> sebzést okoz a fő célpontnak, és <font color='rgb(255,150,100)'>%d</font> sebzést a körülötte lévőknek.", mainDmg, aoeDmg),
+				BottomStats = {
+					{"Lassítás", "50%"},
+					{"Ketyegési idő", "3s"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
@@ -1211,6 +1541,29 @@ SkillDatabase.Skills = {
 	},
 	["Dragon Shackles"] = {
 		Mana = 35, Cooldown = 15,
+		
+		-- Ide tedd az Execute elé!
+		GetTooltipData = function(player)
+			local classDamage = player:GetAttribute("AttackDamage") or 10
+			local charges = player:GetAttribute("SealCharges") or 0
+			local masteryMulti = 1 + (charges * 0.02)
+
+			local startDmg = math.floor((classDamage * 2.5) * masteryMulti)
+
+			return {
+				Name = "Dragon Shackles",
+				Icon = "rbxassetid://0",
+				Cooldown = 15,
+				Mana = 35,
+				Active = "Lekötözöl (Root) egy ellenséget, ami <font color='rgb(100,200,255)'>2 másodpercre megbénítja</font>. A varázslat ezután aranyló láncként átugrik a legközelebbi ellenfelekre.",
+				Passive = string.format("Az első célpont <font color='rgb(255,100,50)'>%d</font> sebzést kap. Minden további ugrásnál a sebzés 15%%-kal csökken.", startDmg),
+				BottomStats = {
+					{"Kábítás", "2s"},
+					{"Max ugrás", "5 (Játékosokra: 3)"}
+				}
+			}
+		end,
+		
 		Execute = function(player, char, root, mousePos, target)
 			local primaryTarget = target and target.Parent
 			if not SkillDatabase.isValidTarget(primaryTarget) then return false end

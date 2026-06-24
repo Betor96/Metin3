@@ -8,6 +8,11 @@ local BuyItem = Events:WaitForChild("BuyItem")
 
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
+-- ==========================================
+-- ÚJ: TOOLTIP MANAGER BEHÍVÁSA
+-- ==========================================
+local TooltipManager = require(ReplicatedStorage:WaitForChild("TooltipManager"))
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -21,17 +26,20 @@ shopFrame.Name = "ShopFrame" -- FONTOS AZ ELNEVEZÉS A DRAG & DROP MIATT!
 shopFrame.Size = UDim2.new(0, 250, 0, 350)
 shopFrame.AnchorPoint = Vector2.new(0, 0.5) 
 shopFrame.Position = UDim2.new(0.05, 0, 0.5, 0) 
-shopFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
-shopFrame.BorderColor3 = Color3.fromRGB(100, 80, 50)
-shopFrame.BorderSizePixel = 3
+-- METINESÍTÉS
+shopFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Sötét, rusztikus háttér
+shopFrame.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
+shopFrame.BorderSizePixel = 2
 shopFrame.Active = true
 shopFrame.Visible = false 
 shopFrame.Parent = screenGui
 
 local shopTitle = Instance.new("TextLabel")
 shopTitle.Size = UDim2.new(1, 0, 0, 30)
-shopTitle.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
-shopTitle.TextColor3 = Color3.new(1, 1, 1)
+shopTitle.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+shopTitle.BorderColor3 = Color3.fromRGB(180, 140, 50)
+shopTitle.BorderSizePixel = 1
+shopTitle.TextColor3 = Color3.fromRGB(255, 215, 0) -- Arany szöveg
 shopTitle.Text = "BOLT"
 shopTitle.Font = Enum.Font.GothamBold
 shopTitle.TextSize = 14
@@ -68,7 +76,7 @@ local currentShopNPC = nil
 local MAX_SHOP_DISTANCE = 15
 
 -- ==========================================
--- ÚJ: ELADÁS MÓD KAPCSOLÓ
+-- ELADÁS MÓD KAPCSOLÓ
 -- ==========================================
 local sellMode = Instance.new("BoolValue")
 sellMode.Name = "SellMode"
@@ -78,7 +86,10 @@ sellMode.Parent = shopFrame
 local sellToggleBtn = Instance.new("TextButton")
 sellToggleBtn.Size = UDim2.new(1, -20, 0, 30)
 sellToggleBtn.Position = UDim2.new(0, 10, 1, -40)
-sellToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+-- Metinesítés
+sellToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+sellToggleBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+sellToggleBtn.BorderSizePixel = 1
 sellToggleBtn.TextColor3 = Color3.new(1, 1, 1)
 sellToggleBtn.Text = "Eladás Mód: KI"
 sellToggleBtn.Font = Enum.Font.GothamBold
@@ -88,9 +99,11 @@ sellToggleBtn.MouseButton1Click:Connect(function()
 	sellMode.Value = not sellMode.Value
 	if sellMode.Value then
 		sellToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+		sellToggleBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 		sellToggleBtn.Text = "Eladás Mód: BE (Jobb Klikk)"
 	else
-		sellToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		sellToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+		sellToggleBtn.TextColor3 = Color3.new(1, 1, 1)
 		sellToggleBtn.Text = "Eladás Mód: KI"
 	end
 end)
@@ -99,6 +112,8 @@ local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -30, 0, 0)
 closeBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+closeBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+closeBtn.BorderSizePixel = 2
 closeBtn.TextColor3 = Color3.new(1, 1, 1)
 closeBtn.Text = "X"
 closeBtn.Font = Enum.Font.GothamBold
@@ -108,8 +123,10 @@ local function resetShop()
 	shopFrame.Visible = false
 	currentShopNPC = nil
 	sellMode.Value = false
-	sellToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	sellToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+	sellToggleBtn.TextColor3 = Color3.new(1, 1, 1)
 	sellToggleBtn.Text = "Eladás Mód: KI"
+	TooltipManager.hide() -- Biztonság kedvéért bezáráskor is elrejtjük
 end
 
 closeBtn.MouseButton1Click:Connect(resetShop)
@@ -142,6 +159,41 @@ local SHOPS = {
 	}
 }
 
+-- ==========================================
+-- JAVÍTÁS: TOOLTIP GENERÁLÓ A BOLTOSHOZ IS!
+-- ==========================================
+local function getTooltipDataForItem(itemName)
+	local data = ItemDatabase[itemName]
+	if not data then return nil end
+
+	local toolData = {
+		Name = itemName,
+		Icon = "rbxassetid://0",
+	}
+
+	if data.Type == "Fegyver" then
+		toolData.Active = "Szintkövetelmény: " .. (data.Level or 1)
+		toolData.Passive = string.format("Sebzés: <font color='rgb(255,100,50)'>%d - %d</font>", data.MinDmg or 0, data.MaxDmg or 0)
+
+	elseif data.Type == "Páncél" then
+		toolData.Active = "Szintkövetelmény: " .. (data.Level or 1)
+		toolData.Passive = string.format("Védelem: <font color='rgb(50,150,255)'>+%d Páncél</font>", data.Defense or 0)
+
+	elseif data.Type == "Fogyóeszköz" then
+		toolData.Active = "Nyomd meg a gombot vagy kattints duplán a használathoz."
+	end
+
+	if data.Description then
+		toolData.Passive = (toolData.Passive and (toolData.Passive .. "\n\n") or "") .. "<i>" .. data.Description .. "</i>"
+	end
+
+	if data.Price then
+		toolData.BottomStats = {{"Vételár", (data.Price) .. " Pénz"}}
+	end
+
+	return toolData
+end
+
 local function openShop(npcName)
 	local shopData = SHOPS[npcName]
 	if not shopData then return end
@@ -157,8 +209,9 @@ local function openShop(npcName)
 
 		if itemData then
 			local itemRow = Instance.new("Frame")
-			itemRow.BackgroundColor3 = Color3.fromRGB(30, 35, 40)
-			itemRow.BorderColor3 = Color3.fromRGB(80, 80, 80)
+			itemRow.BackgroundColor3 = Color3.fromRGB(20, 18, 15) -- Metines belső
+			itemRow.BorderColor3 = Color3.fromRGB(180, 140, 50)
+			itemRow.BorderSizePixel = 1
 			itemRow.Parent = scrollFrame
 
 			local nameLabel = Instance.new("TextLabel")
@@ -175,7 +228,9 @@ local function openShop(npcName)
 			local buyBtn = Instance.new("TextButton")
 			buyBtn.Size = UDim2.new(0.4, 0, 0.6, 0)
 			buyBtn.Position = UDim2.new(0.55, 0, 0.2, 0)
-			buyBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+			buyBtn.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
+			buyBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+			buyBtn.BorderSizePixel = 1
 			buyBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
 			buyBtn.Text = itemData.Price .. " Pénz"
 			buyBtn.Font = Enum.Font.GothamBold
@@ -183,6 +238,13 @@ local function openShop(npcName)
 			buyBtn.Parent = itemRow
 
 			buyBtn.MouseButton1Click:Connect(function() BuyItem:FireServer(itemName) end)
+
+			-- ÚJ: TOOLTIP MEGJELENÍTÉSE A TÁRGY FÖLÖTT!
+			itemRow.MouseEnter:Connect(function()
+				local tData = getTooltipDataForItem(itemName)
+				if tData then TooltipManager.show(tData) end
+			end)
+			itemRow.MouseLeave:Connect(function() TooltipManager.hide() end)
 		end
 	end
 

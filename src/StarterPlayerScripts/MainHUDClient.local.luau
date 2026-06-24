@@ -6,7 +6,12 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- ==========================================
+-- ÚJ: TOOLTIP MANAGER ÉS SKILL DATABASE
+-- ==========================================
 local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
+local TooltipManager = require(ReplicatedStorage:WaitForChild("TooltipManager"))
 local Events = ReplicatedStorage:WaitForChild("Events")
 
 local SyncHotbarSlot = Events:WaitForChild("SyncHotbarSlot", 5)
@@ -15,7 +20,6 @@ local SyncHotbarSlot = Events:WaitForChild("SyncHotbarSlot", 5)
 -- PASSZÍV KÉPESSÉG INDIKÁTOROK (ESZKÖZTÁR FÖLÖTT)
 -- ==================================================
 task.spawn(function()
-	local Players = game:GetService("Players")
 	local localPlayer = Players.LocalPlayer
 	local playerGui = localPlayer:WaitForChild("PlayerGui")
 
@@ -30,14 +34,19 @@ task.spawn(function()
 	local indicatorFrame = Instance.new("Frame")
 	indicatorFrame.Size = UDim2.new(0, 240, 0, 35)
 	indicatorFrame.Position = UDim2.new(0.5, -120, 1, -140) 
-	indicatorFrame.BackgroundTransparency = 0.6
-	indicatorFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	indicatorFrame.BackgroundTransparency = 0.3
+	indicatorFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Metines háttér
 	indicatorFrame.BorderSizePixel = 0
 	indicatorFrame.Visible = false
 	indicatorFrame.Parent = screenGui
 
 	local uiCorner = Instance.new("UICorner", indicatorFrame)
 	uiCorner.CornerRadius = UDim.new(0, 8)
+
+	-- Arany keret a passzív ablaknak is!
+	local stroke = Instance.new("UIStroke", indicatorFrame)
+	stroke.Color = Color3.fromRGB(180, 140, 50)
+	stroke.Thickness = 1.5
 
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -72,7 +81,7 @@ task.spawn(function()
 			local hpPercent = hum.Health / hum.MaxHealth
 			if hpPercent <= 0.50 then
 				indicatorFrame.Visible = true
-				textLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+				textLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 
 				local armorBonus = "+10%"
 				if hpPercent <= 0.15 then
@@ -120,12 +129,15 @@ screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1
 screenGui.Parent = playerGui
 
+-- ==========================================
+-- HUD HÁTTEREK METINESÍTÉSE
+-- ==========================================
 local statusContainer = Instance.new("Frame")
 statusContainer.Size = UDim2.new(0, 300, 0, 80)
 statusContainer.AnchorPoint = Vector2.new(1, 1) 
 statusContainer.Position = UDim2.new(0.5, -230, 1, -20) 
-statusContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
-statusContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
+statusContainer.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+statusContainer.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
 statusContainer.BorderSizePixel = 2
 statusContainer.Parent = screenGui
 
@@ -134,7 +146,7 @@ hpBg.Size = UDim2.new(1, -20, 0, 20)
 hpBg.Position = UDim2.new(0, 10, 0, 10)
 hpBg.BackgroundColor3 = Color3.fromRGB(40, 10, 10)
 hpBg.BorderSizePixel = 1
-hpBg.BorderColor3 = Color3.fromRGB(80, 80, 80)
+hpBg.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany
 
 local hpBar = Instance.new("Frame", hpBg)
 hpBar.Size = UDim2.new(1, 0, 1, 0)
@@ -154,7 +166,7 @@ mpBg.Size = UDim2.new(1, -20, 0, 20)
 mpBg.Position = UDim2.new(0, 10, 0, 35)
 mpBg.BackgroundColor3 = Color3.fromRGB(10, 10, 40)
 mpBg.BorderSizePixel = 1
-mpBg.BorderColor3 = Color3.fromRGB(80, 80, 80)
+mpBg.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany
 
 local mpBar = Instance.new("Frame", mpBg)
 mpBar.Size = UDim2.new(1, 0, 1, 0)
@@ -173,7 +185,8 @@ local expBg = Instance.new("Frame", statusContainer)
 expBg.Size = UDim2.new(1, -20, 0, 10)
 expBg.Position = UDim2.new(0, 10, 0, 60)
 expBg.BackgroundColor3 = Color3.fromRGB(30, 30, 15)
-expBg.BorderSizePixel = 0
+expBg.BorderSizePixel = 1
+expBg.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany
 
 local expBar = Instance.new("Frame", expBg)
 expBar.Size = UDim2.new(0.5, 0, 1, 0)
@@ -193,7 +206,6 @@ end
 local function setupCharacter(char)
 	currentHumanoid = char:WaitForChild("Humanoid")
 	currentHumanoid.HealthChanged:Connect(updateHP)
-	-- MaxHealth is lekezelve
 	currentHumanoid:GetPropertyChangedSignal("MaxHealth"):Connect(updateHP)
 	updateHP()
 end
@@ -201,15 +213,13 @@ end
 player.CharacterAdded:Connect(setupCharacter)
 if player.Character then setupCharacter(player.Character) end
 
--- ==========================================
--- JAVÍTÁS: Dinamikus Mana és XP csík frissítés! (Nincs több while ciklus)
--- ==========================================
+-- Dinamikus Mana és XP csík frissítés!
 task.spawn(function()
 	local stats = player:WaitForChild("PlayerStats")
 	local mana = stats:WaitForChild("Mana")
 	local maxMana = stats:WaitForChild("MaxMana")
 	local exp = stats:WaitForChild("Experience")
-	local maxExp = stats:WaitForChild("MaxExperience", 10) -- Megvárjuk míg a LevelHandler legenerálja
+	local maxExp = stats:WaitForChild("MaxExperience", 10)
 
 	local function updateMana()
 		if maxMana and maxMana.Value > 0 then
@@ -226,13 +236,11 @@ task.spawn(function()
 		end
 	end
 
-	-- Események bekötése
 	mana.Changed:Connect(updateMana)
 	maxMana.Changed:Connect(updateMana)
 	exp.Changed:Connect(updateXP)
 	if maxExp then maxExp.Changed:Connect(updateXP) end
 
-	-- Alap értékek beállítása
 	updateMana()
 	updateXP()
 end)
@@ -241,8 +249,8 @@ local hotbarContainer = Instance.new("Frame")
 hotbarContainer.Size = UDim2.new(0, 440, 0, 60)
 hotbarContainer.AnchorPoint = Vector2.new(0.5, 1) 
 hotbarContainer.Position = UDim2.new(0.5, 0, 1, -20) 
-hotbarContainer.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
-hotbarContainer.BorderColor3 = Color3.fromRGB(100, 20, 20)
+hotbarContainer.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+hotbarContainer.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
 hotbarContainer.BorderSizePixel = 2
 hotbarContainer.Active = true 
 hotbarContainer.Parent = screenGui
@@ -253,6 +261,9 @@ uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 uiList.VerticalAlignment = Enum.VerticalAlignment.Center
 uiList.Padding = UDim.new(0, 5)
 
+-- ==========================================
+-- GOMBOK LÉTREHOZÁSA ÉS TOOLTIP BEKÖTÉSE
+-- ==========================================
 for i = 1, 8 do
 	if i == 5 then
 		local gap = Instance.new("Frame")
@@ -265,8 +276,8 @@ for i = 1, 8 do
 	local slotFrame = Instance.new("Frame")
 	slotFrame.Name = "HotbarSlotUI_" .. i
 	slotFrame.Size = UDim2.new(0, 45, 0, 45)
-	slotFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
-	slotFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
+	slotFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 15) -- Sötét belső
+	slotFrame.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
 	slotFrame.BorderSizePixel = 1
 	slotFrame.Active = true 
 	slotFrame.Parent = hotbarContainer
@@ -276,7 +287,7 @@ for i = 1, 8 do
 	numLabel.Position = UDim2.new(0, 2, 0, 2)
 	numLabel.BackgroundTransparency = 1
 	numLabel.Text = tostring(i)
-	numLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+	numLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	numLabel.Font = Enum.Font.GothamBold
 	numLabel.TextSize = 10
 	numLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -303,6 +314,30 @@ for i = 1, 8 do
 	cdOverlay.AnchorPoint = Vector2.new(0, 1) 
 	cdOverlay.ZIndex = 4
 	cdOverlay.Visible = false
+
+	-- TOOLTIP HOVER ESEMÉNYEK
+	slotFrame.MouseEnter:Connect(function()
+		local slotVal = hotbarFolder:FindFirstChild("Hotbar_" .. i)
+		if slotVal and slotVal.Value ~= "" then
+			local sName = slotVal.Value
+			local skillData = SkillDatabase.Skills[sName]
+
+			-- Ha ez egy Képesség
+			if skillData and skillData.GetTooltipData then
+				TooltipManager.show(skillData.GetTooltipData(player))
+			else
+				-- Ha ez egy Tárgy (pl. Kis HP Ital)
+				TooltipManager.show({
+					Name = sName,
+					Active = "Fogyóeszköz (Nyomd meg a használathoz)",
+				})
+			end
+		end
+	end)
+
+	slotFrame.MouseLeave:Connect(function()
+		TooltipManager.hide()
+	end)
 end
 
 local function renderHotbar()
@@ -323,6 +358,7 @@ local function renderHotbar()
 					icon.Text = slotVal.Value
 					local sVal = slotVal.Value
 
+					-- Ha KÉPESSÉG van a sloton
 					if SkillDatabase.Ranges[sVal] then
 						icon.BackgroundTransparency = 0
 						local isActive = false
@@ -334,11 +370,13 @@ local function renderHotbar()
 						if sVal == "Seal of Protection" and player:GetAttribute("SealOfProtection_Active") then isActive = true end
 
 						if isActive then
-							icon.BackgroundColor3 = Color3.fromRGB(200, 150, 20) 
+							icon.BackgroundColor3 = Color3.fromRGB(150, 110, 30) -- Aktív, aranyos aura
 						else
-							icon.BackgroundColor3 = Color3.fromRGB(80, 40, 120) 
+							icon.BackgroundColor3 = Color3.fromRGB(30, 25, 20) -- Alap, sötét gomb
 						end
 						icon.TextTransparency = 0
+
+						-- Ha TÁRGY van a sloton
 					else
 						local totalAmount = 0
 						for _, invSlot in pairs(invFolder:GetChildren()) do
@@ -350,7 +388,7 @@ local function renderHotbar()
 
 						if totalAmount > 0 then
 							icon.BackgroundTransparency = 0
-							icon.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
+							icon.BackgroundColor3 = Color3.fromRGB(40, 20, 20) -- Tárgy háttérszín
 							icon.TextTransparency = 0
 
 							local amtLabel = Instance.new("TextLabel")
@@ -368,7 +406,7 @@ local function renderHotbar()
 							amtLabel.Parent = icon
 						else
 							icon.BackgroundTransparency = 0
-							icon.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+							icon.BackgroundColor3 = Color3.fromRGB(30, 15, 15)
 							icon.TextTransparency = 0.6 
 
 							local amtLabel = Instance.new("TextLabel")

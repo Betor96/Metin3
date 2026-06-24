@@ -13,17 +13,21 @@ local eqFrame = Instance.new("Frame")
 eqFrame.Size = UDim2.new(0, 260, 0, 360)
 eqFrame.AnchorPoint = Vector2.new(0.5, 0.5) 
 eqFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-eqFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
-eqFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
-eqFrame.BorderSizePixel = 3
+-- METINESÍTÉS
+eqFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+eqFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
+eqFrame.BorderSizePixel = 2
 eqFrame.Active = true 
 eqFrame.Visible = false
 eqFrame.Parent = screenGui
 
 local eqTitle = Instance.new("TextLabel")
 eqTitle.Size = UDim2.new(1, 0, 0, 30)
-eqTitle.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
-eqTitle.TextColor3 = Color3.new(1, 1, 1)
+-- METINESÍTÉS
+eqTitle.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+eqTitle.BorderColor3 = Color3.fromRGB(180, 140, 50)
+eqTitle.BorderSizePixel = 1
+eqTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 eqTitle.Text = "FELSZERELÉS (E)"
 eqTitle.Font = Enum.Font.GothamBold
 eqTitle.TextSize = 14
@@ -59,7 +63,7 @@ local silhouette = Instance.new("TextLabel")
 silhouette.Size = UDim2.new(0, 100, 0, 260)
 silhouette.Position = UDim2.new(0.5, -50, 0.5, -110)
 silhouette.BackgroundTransparency = 1
-silhouette.TextColor3 = Color3.fromRGB(50, 50, 50)
+silhouette.TextColor3 = Color3.fromRGB(80, 80, 80) -- Kicsit sötétebb hogy illeszkedjen az új háttérhez
 silhouette.Text = "[Karakter\nHelye]"
 silhouette.Font = Enum.Font.GothamBold
 silhouette.TextSize = 16
@@ -70,9 +74,10 @@ local function createSlot(parent, name, posX, posY, sizeY)
 	slot.Name = name
 	slot.Size = UDim2.new(0, 40, 0, sizeY or 40)
 	slot.Position = UDim2.new(0, posX, 0, posY)
-	slot.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-	slot.BorderColor3 = Color3.fromRGB(100, 80, 50)
-	slot.BorderSizePixel = 2
+	-- METINESÍTÉS
+	slot.BackgroundColor3 = Color3.fromRGB(20, 18, 15)
+	slot.BorderColor3 = Color3.fromRGB(180, 140, 50)
+	slot.BorderSizePixel = 1
 	slot.Parent = parent
 
 	local label = Instance.new("TextLabel")
@@ -102,8 +107,8 @@ eqFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local highest = 0
 		for _, gui in pairs(player.PlayerGui:GetChildren()) do
-			-- BIZTONSÁG: A TooltipHUD kivétele a versenyből!
-			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" then
+			-- BIZTONSÁG: A TooltipHUD és a SkillTooltipGUI kivétele a versenyből!
+			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" and gui.Name ~= "SkillTooltipGUI" then
 				if gui.DisplayOrder > highest then
 					highest = gui.DisplayOrder
 				end
@@ -119,7 +124,8 @@ eqCloseBtn.Size = UDim2.new(0, 30, 0, 30)
 eqCloseBtn.Position = UDim2.new(1, -5, 0, 5)
 eqCloseBtn.AnchorPoint = Vector2.new(1, 0)
 eqCloseBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
-eqCloseBtn.BorderColor3 = Color3.fromRGB(80, 20, 20)
+-- METINESÍTÉS
+eqCloseBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
 eqCloseBtn.BorderSizePixel = 2
 eqCloseBtn.Text = "X"
 eqCloseBtn.TextColor3 = Color3.new(1, 1, 1)
