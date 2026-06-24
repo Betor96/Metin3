@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
@@ -79,19 +80,22 @@ slotContainer.Size = UDim2.new(0, 400, 0, 400)
 slotContainer.Position = UDim2.new(0.5, -200, 0.5, -150)
 slotContainer.BackgroundTransparency = 1
 
+-- ==========================================
+-- FRISSÍTETT, PONTOS KASZT LEÍRÁSOK
+-- ==========================================
 local classes = {
 	{
 		Name = "GUARDIAN",
 		Role = "<b>Szerep:</b> Tank / Bruiser\n<b>Erősség:</b> Hatalmas túlélés, Tömegkontroll (CC)\n<b>Hátrány:</b> Lassú mozgás, Alacsony burst sebzés",
 		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Iron Will:</b></font>\nAhogy csökken a HP-d, úgy leszel egyre keményebb. 50% HP alatt +10%, 30% alatt +20%, 15% HP alatt +30% bónusz Páncélzatot (Defense) kapsz valós időben.",
-		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Shield Charge:</b> Előrerohan, fellöki és sebzi az útjába esőket.\n<b>2. Earthbreaker:</b> Területi (AOE) földcsapás, 3 másodpercre 50%-kal lassít.\n<b>3. Blade Spirit (Aura):</b> Kiosztott sebzésből (Life Steal) HP-t tölt vissza.\n<b>4. Iron Skin (Aura):</b> 6 másodpercig 50%-kal kevesebb sebzést kapsz.",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Shield Charge:</b> Előrerohan, fellöki és sebzi az útjába esőket.\n<b>2. Earthbreaker:</b> Területi földcsapás, ami 1.5 másodpercre a földbe gyökerezi (Kábítja) az ellenfeleket.\n<b>3. Blade Spirit (Aura):</b> Jelentősen növeli a sebzésed és minden ütésed HP-t tölt vissza (Életlopás).\n<b>4. Iron Skin (Pajzs):</b> Egy barna energiagömb véd a sebzéstől, ami 6 másodperc múlva felrobban, sebez és 50%-kal lassít.",
 		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: VIT (Élet) és STR (Erő).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] Ha túl sok az INT (Mágia), a páncélzatod csökken!</b></font>"
 	},
 	{
 		Name = "SHADOWBLADE",
 		Role = "<b>Szerep:</b> Burst DPS / Assassin\n<b>Erősség:</b> Extrém mobilitás, Brutális egycélpontos sebzés\n<b>Hátrány:</b> Üvegágyú, Gyenge védelem",
-		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Shadow Mastery:</b></font>\nPozicionálás és kivégzés. Ha a célpontod mögül támadsz (180 fok), +10% sebzést kapsz. Ha a célpont HP-ja 30% alatt van, további +10% sebzést kapsz (A kettő halmozódik!).",
-		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Shadow Strike:</b> A célpont mögé teleportál és hatalmasat sebez.\n<b>2. Whirling Blades:</b> 3 ütésből álló, pörgő területi (AOE) vágás.\n<b>3. Bloodlust (Aura):</b> Megnöveli a Támadási- és Mozgási sebességedet.\n<b>4. Death Mark:</b> Megjelöli a célt, majd a következő ütés bónuszt sebez.",
+		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Shadow Mastery:</b></font>\nIgazi orgyilkos. A sima ütések csak 1 célpontot sebeznek. Ha a célpontod mögül támadsz (Hátbatámadás), <b>+50%</b> sebzést kapsz. Ha a célpont HP-ja 30% alatt van, további <b>+10%</b> sebzést kapsz (A kettő halmozódik!).",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Shadow Strike:</b> A célpont mögé teleportál és hatalmasat sebez.\n<b>2. Whirling Blades:</b> 3 ütésből álló, pörgő területi vágás, ami egyben 40%-kal le is lassítja a célpontokat.\n<b>3. Bloodlust (Aura):</b> Megnöveli a Támadási- és Mozgási sebességedet.\n<b>4. Death Mark:</b> Haláljelet tesz a célra. A következő sima ütésed berobbantja és extrém sebzést okoz.",
 		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: DEX (Ügyesség) és STR (Erő).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] A nehéz vértezet (sok Páncél) drasztikusan lelassít!</b></font>"
 	},
 	{
@@ -105,7 +109,7 @@ local classes = {
 		Name = "SEALER",
 		Role = "<b>Szerep:</b> Support / Control\n<b>Erősség:</b> Csapat erősítése, Láncreakciós tömegkontroll\n<b>Hátrány:</b> Alacsony alap sebzés, Csapattársak nélkül gyengébb",
 		Passive = "<font color='rgb(255,215,0)'><b>[ PASSZÍV ] Seal Mastery:</b></font>\nAktivált képességenként kapsz egy töltetet (Max 5). Minden töltet +2% Sebzést és +2% Buff erőt ad. Ha 10 másodpercig nem használsz skillt, a töltetek elvesznek.",
-		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Seal of Power (Buff):</b> Megnöveli a saját vagy társad támadóerejét.\n<b>2. Seal of Protection (Buff):</b> Extra Páncélt és Max HP-t ad a célpontnak.\n<b>3. Explosive Seal:</b> Időzített bombát tesz a célpontra (AOE sebzés).\n<b>4. Dragon Shackles:</b> Lekötözi (Root) a célt, majd ugrálva terjed tovább.",
+		Actives = "<font color='rgb(255,100,50)'><b>[ AKTÍV KÉPESSÉGEK ]</b></font>\n<b>1. Seal of Power (Buff):</b> Megnöveli a saját vagy társad támadóerejét.\n<b>2. Seal of Protection (Buff):</b> Extra Páncélt és Max HP-t ad a célpontnak.\n<b>3. Explosive Seal:</b> Időzített bombát tesz a célpontra, ami folyamatosan lassítja őt, majd 3 másodperc után felrobban.\n<b>4. Dragon Shackles:</b> Lekötözi (Root) a célt, majd ugrálva terjed tovább.",
 		Stats = "<b>[ FEJLŐDÉS ]</b> Fő statok: INT (Mágia) és STR (Erő).\n<font color='rgb(255,50,50)'><b>[ BÜNTETÉS ] A kapkodás (magas DEX) rontja a buffjaid erejét!</b></font>"
 	}
 }
@@ -118,15 +122,20 @@ creatorContainer.Size = UDim2.new(1, 0, 1, 0)
 creatorContainer.BackgroundTransparency = 1
 creatorContainer.Visible = false
 
-local classInfoPanel = Instance.new("Frame", creatorContainer)
-classInfoPanel.Size = UDim2.new(0, 480, 1, -120) -- Szélesebb panel
+-- ==========================================
+-- ÚJ: GÖRGETHETŐ ÉS AUTOMATIKUSAN ÁTMÉRETEZŐ PANEL
+-- ==========================================
+local classInfoPanel = Instance.new("ScrollingFrame", creatorContainer)
+classInfoPanel.Size = UDim2.new(0, 480, 1, -140) -- Kicsit rövidebb, hogy a gomb kiférjen alá
 classInfoPanel.Position = UDim2.new(0, 40, 0, 60)
-classInfoPanel.BackgroundColor3 = Color3.fromRGB(15, 12, 10) -- Sötétebb, elegánsabb háttér
+classInfoPanel.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
 classInfoPanel.BackgroundTransparency = 0.15
 classInfoPanel.BorderSizePixel = 2
-classInfoPanel.BorderColor3 = Color3.fromRGB(180, 140, 50) -- Arany keret
+classInfoPanel.BorderColor3 = Color3.fromRGB(180, 140, 50)
+classInfoPanel.ScrollBarThickness = 4
+classInfoPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+classInfoPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
 
--- Automatikus elrendezés (nem lóg egymásba a szöveg)
 local listLayout = Instance.new("UIListLayout", classInfoPanel)
 listLayout.Padding = UDim.new(0, 10)
 listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -136,7 +145,7 @@ local padding = Instance.new("UIPadding", classInfoPanel)
 padding.PaddingTop = UDim.new(0, 15)
 padding.PaddingBottom = UDim.new(0, 15)
 padding.PaddingLeft = UDim.new(0, 15)
-padding.PaddingRight = UDim.new(0, 15)
+padding.PaddingRight = UDim.new(0, 20) -- Kicsit több hely a görgetősávnak
 
 local lblName = Instance.new("TextLabel", classInfoPanel)
 lblName.Size = UDim2.new(1, 0, 0, 40)
@@ -147,20 +156,23 @@ lblName.BackgroundTransparency = 1
 lblName.LayoutOrder = 1
 
 local lblRole = Instance.new("TextLabel", classInfoPanel)
-lblRole.Size = UDim2.new(1, 0, 0, 60)
+lblRole.Size = UDim2.new(1, 0, 0, 0)
+lblRole.AutomaticSize = Enum.AutomaticSize.Y -- Dinamikus magasság
 lblRole.Font = Enum.Font.Gotham
 lblRole.TextSize = 14
 lblRole.TextColor3 = Color3.fromRGB(220, 220, 220)
 lblRole.BackgroundTransparency = 1
 lblRole.TextXAlignment = Enum.TextXAlignment.Left
 lblRole.TextYAlignment = Enum.TextYAlignment.Top
+lblRole.TextWrapped = true
 lblRole.RichText = true
 lblRole.LayoutOrder = 2
 
 local lblPassives = Instance.new("TextLabel", classInfoPanel)
-lblPassives.Size = UDim2.new(1, 0, 0, 70)
+lblPassives.Size = UDim2.new(1, 0, 0, 0)
+lblPassives.AutomaticSize = Enum.AutomaticSize.Y
 lblPassives.Font = Enum.Font.Gotham
-lblPassives.TextSize = 13
+lblPassives.TextSize = 14
 lblPassives.TextColor3 = Color3.fromRGB(200, 255, 200)
 lblPassives.BackgroundTransparency = 1
 lblPassives.TextXAlignment = Enum.TextXAlignment.Left
@@ -170,9 +182,10 @@ lblPassives.RichText = true
 lblPassives.LayoutOrder = 3
 
 local lblActives = Instance.new("TextLabel", classInfoPanel)
-lblActives.Size = UDim2.new(1, 0, 0, 110)
+lblActives.Size = UDim2.new(1, 0, 0, 0)
+lblActives.AutomaticSize = Enum.AutomaticSize.Y
 lblActives.Font = Enum.Font.Gotham
-lblActives.TextSize = 13
+lblActives.TextSize = 14
 lblActives.TextColor3 = Color3.fromRGB(230, 230, 230)
 lblActives.BackgroundTransparency = 1
 lblActives.TextXAlignment = Enum.TextXAlignment.Left
@@ -182,9 +195,10 @@ lblActives.RichText = true
 lblActives.LayoutOrder = 4
 
 local lblStats = Instance.new("TextLabel", classInfoPanel)
-lblStats.Size = UDim2.new(1, 0, 0, 60)
+lblStats.Size = UDim2.new(1, 0, 0, 0)
+lblStats.AutomaticSize = Enum.AutomaticSize.Y
 lblStats.Font = Enum.Font.Gotham
-lblStats.TextSize = 13
+lblStats.TextSize = 14
 lblStats.TextColor3 = Color3.fromRGB(255, 255, 255)
 lblStats.BackgroundTransparency = 1
 lblStats.TextXAlignment = Enum.TextXAlignment.Left
@@ -193,14 +207,15 @@ lblStats.TextWrapped = true
 lblStats.RichText = true
 lblStats.LayoutOrder = 5
 
-local btnCreate = Instance.new("TextButton", classInfoPanel)
-btnCreate.Size = UDim2.new(1, 0, 0, 45)
+-- A gombot kitettük a görgetősávon KÍVÜLRE, hogy mindig látszódjon fixen alul!
+local btnCreate = Instance.new("TextButton", creatorContainer)
+btnCreate.Size = UDim2.new(0, 480, 0, 45)
+btnCreate.Position = UDim2.new(0, 40, 1, -70)
 btnCreate.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
 btnCreate.TextColor3 = Color3.new(1,1,1)
 btnCreate.Font = Enum.Font.GothamBlack
 btnCreate.TextSize = 20
 btnCreate.Text = "KARAKTER LÉTREHOZÁSA"
-btnCreate.LayoutOrder = 6
 
 local btnBack = Instance.new("TextButton", creatorContainer)
 btnBack.Size = UDim2.new(0, 100, 0, 40)
@@ -245,7 +260,7 @@ btnToggleDelete.Text = "Karakterek Törlése"
 
 local confirmPopup = Instance.new("Frame", sg)
 confirmPopup.Size = UDim2.new(1, 0, 1, 0)
-confirmPopup.BackgroundTransparency = 1 -- JAVÍTVA: Nincs sötétítés, teljesen átlátszó a háttér
+confirmPopup.BackgroundTransparency = 1 
 confirmPopup.Visible = false
 confirmPopup.ZIndex = 10
 
@@ -321,7 +336,6 @@ end)
 local function focusCameraOnClass(index, instant)
 	local className = classes[index].Name
 
-	-- Az új RichText elemek betöltése
 	lblName.Text = classes[index].Name
 	lblRole.Text = classes[index].Role
 	lblPassives.Text = classes[index].Passive
@@ -479,6 +493,30 @@ btnCreate.MouseButton1Click:Connect(function()
 	sg:Destroy()
 	camera.CameraType = Enum.CameraType.Custom
 	CreateCharacter:FireServer(activeSlot, selectedClass)
+end)
+
+-- ==========================================
+-- ÚJ: BILLENTYŰZETES LAPOZÁS (LAZY SUSAN)
+-- ==========================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	-- Ha épp gépel (pl. karakter törlésnél), akkor ne lapozzon!
+	if gameProcessed then return end 
+
+	-- Csak akkor lapozhasson a nyilakkal, ha bent van a karakterkészítő menüben
+	if inMenu and creatorContainer.Visible then
+		if input.KeyCode == Enum.KeyCode.Right or input.KeyCode == Enum.KeyCode.D then
+			-- Jobbra nyíl (vagy D betű)
+			currentClassIndex = currentClassIndex + 1
+			if currentClassIndex > #classes then currentClassIndex = 1 end
+			focusCameraOnClass(currentClassIndex, false)
+
+		elseif input.KeyCode == Enum.KeyCode.Left or input.KeyCode == Enum.KeyCode.A then
+			-- Balra nyíl (vagy A betű)
+			currentClassIndex = currentClassIndex - 1
+			if currentClassIndex < 1 then currentClassIndex = #classes end
+			focusCameraOnClass(currentClassIndex, false)
+		end
+	end
 end)
 
 loadMenu()

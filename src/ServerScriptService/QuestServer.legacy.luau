@@ -41,16 +41,20 @@ end)
 -- BIZTONSÁG 2: NPC TÁVOLSÁG ELLENŐRZÉS
 -- ==========================================
 local function isNearNPC(player, npcName)
-	if not npcName then return true end -- Ha a küldetés nem kér specifikus NPC-t, engedjük
+	if not npcName then return true end
 	local char = player.Character
 	if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
 	local root = char.HumanoidRootPart
 
-	for _, obj in pairs(workspace:GetChildren()) do
-		if obj.Name == npcName and obj:FindFirstChild("HumanoidRootPart") then
-			local dist = (root.Position - obj.HumanoidRootPart.Position).Magnitude
-			if dist <= 20 then
-				return true
+	-- OPTIMALIZÁLVA: Csak az NPCs mappát nézi át!
+	local npcFolder = workspace:FindFirstChild("NPCs")
+	if npcFolder then
+		for _, obj in pairs(npcFolder:GetChildren()) do
+			if obj.Name == npcName and obj:FindFirstChild("HumanoidRootPart") then
+				local dist = (root.Position - obj.HumanoidRootPart.Position).Magnitude
+				if dist <= 20 then
+					return true
+				end
 			end
 		end
 	end

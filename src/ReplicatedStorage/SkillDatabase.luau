@@ -458,54 +458,47 @@ SkillDatabase.Skills = {
 		Mana = 25, Cooldown = 12,
 		Execute = function(player, char, root, mousePos, target)
 			local range = 15
-			local pos = root.Position - Vector3.new(0, 2.5, 0) -- Föld szintje
+			local pos = root.Position - Vector3.new(0, 2.5, 0)
 
-			-- 1. Vizuális AOE Indikátor (Földrengés gyűrű)
+			-- Vizuális AOE Indikátor (Földrengés gyűrű)
 			local indicator = Instance.new("Part")
 			indicator.Shape = Enum.PartType.Cylinder
 			indicator.Size = Vector3.new(0.5, range * 2, range * 2)
 			indicator.Color = Color3.fromRGB(130, 80, 20)
 			indicator.Material = Enum.Material.Neon
-			indicator.Anchored = true
-			indicator.CanCollide = false
-			indicator.Transparency = 0.2
+			indicator.Anchored = true; indicator.CanCollide = false; indicator.Transparency = 0.2
 			indicator.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
 			indicator.Parent = workspace
 
 			local ts = game:GetService("TweenService")
 			ts:Create(indicator, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				Transparency = 1, 
-				Size = Vector3.new(0.5, (range * 2) + 2, (range * 2) + 2)
+				Transparency = 1, Size = Vector3.new(0.5, (range * 2) + 2, (range * 2) + 2)
 			}):Play()
 			Debris:AddItem(indicator, 0.5)
 
-			-- 2. Klasszikus részecske effekt és Sebzés kiosztása
 			SkillDatabase.playVFX(root.Position, Color3.fromRGB(150, 80, 20), range)
 
 			local enemies = SkillDatabase.getEnemiesInRadius(root.Position, range, char)
 			for _, enemy in pairs(enemies) do 
-				SkillDatabase.applyDamage(player, enemy, 1.8) 
+				-- JAVÍTVA: Megemelt sebzés (1.8 -> 2.5)
+				SkillDatabase.applyDamage(player, enemy, 2.5) 
 
-				-- 3. JAVÍTÁS: 3 MÁSODPERCES LASSÍTÁS (CC)
+				-- JAVÍTVA: KÁBÍTÁS (Stun) 1.5 másodpercre
 				local eHum = enemy:FindFirstChild("Humanoid")
-				if eHum and eHum.Health > 0 and not enemy:GetAttribute("EarthbreakerSlowed") then
-					enemy:SetAttribute("EarthbreakerSlowed", true)
+				if eHum and eHum.Health > 0 and not enemy:GetAttribute("EarthbreakerStunned") then
+					enemy:SetAttribute("EarthbreakerStunned", true)
 
 					local originalSpeed = eHum.WalkSpeed
-					eHum.WalkSpeed = originalSpeed * 0.5 -- 50%-os lassítás
+					eHum.WalkSpeed = 0 -- Kábítás (Odaszögezi a földhöz)
 
-					-- Visszaállítás 3 másodperc múlva
-					task.delay(3, function()
-						if enemy and enemy.Parent then 
-							enemy:SetAttribute("EarthbreakerSlowed", nil) 
-						end
+					task.delay(1.5, function()
+						if enemy and enemy.Parent then enemy:SetAttribute("EarthbreakerStunned", nil) end
 						if eHum and eHum.Health > 0 then
 							eHum.WalkSpeed = originalSpeed
 						end
 					end)
 				end
 			end
-
 			return true
 		end
 	},
@@ -514,33 +507,41 @@ SkillDatabase.Skills = {
 		Execute = function(player, char, root, mousePos, target)
 			local isActive = player:GetAttribute("BladeSpirit_Active")
 			local stats = player:FindFirstChild("PlayerStats")
-			local defStat = stats and stats:FindFirstChild("Defense")
+			local lifeStealStat = stats and stats:FindFirstChild("LifeSteal")
 
 			if not isActive then
 				-- BEKAPCSOLÁS
 				player:SetAttribute("BladeSpirit_Active", true)
 
-				-- +10% Védelem kiszámolása az aktuális védelemből
-				local defBonus = 0
-				if defStat then
-					defBonus = math.floor(defStat.Value * 0.10)
-					if defBonus < 1 then defBonus = 1 end -- Adjon legalább 1-et
-					defStat.Value += defBonus
+				-- 1. Életlopás (Life Steal) stat megadása (+20%)
+				if lifeStealStat then
+					lifeStealStat.Value += 20
 				end
-				player:SetAttribute("BladeSpirit_DefBonus", defBonus) -- Eltároljuk, mennyit adtunk
 
-				-- Végtelen vizuális aura (amíg ki nem kapcsolják)
-				SkillDatabase.applyBuffVFX(char, "BladeSpirit", Color3.fromRGB(255, 255, 100), 999999)
+				-- 2. Sebzés növelése (Az alap AttackDamage attribútumot húzzuk fel 25%-kal)
+				local currentDmg = player:GetAttribute("AttackDamage") or 10
+				local dmgBonus = math.floor(currentDmg * 0.25)
+				if dmgBonus < 5 then dmgBonus = 5 end -- Minimum +5 bónusz sebzés garantált
+
+				player:SetAttribute("BladeSpirit_DmgBonus", dmgBonus)
+				player:SetAttribute("AttackDamage", currentDmg + dmgBonus)
+
+				-- Végtelen vizuális aura (amíg ki nem kapcsolják, most agresszívabb pirosas színnel)
+				SkillDatabase.applyBuffVFX(char, "BladeSpirit", Color3.fromRGB(255, 50, 50), 999999)
 			else
 				-- KIKAPCSOLÁS
 				player:SetAttribute("BladeSpirit_Active", false)
 
-				-- Védelem bónusz pontos levonása
-				local defBonus = player:GetAttribute("BladeSpirit_DefBonus") or 0
-				if defStat then
-					defStat.Value = math.max(0, defStat.Value - defBonus)
+				-- Életlopás visszavétele
+				if lifeStealStat then
+					lifeStealStat.Value = math.max(0, lifeStealStat.Value - 20)
 				end
-				player:SetAttribute("BladeSpirit_DefBonus", nil)
+
+				-- Sebzés bónusz pontos visszavétele
+				local dmgBonus = player:GetAttribute("BladeSpirit_DmgBonus") or 0
+				local currentDmg = player:GetAttribute("AttackDamage") or 10
+				player:SetAttribute("AttackDamage", math.max(1, currentDmg - dmgBonus))
+				player:SetAttribute("BladeSpirit_DmgBonus", nil)
 
 				-- Aura azonnali eltüntetése
 				local vfx = root:FindFirstChild("BladeSpirit_VFX")
@@ -552,27 +553,98 @@ SkillDatabase.Skills = {
 	["Iron Skin"] = {
 		Mana = 40, Cooldown = 20, Duration = 6,
 		Execute = function(player, char, root, mousePos, target)
-			local stats = player:FindFirstChild("PlayerStats")
-			local msStat = stats and stats:FindFirstChild("MovementSpeed")
-
-			-- Vasbőr aktiválása (az applyDamage ezt figyeli az 50% DR-hez)
+			-- Vasbőr bekapcsolása (a passzív védelem bónuszt a háttérrendszer kezeli)
 			player:SetAttribute("IronSkin_Active", true)
 
-			-- -20% mozgási sebesség büntetés (Lassítás)
-			if msStat then msStat.Value -= 20 end
+			-- 1. IGAZI BARNA PAJZS LÉTREHOZÁSA A KARAKTER KÖRÜL
+			local shieldPart = Instance.new("Part")
+			shieldPart.Name = "IronSkinShield"
+			shieldPart.Shape = Enum.PartType.Ball
+			shieldPart.Size = Vector3.new(7, 7, 7) -- Elég nagy, hogy befedje a karaktert
+			shieldPart.Color = Color3.fromRGB(139, 69, 19) -- Barna szín
+			shieldPart.Material = Enum.Material.ForceField -- Erőtér textúra, ami animálva van a Robloxban
+			shieldPart.Transparency = 0.3
+			shieldPart.Anchored = false
+			shieldPart.CanCollide = false
+			shieldPart.Massless = true
+			shieldPart.CFrame = root.CFrame
+			shieldPart.Parent = char
 
-			-- Fém-szürke, vizuális "Armored State" effekt
-			SkillDatabase.applyBuffVFX(char, "IronSkin", Color3.fromRGB(160, 160, 170), 6)
+			-- Hozzákötjük a játékoshoz, hogy vele mozogjon (Weld)
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = shieldPart
+			weld.Part1 = root
+			weld.Parent = shieldPart
 
-			-- 6 másodperc múlva automatikusan lejár
+			-- 6 másodperc múlva Robbanás
 			task.delay(6, function()
 				if player and player.Parent then
 					player:SetAttribute("IronSkin_Active", false)
+				end
 
-					-- Visszaadjuk a mozgási sebességet
-					local currentStats = player:FindFirstChild("PlayerStats")
-					local currentMs = currentStats and currentStats:FindFirstChild("MovementSpeed")
-					if currentMs then currentMs.Value += 20 end
+				-- Pajzs eltüntetése
+				if shieldPart then shieldPart:Destroy() end
+
+				-- Robbanás és Lassítás
+				if char and root and root.Parent then
+					local range = 15
+					local pos = root.Position - Vector3.new(0, 2.5, 0) -- Földszint
+					local ts = game:GetService("TweenService")
+
+					-- 2. VIZUÁLIS FÖLDI INDIKÁTOR (A robbanás területe a talajon)
+					local indicator = Instance.new("Part")
+					indicator.Shape = Enum.PartType.Cylinder
+					indicator.Size = Vector3.new(0.5, range * 2, range * 2)
+					indicator.Color = Color3.fromRGB(139, 69, 19)
+					indicator.Material = Enum.Material.Neon
+					indicator.Anchored = true
+					indicator.CanCollide = false
+					indicator.Transparency = 0.2
+					indicator.CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90))
+					indicator.Parent = workspace
+
+					ts:Create(indicator, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Transparency = 1, Size = Vector3.new(0.5, (range * 2) + 2, (range * 2) + 2)
+					}):Play()
+					Debris:AddItem(indicator, 0.5)
+
+					-- 3. LÁTVÁNYOS ROBBANÓ GÖMB (Shockwave)
+					local wave = Instance.new("Part")
+					wave.Shape = Enum.PartType.Ball
+					wave.Size = Vector3.new(4, 4, 4)
+					wave.Color = Color3.fromRGB(180, 90, 30)
+					wave.Material = Enum.Material.Neon
+					wave.Anchored = true; wave.CanCollide = false; wave.Transparency = 0.1
+					wave.Position = root.Position
+					wave.Parent = workspace
+
+					ts:Create(wave, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+						Size = Vector3.new(range * 2, range * 2, range * 2), Transparency = 1
+					}):Play()
+					Debris:AddItem(wave, 0.5)
+
+					-- Alap particle burst
+					SkillDatabase.playVFX(root.Position, Color3.fromRGB(139, 69, 19), range)
+
+					-- 4. SEBZÉS ÉS LASSÍTÁS KIOSZTÁSA
+					local enemies = SkillDatabase.getEnemiesInRadius(root.Position, range, char)
+					for _, enemy in pairs(enemies) do
+						-- Pajzs robbanás sebzése
+						SkillDatabase.applyDamage(player, enemy, 1.5)
+
+						-- Lassítás 2 másodpercre
+						local eHum = enemy:FindFirstChild("Humanoid")
+						if eHum and eHum.Health > 0 and not enemy:GetAttribute("IronSkinSlowed") then
+							enemy:SetAttribute("IronSkinSlowed", true)
+							local originalSpeed = eHum.WalkSpeed
+							eHum.WalkSpeed = originalSpeed * 0.5 -- 50% Lassítás
+
+							task.delay(2, function()
+								if enemy and enemy.Parent then enemy:SetAttribute("IronSkinSlowed", nil) end
+								if eHum and eHum.Health > 0 then eHum.WalkSpeed = originalSpeed end
+							end)
+						end
+					end
 				end
 			end)
 			return true
@@ -620,7 +692,28 @@ SkillDatabase.Skills = {
 					createRedAura()
 					SkillDatabase.playVFX(root.Position, Color3.fromRGB(200, 50, 50), 12)
 					local enemies = SkillDatabase.getEnemiesInRadius(root.Position, 12, char)
-					for _, enemy in pairs(enemies) do SkillDatabase.applyDamage(player, enemy, 0.6) end
+					for _, enemy in pairs(enemies) do 
+						SkillDatabase.applyDamage(player, enemy, 0.6) 
+
+						-- ==========================================
+						-- ÚJ: LASSÍTÁS A WHIRLING BLADES HULLÁMAINÁL
+						-- ==========================================
+						local eHum = enemy:FindFirstChild("Humanoid")
+						if eHum and eHum.Health > 0 and not enemy:GetAttribute("WhirlingSlowed") then
+							enemy:SetAttribute("WhirlingSlowed", true)
+							local originalSpeed = eHum.WalkSpeed
+							eHum.WalkSpeed = originalSpeed * 0.6 -- 40%-os lassítás
+
+							task.delay(3, function()
+								if enemy and enemy.Parent then
+									enemy:SetAttribute("WhirlingSlowed", nil)
+								end
+								if eHum and eHum.Health > 0 then
+									eHum.WalkSpeed = originalSpeed
+								end
+							end)
+						end
+					end
 					task.wait(2/3) 
 				end
 				if hum then hum.WalkSpeed = oldWalkSpeed end 
@@ -918,28 +1011,39 @@ SkillDatabase.Skills = {
 			local bChar = buffTarget.Character
 			if not bChar then return false end
 
-			-- VARÁZSLÓ (Caster) STATJAINAK LEKÉRÉSE
 			local stats = player:FindFirstChild("PlayerStats")
 			local intStat = stats and stats:FindFirstChild("INT")
 			local dexStat = stats and stats:FindFirstChild("DEX")
 			local intVal = intStat and intStat.Value or 1
 			local dexVal = dexStat and dexStat.Value or 1
 
-			-- BÜNTETÉS: Magas DEX rontja a buffot (Minden DEX 15 felett -1% buff erő!)
 			local dexPenalty = 0
 			if dexVal > 15 then dexPenalty = (dexVal - 15) * 1 end
 
-			-- Bónusz matek: Alap 5% + INT skálázódás + Seal Mastery töltetek - DEX büntetés
 			local masteryBonus = charges * 2
 			local bonusPercent = math.max(1, 5 + math.floor(intVal / 10) + masteryBonus - dexPenalty)
 			local multi = 1 + (bonusPercent / 100)
 
-			SkillDatabase.applyBuffVFX(bChar, "SealOfPower", Color3.fromRGB(255, 50, 50), 7200)
-			buffTarget:SetAttribute("SealOfPower_Active", true)
+			-- IDŐZÍTŐ FRISSÍTÉSE (ha már rajta van a buff, csak az időt toljuk ki!)
+			buffTarget:SetAttribute("SealOfPower_Expiry", tick() + 7200)
 			buffTarget:SetAttribute("SealOfPower_Multi", multi) 
 
-			task.delay(7200, function() 
-				if buffTarget then 
+			if buffTarget:GetAttribute("SealOfPower_Active") then
+				return true -- Már aktív, nem futtatjuk le az aurát és a loopot még egyszer!
+			end
+
+			buffTarget:SetAttribute("SealOfPower_Active", true)
+			SkillDatabase.applyBuffVFX(bChar, "SealOfPower", Color3.fromRGB(255, 50, 50), 7200)
+
+			task.spawn(function()
+				-- Folyamatosan nézi, hogy lejárt-e (újrakasztoláskor a tick() kitolódik)
+				while buffTarget and buffTarget.Parent do
+					local expiry = buffTarget:GetAttribute("SealOfPower_Expiry") or 0
+					if tick() >= expiry then break end
+					task.wait(1)
+				end
+				-- Ha végleg lejárt az idő:
+				if buffTarget and buffTarget.Parent then 
 					buffTarget:SetAttribute("SealOfPower_Active", false)
 					buffTarget:SetAttribute("SealOfPower_Multi", nil)
 				end 
@@ -967,20 +1071,25 @@ SkillDatabase.Skills = {
 			local intVal = intStat and intStat.Value or 1
 			local dexVal = dexStat and dexStat.Value or 1
 
-			-- BÜNTETÉS: Magas DEX rontja a védelmi buffot (Minden DEX 15 felett -1% végső szorzó)
 			local dexPenalty = 0
 			if dexVal > 15 then dexPenalty = (dexVal - 15) * 0.01 end 
 
-			SkillDatabase.applyBuffVFX(bChar, "SealOfProtection", Color3.fromRGB(255, 215, 0), 7200)
+			-- IDŐZÍTŐ FRISSÍTÉSE
+			buffTarget:SetAttribute("SealOfProtection_Expiry", tick() + 7200)
+
+			if buffTarget:GetAttribute("SealOfProtection_Active") then
+				return true -- Már aktív, nem adjuk rá mégegyszer a statokat (nincs több infinite stack!)
+			end
+
 			buffTarget:SetAttribute("SealOfProtection_Active", true)
+			SkillDatabase.applyBuffVFX(bChar, "SealOfProtection", Color3.fromRGB(255, 215, 0), 7200)
 
 			local targetStats = buffTarget:FindFirstChild("PlayerStats")
 			local defStat = targetStats and targetStats:FindFirstChild("Defense")
 
 			local masteryBonus = charges * 0.02
-			local finalMultiplier = math.max(0.1, 1 + masteryBonus - dexPenalty) -- Büntetéssel módosított szorzó
+			local finalMultiplier = math.max(0.1, 1 + masteryBonus - dexPenalty)
 
-			-- INT x 0.15 skálázódás (10 + 0.15 INT) szorozva a (mastery bónusz - dex büntetés)
 			local addedDef = math.floor((10 + (intVal * 0.15)) * finalMultiplier)
 			local hpPercent = (0.05 + (intVal * 0.001)) * finalMultiplier 
 			local addedHP = math.floor(hum.MaxHealth * hpPercent)
@@ -989,8 +1098,14 @@ SkillDatabase.Skills = {
 			hum.MaxHealth += addedHP
 			hum.Health += addedHP
 
-			task.delay(7200, function() 
-				if buffTarget then 
+			task.spawn(function()
+				while buffTarget and buffTarget.Parent do
+					local expiry = buffTarget:GetAttribute("SealOfProtection_Expiry") or 0
+					if tick() >= expiry then break end
+					task.wait(1)
+				end
+
+				if buffTarget and buffTarget.Parent then 
 					buffTarget:SetAttribute("SealOfProtection_Active", false) 
 					if defStat then defStat.Value = math.max(0, defStat.Value - addedDef) end
 					if hum then
@@ -1003,18 +1118,22 @@ SkillDatabase.Skills = {
 		end
 	},
 	["Explosive Seal"] = {
-		Mana = 30, Cooldown = 15,
+		Mana = 30, Cooldown = 7, -- JAVÍTVA: 15-ről 7 másodpercre felezve
 		Execute = function(player, char, root, mousePos, target)
 			local enemyModel = target and target.Parent
 			if not SkillDatabase.isValidTarget(enemyModel) then return false end
 
-			-- Töltet generálás
 			local charges = math.min(5, (player:GetAttribute("SealCharges") or 0) + 1)
 			player:SetAttribute("SealCharges", charges)
 			SkillDatabase.resetChargeTimer(player)
 
 			local eRoot = enemyModel:FindFirstChild("HumanoidRootPart")
-			if not eRoot then return false end
+			local eHum = enemyModel:FindFirstChild("Humanoid")
+			if not eRoot or not eHum then return false end
+
+			-- JAVÍTVA: Lassítás alkalmazása (amíg a pecsét ketyeg)
+			local originalSpeed = eHum.WalkSpeed
+			eHum.WalkSpeed = originalSpeed * 0.5 -- 50%-os lassítás
 
 			local attachPart = enemyModel:FindFirstChild("Head") or eRoot
 			local bb = Instance.new("BillboardGui")
@@ -1057,6 +1176,11 @@ SkillDatabase.Skills = {
 
 				if bb then bb:Destroy() end
 
+				-- JAVÍTVA: Robbanáskor visszakapja az eredeti sebességét
+				if eHum and eHum.Health > 0 then
+					eHum.WalkSpeed = originalSpeed
+				end
+
 				if enemyModel and eRoot and enemyModel.Parent then
 					local explosionPos = eRoot.Position
 
@@ -1073,11 +1197,11 @@ SkillDatabase.Skills = {
 
 					local enemies = SkillDatabase.getEnemiesInRadius(explosionPos, 15, char)
 					for _, enemy in pairs(enemies) do
-						-- Balanszolt Sebzés (Fő célpont: 2.2x, AOE: 1.2x)
+						-- JAVÍTVA: Kisebb, spammelhetőbb sebzés (2.2 helyett 1.2, AOE 1.2 helyett 0.6)
 						if enemy == enemyModel then
-							SkillDatabase.applyDamage(player, enemy, 2.2)
-						else
 							SkillDatabase.applyDamage(player, enemy, 1.2)
+						else
+							SkillDatabase.applyDamage(player, enemy, 0.6)
 						end
 					end
 				end

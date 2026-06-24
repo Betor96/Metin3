@@ -58,6 +58,16 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	}
 
 	-- ==========================================
+	-- KASZT BIZTONSÁGOS LEKÉRÉSE ÉS KISBETŰSÍTÉSE
+	-- ==========================================
+	local playerClass = player:GetAttribute("Class") 
+	if not playerClass and stats:FindFirstChild("Class") then
+		playerClass = stats.Class.Value
+	end
+	-- Kisbetűsítjük, hogy a "ShadowBlade" és "shadowblade" ne okozzon gondot
+	playerClass = playerClass and string.lower(tostring(playerClass)) or ""
+
+	-- ==========================================
 	-- OPTIMALIZÁLÁS: A workspace:GetChildren() helyett
 	-- Csak a játékosokat és a specifikus mappákat nézzük át (O(N) gyorsítás)
 	-- ==========================================
@@ -89,11 +99,14 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	end
 
 	local oreHitCount = 0 -- Számláló, hogy csak 1 ércet üthess egyszerre!
+	local hitEnemyCount = 0 -- ÚJ: Számláló, hogy hányszor találtunk ellenséget
 
-	-- ==========================================
-	-- A TE EREDETI HIBÁTLAN MATEKOD:
-	-- ==========================================
 	for _, obj in pairs(possibleTargets) do
+		-- ==========================================
+		-- SHADOWBLADE SPECIFIKUS: Single Target (Csak 1 ellenséget üthet egyszerre)
+		-- ==========================================
+		if playerClass == "shadowblade" and hitEnemyCount >= 1 then continue end
+
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")
 			local targetHum = obj.Humanoid
@@ -129,12 +142,45 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 						oreHitCount += 1
 					else
 						-- NORMÁL SZÖRNY / JÁTÉKOS SEBZÉS
+						hitEnemyCount = hitEnemyCount + 1 -- Feljegyezzük, hogy eltaláltunk valakit
+
 						local defense = 0 
 						finalDamage = math.max(1, baseDamage - defense)
 
 						if math.random(1, 100) <= stats.CritChance.Value then
 							finalDamage = finalDamage * 2
 							isCrit = true
+						end
+
+						-- ==========================================
+						-- SHADOWBLADE: AUTO-ATTACK PASSZÍVOK
+						-- ==========================================
+						if playerClass == "shadowblade" then
+							-- 1. HÁTBATÁMADÁS PONTOS MATEK:
+							-- Megnézzük a vektor irányát a szörnytől a játékos felé
+							local directionFromTargetToMe = (rootPart.Position - targetRoot.Position).Unit
+							local targetLook = targetRoot.CFrame.LookVector
+
+							-- Ha a dotProduct negatív (< -0.2), akkor a szörny HÁTA mögött állunk!
+							if targetLook:Dot(directionFromTargetToMe) < -0.2 then
+								finalDamage = math.floor(finalDamage * 1.5) -- +50% Bónusz sebzés!
+								isCrit = true -- Nagyobbnak mutassa a számot
+							end
+
+							-- 2. DEATHMARK PROC
+							-- Megnézzük, hogy a mi Death Mark-unk van-e rajta
+							local markApplier = obj:GetAttribute("DeathMark_Applier")
+							if markApplier == player.UserId then
+								obj:SetAttribute("DeathMark_Applier", nil) -- Levesszük róla a jelet
+								finalDamage = finalDamage + (classDamage * 3) -- Extrém bónusz sebzés (Robbanás)
+								isCrit = true
+
+								-- Vizuális effekt eltüntetése a feje felől
+								local attachPart = obj:FindFirstChild("Head") or targetRoot or obj.PrimaryPart
+								if attachPart and attachPart:FindFirstChild("DeathMarkVisual") then
+									attachPart.DeathMarkVisual:Destroy()
+								end
+							end
 						end
 
 						local isMetin = (obj.Parent and obj.Parent.Name == "MetinStones")

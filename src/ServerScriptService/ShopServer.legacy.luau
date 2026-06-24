@@ -28,20 +28,21 @@ local validMerchants = {
 local function isNearMerchant(player)
 	local char = player.Character
 	if not char then return false end
-
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then return false end
 
-	-- Megnézzük a Workspace-ben, van-e boltos NPC a közelében (20 stud)
-	for _, obj in pairs(workspace:GetChildren()) do
-		if validMerchants[obj.Name] and obj:FindFirstChild("HumanoidRootPart") then
-			local distance = (root.Position - obj.HumanoidRootPart.Position).Magnitude
-			if distance <= 20 then
-				return true
+	-- OPTIMALIZÁLVA: Csak az NPCs mappát nézi át!
+	local npcFolder = workspace:FindFirstChild("NPCs")
+	if npcFolder then
+		for _, obj in pairs(npcFolder:GetChildren()) do
+			if validMerchants[obj.Name] and obj:FindFirstChild("HumanoidRootPart") then
+				local distance = (root.Position - obj.HumanoidRootPart.Position).Magnitude
+				if distance <= 20 then
+					return true
+				end
 			end
 		end
 	end
-
 	return false
 end
 

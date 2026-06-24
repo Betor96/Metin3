@@ -191,8 +191,18 @@ local function openShop(npcName)
 end
 
 local function setupNPCs()
+	local npcFolder = workspace:FindFirstChild("NPCs")
+
 	for npcName, _ in pairs(SHOPS) do
-		local npc = workspace:FindFirstChild(npcName)
+		-- Keresés az új NPCs mappában (ha nincs ott, megnézi a Workspace-t tartalékként)
+		local npc = nil
+		if npcFolder then
+			npc = npcFolder:FindFirstChild(npcName)
+		end
+		if not npc then
+			npc = workspace:FindFirstChild(npcName)
+		end
+
 		if npc then
 			local clickDetector = npc:FindFirstChildOfClass("ClickDetector")
 			if clickDetector then
@@ -225,7 +235,17 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
+-- Figyeljük az új NPCs mappát is, hátha később tölt be egy boltos!
+local npcFolder = workspace:WaitForChild("NPCs", 5)
+if npcFolder then
+	npcFolder.ChildAdded:Connect(function(child)
+		if SHOPS[child.Name] then task.wait(0.5) setupNPCs() end
+	end)
+end
+
+-- Eredeti workspace figyelő tartaléknak
 workspace.ChildAdded:Connect(function(child)
 	if SHOPS[child.Name] then task.wait(0.5) setupNPCs() end
 end)
+
 setupNPCs()
