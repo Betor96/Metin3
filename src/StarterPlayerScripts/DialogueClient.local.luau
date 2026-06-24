@@ -25,16 +25,18 @@ local mainFrame = Instance.new("Frame", gui)
 mainFrame.Size = UDim2.new(0, 350, 0, 450)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 20)
-mainFrame.BorderSizePixel = 3
-mainFrame.BorderColor3 = Color3.fromRGB(80, 60, 40)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+mainFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
+mainFrame.BorderSizePixel = 2
 mainFrame.Visible = false
 mainFrame.Active = true
 
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundColor3 = Color3.fromRGB(40, 30, 20)
-title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundColor3 = Color3.fromRGB(25, 20, 15)
+title.BorderColor3 = Color3.fromRGB(180, 140, 50)
+title.BorderSizePixel = 1
+title.TextColor3 = Color3.fromRGB(255, 215, 0)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
@@ -43,6 +45,8 @@ closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -5, 0, 5)
 closeBtn.AnchorPoint = Vector2.new(1, 0)
 closeBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+closeBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+closeBtn.BorderSizePixel = 2
 closeBtn.TextColor3 = Color3.new(1, 1, 1)
 closeBtn.Text = "X"
 closeBtn.Font = Enum.Font.GothamBold
@@ -55,6 +59,7 @@ scroll.BackgroundTransparency = 1
 scroll.ScrollBarThickness = 6
 local layout = Instance.new("UIListLayout", scroll)
 layout.Padding = UDim.new(0, 10)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- JAVÍTÁS: Középre igazítjuk a küldetéseket!
 
 -- ==========================================
 -- 2. ABLAK: PÁRBESZÉD ABLAK (Képernyő alján)
@@ -63,10 +68,10 @@ local dialogFrame = Instance.new("Frame", gui)
 dialogFrame.Size = UDim2.new(0, 600, 0, 150)
 dialogFrame.AnchorPoint = Vector2.new(0.5, 1) 
 dialogFrame.Position = UDim2.new(0.5, 0, 1, -50) 
-dialogFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+dialogFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+dialogFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
+dialogFrame.BorderSizePixel = 2
 dialogFrame.BackgroundTransparency = 0.1
-dialogFrame.BorderColor3 = Color3.fromRGB(180, 150, 80)
-dialogFrame.BorderSizePixel = 3
 dialogFrame.Visible = false
 dialogFrame.Active = true
 
@@ -130,8 +135,10 @@ local function showConversation(npcName, text, options)
 	for _, opt in ipairs(options) do
 		local btn = Instance.new("TextButton", buttonContainer)
 		btn.Size = UDim2.new(0, 150, 1, 0)
-		btn.BackgroundColor3 = Color3.fromRGB(40, 50, 60)
-		btn.TextColor3 = Color3.new(1, 1, 1)
+		btn.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+		btn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+		btn.BorderSizePixel = 1
+		btn.TextColor3 = Color3.fromRGB(255, 215, 0)
 		btn.Font = Enum.Font.GothamBold
 		btn.TextSize = 14
 		btn.Text = opt.Text
@@ -171,9 +178,6 @@ local function openDialogueList(npcName)
 		local isCompleted = completedQuests and completedQuests:FindFirstChild(qName)
 		local isActive = activeQuests and activeQuests:FindFirstChild(qName)
 
-		-- ==========================================
-		-- JAVÍTÁS: SZIGORÚ ELLENŐRZÉS! Ha kész van, soha többé nem mutatjuk!
-		-- ==========================================
 		if isCompleted then continue end 
 		if not isActive and (pLevel < minLvl or pLevel > maxLvl) then continue end
 
@@ -216,15 +220,15 @@ local function openDialogueList(npcName)
 
 			local qFrame = Instance.new("Frame", scroll)
 			qFrame.Size = UDim2.new(1, -10, 0, 110)
-			qFrame.BackgroundColor3 = Color3.fromRGB(35, 30, 30)
+			qFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 15)
+			qFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
 			qFrame.BorderSizePixel = 1
-			qFrame.BorderColor3 = Color3.fromRGB(100, 80, 50)
 
 			local qTitle = Instance.new("TextLabel", qFrame)
 			qTitle.Size = UDim2.new(1, -10, 0, 20)
 			qTitle.Position = UDim2.new(0, 5, 0, 5)
 			qTitle.BackgroundTransparency = 1
-			qTitle.TextColor3 = Color3.fromRGB(255, 200, 50)
+			qTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 			qTitle.Font = Enum.Font.GothamBold
 			qTitle.Text = qName .. " (Szint: " .. minLvl .. "-" .. maxLvl .. ")"
 			qTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -246,6 +250,8 @@ local function openDialogueList(npcName)
 			qBtn.Position = UDim2.new(0, 5, 0, 75)
 			qBtn.Font = Enum.Font.GothamBold
 			qBtn.BackgroundColor3 = btnColor
+			qBtn.BorderColor3 = Color3.fromRGB(180, 140, 50)
+			qBtn.BorderSizePixel = 1
 			qBtn.TextColor3 = Color3.new(1, 1, 1)
 			qBtn.Text = buttonText
 			qBtn.Active = isClickable
@@ -286,7 +292,8 @@ local function openDialogueList(npcName)
 
 	local highest = 0
 	for _, g in pairs(player.PlayerGui:GetChildren()) do
-		if g:IsA("ScreenGui") and g ~= gui and g.Name ~= "TooltipHUD" then
+		-- Biztonsági kivételek bővítése!
+		if g:IsA("ScreenGui") and g ~= gui and g.Name ~= "TooltipHUD" and g.Name ~= "SkillTooltipGUI" then
 			if g.DisplayOrder > highest then highest = g.DisplayOrder end
 		end
 	end

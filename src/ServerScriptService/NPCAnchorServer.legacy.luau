@@ -1,53 +1,48 @@
 -- Fájl helye: ServerScriptService -> NPCAnchorServer
 
-local function secureNPC(npc)
-	-- Várunk egy picit, hogy a modell minden része betöltődjön
+local workspace = game:GetService("Workspace")
+
+local function lockNPC(npc)
+	-- Várunk egy pillanatot, hogy a modell minden része (ruhák, fegyverek) betöltsön
 	task.wait(0.5)
 
-	-- Megkeressük a gyökér-alkatrészt (ez a fő fizikai test)
-	local rootPart = npc:FindFirstChild("HumanoidRootPart")
+	if npc:IsA("Model") then
+		local hum = npc:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.WalkSpeed = 0
+			hum.JumpPower = 0
+		end
 
-	if rootPart then
-		-- 1. Odaszögezzük a földhöz! Ezentúl senki sem tudja eltolni.
-		rootPart.Anchored = true
-
-		-- (Opcionális) Ha azt akarod, hogy egyáltalán ne remegjenek vagy csússzanak meg
-		-- beállíthatjuk a többi testrészüket is extrán nehézre:
+		-- Végigmegyünk az NPC minden egyes apró alkatrészén
 		for _, part in pairs(npc:GetDescendants()) do
 			if part:IsA("BasePart") then
-				part.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5) -- 100-as sűrűség (nagyon nehéz)
+				part.Anchored = true -- Teljesen lefagyasztjuk (nem lehet eltolni)
+				part.CanCollide = false -- Kikapcsoljuk az ütközést (nem lehet rájuk mászni, átmész rajtuk)
 			end
 		end
+	end
+end
 
-		-- 2. Kikapcsoljuk az NPC saját mozgását
-		local humanoid = npc:FindFirstChild("Humanoid")
-		if humanoid then
-			humanoid.WalkSpeed = 0
-			humanoid.JumpPower = 0
+local function setupNPCs()
+	local npcFolder = workspace:FindFirstChild("NPCs")
+
+	-- 1. Végigmegyünk a dedikált NPCs mappán
+	if npcFolder then
+		for _, npc in pairs(npcFolder:GetChildren()) do
+			lockNPC(npc)
+		end
+
+		-- 2. Figyeljük a mappába menet közben érkező új NPC-ket is
+		npcFolder.ChildAdded:Connect(lockNPC)
+	end
+
+	-- 3. Tartalék biztonsági háló: ha véletlenül a Workspace-be raktál egy NPC-t
+	for _, obj in pairs(workspace:GetChildren()) do
+		-- Olyan modelleket keresünk, amiknek van Humanoidja és rájuk is lehet kattintani
+		if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") and obj:FindFirstChildOfClass("ClickDetector", true) then
+			lockNPC(obj)
 		end
 	end
 end
 
--- ==========================================
--- 1. RÖGZÍTI A MÁR BENT LÉVŐ NPC-KET
--- ==========================================
-for _, obj in pairs(workspace:GetChildren()) do
-	-- Ha ez egy modell, van benne Humanoid (karakter) ÉS van benne ClickDetector (interakció)
-	-- Akkor ez biztosan egy Bolt/Kovács/Küldetés NPC! (A szörnyekben nincs ClickDetector)
-	if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChildOfClass("ClickDetector") then
-		task.spawn(function()
-			secureNPC(obj)
-		end)
-	end
-end
-
--- ==========================================
--- 2. RÖGZÍTI AZOKAT, AKIK KÉSŐBB KERÜLNEK BE (pl. eventekkor)
--- ==========================================
-workspace.ChildAdded:Connect(function(obj)
-	-- Megvárjuk, amíg teljesen bekerül a játékba
-	task.wait(1) 
-	if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChildOfClass("ClickDetector") then
-		secureNPC(obj)
-	end
-end)
+setupNPCs()

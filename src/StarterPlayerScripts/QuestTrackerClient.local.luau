@@ -37,10 +37,11 @@ local function updateTracker()
 		local qData = QuestDatabase[qVal.Name]
 		if qData then
 			local qFrame = Instance.new("Frame", container)
-			qFrame.BackgroundTransparency = 0.4
-			qFrame.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
+			-- METINESÍTÉS
+			qFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10)
+			qFrame.BorderColor3 = Color3.fromRGB(180, 140, 50)
 			qFrame.BorderSizePixel = 2
-			qFrame.BorderColor3 = Color3.fromRGB(60, 40, 20)
+			qFrame.BackgroundTransparency = 0.2
 			qFrame.Size = UDim2.new(1, 0, 0, 45)
 
 			local title = Instance.new("TextLabel", qFrame)
