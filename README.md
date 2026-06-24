@@ -1,6 +1,6 @@
 
 # játék frissitések, aktuális dolgok
-halál rendzser finimitása, szörnyek ai-ja erősitva és falka támádaásr aképesek
+Kasztok balacolása, új dolgok hozzáadás szüentelteve, Quality of Life frissitések, követklező frissités ablakaok javitása, lolos képéeség tippek
 
 # -----------------------------------------------------------------
 
