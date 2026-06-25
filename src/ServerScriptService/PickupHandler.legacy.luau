@@ -23,6 +23,7 @@ PickupItems.OnServerEvent:Connect(function(player)
 		local dist = (itemPart.Position - rootPart.Position).Magnitude
 
 		if dist <= PICKUP_RADIUS then
+			if itemPart:GetAttribute("PickedUp") then continue end
 			-- ==========================================
 			-- ÚJ: TULAJDONJOG ELLENŐRZÉSE
 			-- ==========================================
@@ -30,6 +31,8 @@ PickupItems.OnServerEvent:Connect(function(player)
 			if ownerTag and ownerTag.Value ~= "" and ownerTag.Value ~= player.Name then
 				continue -- Ha van tulajdonosa, és az NEM a játékos, akkor nem veheti fel! (Ugrás a következőre)
 			end
+
+			itemPart:SetAttribute("PickedUp", true)
 
 			local itemTag = itemPart:FindFirstChild("ItemName")
 			if itemTag then

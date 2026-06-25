@@ -161,6 +161,25 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 	end
 
 	if canComplete then
+		
+		-- JAVÍTÁS: Adatvesztés védelem (Ellenőrizzük, hogy befér-e a jutalom!)
+		if questData.RewardItem then
+			local stats = player:FindFirstChild("PlayerStats")
+			local inv = player:FindFirstChild("Inventory")
+			local maxUnlocked = (stats and stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+			local hasSpace = false
+
+			for i = 1, maxUnlocked do
+				local slot = inv:FindFirstChild("Slot_" .. i)
+				if slot and slot.Value == "" then hasSpace = true break end
+			end
+
+			if not hasSpace then
+				-- Opcionális: Küldhetsz ide egy Notification-t a kliensnek, hogy "Tele van a táskád!"
+				return -- KILÉPÜNK, nem adjuk le a küldetést!
+			end
+		end
+		
 		-- BIZTONSÁG 3: AZONNAL letöröljük a questet, MIELŐTT bármit adnánk!
 		qVal:Destroy()
 

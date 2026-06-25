@@ -6,7 +6,46 @@ local UpgradeResult = Events:WaitForChild("UpgradeResult")
 -- BEKÖTJÜK A KÖZPONTI ADATBÁZIST
 local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
 
+-- ==========================================
+-- BIZTONSÁGI ELLENŐRZÉS ÉS ANTI-SPAM
+-- ==========================================
+local playerLocks = {}
+local function checkSpam(player, cooldown)
+	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < cooldown then return true end
+	playerLocks[player.UserId] = tick()
+	return false
+end
+
+game:GetService("Players").PlayerRemoving:Connect(function(player)
+	playerLocks[player.UserId] = nil
+end)
+
+local function isNearBlacksmith(player)
+	local char = player.Character
+	if not char then return false end
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return false end
+
+	local npcFolder = workspace:FindFirstChild("NPCs")
+	if npcFolder then
+		local kovacs = npcFolder:FindFirstChild("Kovacs")
+		if kovacs and kovacs:FindFirstChild("HumanoidRootPart") then
+			return (root.Position - kovacs.HumanoidRootPart.Position).Magnitude <= 20
+		end
+	end
+	return false
+end
+
 ProcessUpgrade.OnServerEvent:Connect(function(player, folderStr, slotName)
+	-- JAVÍTÁS: Anti-Spam védelem (Makró/Auto-clicker ellen)
+	if checkSpam(player, 0.2) then return end
+
+	-- JAVÍTÁS: NPC távolság ellenőrzése (Exploit védelem távoli fejlesztés ellen)
+	if not isNearBlacksmith(player) then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " távolról próbált a Kováccsal fejleszteni!")
+		return
+	end
+
 	local folder = (folderStr == "Inventory") and player:FindFirstChild("Inventory") or player:FindFirstChild("Equipment")
 	if not folder then return end
 
@@ -32,26 +71,43 @@ ProcessUpgrade.OnServerEvent:Connect(function(player, folderStr, slotName)
 	end
 
 	if itemData.ReqItem then
-		local foundCount = 0
-		for i = 1, 8 do
+		local maxUnlockedSlots = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
+		local foundAmount = 0
+
+		-- Megszámoljuk, mennyi van összesen
+		for i = 1, maxUnlockedSlots do
 			local checkSlot = inv:FindFirstChild("Slot_" .. i)
 			if checkSlot and checkSlot.Value == itemData.ReqItem then
-				foundCount = foundCount + 1
+				local amtObj = checkSlot:FindFirstChild("Amount")
+				foundAmount += (amtObj and amtObj.Value or 1)
 			end
 		end
 
-		if foundCount < itemData.ReqCount then
+		if foundAmount < itemData.ReqCount then
 			UpgradeResult:FireClient(player, "Nincs elég " .. itemData.ReqItem .. " a táskádban!")
 			return
 		end
 
-		local removedCount = 0
-		for i = 1, 8 do
+		-- Levonjuk a szükséges mennyiséget
+		local remainingToRemove = itemData.ReqCount
+		for i = 1, maxUnlockedSlots do
+			if remainingToRemove <= 0 then break end
+
 			local remSlot = inv:FindFirstChild("Slot_" .. i)
 			if remSlot and remSlot.Value == itemData.ReqItem then
-				remSlot.Value = ""
-				removedCount = removedCount + 1
-				if removedCount >= itemData.ReqCount then break end
+				local amtObj = remSlot:FindFirstChild("Amount")
+				local currentAmt = amtObj and amtObj.Value or 1
+
+				if currentAmt <= remainingToRemove then
+					-- Az egész slot kiürül
+					remainingToRemove -= currentAmt
+					remSlot.Value = ""
+					if amtObj then amtObj.Value = 0 end
+				else
+					-- Csak egy részét vonjuk le a stackből
+					amtObj.Value -= remainingToRemove
+					remainingToRemove = 0
+				end
 			end
 		end
 	end

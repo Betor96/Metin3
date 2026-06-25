@@ -3,7 +3,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
-
+local respawnLocks = {}
 Players.RespawnTime = 99999
 
 local RespawnPlayer = Events:FindFirstChild("RespawnPlayer") or Instance.new("RemoteEvent", Events)
@@ -25,7 +25,13 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 end)
 
+
+
 RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
+	
+	if respawnLocks[player.UserId] and tick() - respawnLocks[player.UserId] < 3 then return end
+	respawnLocks[player.UserId] = tick()
+	
 	local dPos = deathPositions[player.UserId] or Vector3.new(0, 50, 0)
 
 	player:LoadCharacter()
@@ -157,4 +163,12 @@ RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
 			if hum then hum.Health = hum.MaxHealth end
 		end)
 	end
+end)
+
+-- ==========================================
+-- JAVÍTÁS: MEMORY LEAK TAKARÍTÁSA KILÉPÉSKOR
+-- ==========================================
+Players.PlayerRemoving:Connect(function(player)
+	deathPositions[player.UserId] = nil
+	if respawnLocks then respawnLocks[player.UserId] = nil end
 end)
