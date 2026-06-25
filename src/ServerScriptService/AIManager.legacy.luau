@@ -92,6 +92,7 @@ local function setupMonster(npc)
 		Data = myData,
 		State = "IDLE",
 		Target = nil,
+		NextAggroCheck = 0,
 		SpawnPos = npc:GetPivot().Position,
 		NextRoamTime = tick() + math.random(1, 3),
 		CanAttack = true,
@@ -288,8 +289,14 @@ task.spawn(function()
 			local rootPart = ai.RootPart
 
 			-- 1. ÁLLAPOT: SÉTÁLGATÁS / VÁRAKOZÁS
+			-- 1. ÁLLAPOT: SÉTÁLGATÁS / VÁRAKOZÁS
 			if ai.State == "IDLE" then
-				ai.Target = getNearestTarget(rootPart, ai.AggroRange)
+				-- JAVÍTÁS: Csak másodpercenként 1x pásztázzuk a játékosokat, nem 0.2 másodpercenként!
+				if tick() >= (ai.NextAggroCheck or 0) then
+					ai.Target = getNearestTarget(rootPart, ai.AggroRange)
+					ai.NextAggroCheck = tick() + 1
+				end
+
 				if ai.Target then
 					ai.State = "CHASE"
 					alertPack(npc:GetAttribute("PackID"), ai.Target)

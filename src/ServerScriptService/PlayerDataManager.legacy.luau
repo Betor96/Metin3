@@ -281,14 +281,20 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 	}
 
 	local locked = false
+	local alreadyExists = false -- JAVÍTÁS: Új biztonsági flag
 	local success, errorMessage = pcall(function() 
-		playerDataStore:UpdateAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, function(oldData)
-			if oldData and oldData.SessionId and oldData.SessionId ~= SESSION_ID then
-				if oldData.LastSaveTime and os.time() - oldData.LastSaveTime < 600 then
-					locked = true
-					return oldData 
+		return playerDataStore:UpdateAsync("Player_" .. player.UserId .. "_Slot_" .. slotId, function(oldData)
+			-- JAVÍTÁS: Ha a karakter már létezik, TILOS felülírni a létrehozás menüből!
+			if oldData then
+				if oldData.SessionId and oldData.SessionId ~= SESSION_ID then
+					if oldData.LastSaveTime and os.time() - oldData.LastSaveTime < 600 then
+						locked = true
+					end
 				end
+				alreadyExists = true
+				return oldData -- Megszakítja az Update-et, visszatér a régivel
 			end
+
 			newData.SessionId = SESSION_ID
 			newData.LastSaveTime = os.time()
 			return newData
@@ -299,6 +305,9 @@ CreateCharacter.OnServerEvent:Connect(function(player, slotId, className)
 		player:Kick("\n🛡️ ADATBÁZIS VÉDELEM 🛡️\nEzt a slotot jelenleg egy másik szerver használja!")
 		return
 	end
+
+	-- JAVÍTÁS: Kilépünk a setupPlayer előtt, ha a karakter már létezett!
+	if alreadyExists then return end
 
 	if success then
 		if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId][slotId] = nil end
@@ -404,7 +413,13 @@ task.spawn(function()
 end)
 
 Players.PlayerRemoving:Connect(function(player)
+	-- JAVÍTÁS: Ha épp mentés alatt áll (Auto-Save), megvárjuk, amíg befejezi!
+	while savingPlayers[player.UserId] do
+		task.wait(0.1)
+	end
+
 	savePlayerData(player, true)
+
 	-- MEMORY LEAK TAKARÍTÁS
 	if deletedSlotsCache[player.UserId] then deletedSlotsCache[player.UserId] = nil end
 	if activeSlots[player.UserId] then activeSlots[player.UserId] = nil end
@@ -414,5 +429,12 @@ game:BindToClose(function()
 	for _, player in pairs(Players:GetPlayers()) do 
 		task.spawn(function() savePlayerData(player, true) end) 
 	end
-	task.wait(2) 
+
+	-- JAVÍTÁS: Dinamikus várakozás a fix task.wait(2) helyett!
+	local timeout = 0
+	-- Addig várunk, amíg van elem a savingPlayers táblában (de maximum 15 másodpercet)
+	while next(savingPlayers) ~= nil and timeout < 15 do
+		task.wait(1)
+		timeout += 1
+	end
 end)

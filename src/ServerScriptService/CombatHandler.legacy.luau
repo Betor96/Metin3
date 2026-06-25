@@ -21,6 +21,11 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 	attackLocks[player.UserId] = tick()
 
 	local character = player.Character
+	
+	if not character or not character:FindFirstChild("Humanoid") or character.Humanoid.Health <= 0 then 
+		return 
+	end
+	
 	-- ==========================================
 	-- HA A JÁTÉKOS ÜT, ELVESZÍTI A PAJZSÁT!
 	-- ==========================================
@@ -106,6 +111,12 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 		-- SHADOWBLADE SPECIFIKUS: Single Target (Csak 1 ellenséget üthet egyszerre)
 		-- ==========================================
 		if playerClass == "shadowblade" and hitEnemyCount >= 1 then continue end
+
+		-- ==========================================
+		-- JAVÍTÁS: A Távolságot nézzük meg legelőször, hogy kiszűrjük a pálya 99%-át!
+		-- ==========================================
+		local objPos = obj:GetPivot().Position
+		if (rootPart.Position - objPos).Magnitude > 15 then continue end
 
 		if obj:IsA("Model") and obj ~= character and obj:FindFirstChild("Humanoid") then
 			local targetRoot = obj:FindFirstChild("HumanoidRootPart")

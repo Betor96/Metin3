@@ -46,10 +46,22 @@ local function isNearMerchant(player)
 	return false
 end
 
+local playerLocks = {}
+local function checkSpam(player, cooldown)
+	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < cooldown then return true end
+	playerLocks[player.UserId] = tick()
+	return false
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	playerLocks[player.UserId] = nil
+end)
+
 -- ==========================================
 -- TÁRGY VÁSÁRLÁSA
 -- ==========================================
 BuyItem.OnServerEvent:Connect(function(player, itemName)
+	if checkSpam(player, 0.1) then return end
 	-- 1. SZIGORÚ VÉDELEM: NPC Távolság ellenőrzése
 	if not isNearMerchant(player) then
 		warn("[EXPLOIT GYANÚ] " .. player.Name .. " távolról, NPC nélkül próbált vásárolni!")
@@ -112,6 +124,7 @@ end)
 -- TÁRGY ELADÁSA
 -- ==========================================
 SellItem.OnServerEvent:Connect(function(player, slotName)
+	if checkSpam(player, 0.1) then return end
 	-- 1. SZIGORÚ VÉDELEM: NPC Távolság ellenőrzése
 	if not isNearMerchant(player) then
 		warn("[EXPLOIT GYANÚ] " .. player.Name .. " távolról, NPC nélkül próbált eladni!")

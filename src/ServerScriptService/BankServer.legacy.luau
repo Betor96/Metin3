@@ -46,7 +46,13 @@ CheckBankPwd.OnServerInvoke = function(player, pwdAttempt)
 	local realPwd = tostring(pwdObj.Value)
 	local attempt = tostring(pwdAttempt)
 
-	return realPwd == attempt
+	-- JAVÍTÁS: Csak akkor kapja meg az engedélyt, ha a jelszó jó!
+	if realPwd == attempt then
+		player:SetAttribute("BankUnlocked", true)
+		return true
+	else
+		return false
+	end
 end
 
 -- ==========================================

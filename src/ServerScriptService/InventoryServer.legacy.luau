@@ -96,6 +96,11 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 	local fromFolder = (fromFolderStr == "Inventory") and inv or ((fromFolderStr == "Equipment") and eq or bank)
 	local toFolder = (toFolderStr == "Inventory") and inv or ((toFolderStr == "Equipment") and eq or bank)
 
+	if (fromFolderStr == "Bank" or toFolderStr == "Bank") and not player:GetAttribute("BankUnlocked") then
+		warn("[EXPLOIT] " .. player.Name .. " jelszó nélkül próbált a raktárhoz nyúlni!")
+		return
+	end
+
 	if toFolderStr == "Inventory" or toFolderStr == "Bank" then
 		local toSlotNum = tonumber(toSlotName:match("%d+"))
 		if toSlotNum then
@@ -118,6 +123,14 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 		if toFolderStr == "Equipment" then
 			local expectedSlot = typeToSlot[itemData.Type]
 			if expectedSlot ~= toSlotName then return end 
+
+			-- JAVÍTÁS: Felszerelés szintkövetelményének szerver-oldali védelme!
+			local playerLevel = stats:FindFirstChild("Level") and stats.Level.Value or 1
+			local requiredLevel = itemData.Level or 1
+
+			if playerLevel < requiredLevel then 
+				return 
+			end
 		end
 
 		if toFolderStr == "Inventory" and fromFolderStr == "Equipment" and targetItemName ~= "" then
@@ -301,6 +314,8 @@ AutoStack.OnServerEvent:Connect(function(player, targetSlotName, isBank)
 
 	local folder = isBank and player:FindFirstChild("Bank") or player:FindFirstChild("Inventory")
 	if not folder then return end
+
+
 
 	local targetSlot = folder:FindFirstChild(targetSlotName)
 	if not targetSlot or targetSlot.Value == "" then return end
