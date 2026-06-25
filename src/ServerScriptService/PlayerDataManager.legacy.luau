@@ -125,16 +125,19 @@ SyncHotbarSlot.OnServerEvent:Connect(function(player, slotNum, itemName)
 	if slotNum < 1 or slotNum > 8 then return end
 	if math.floor(slotNum) ~= slotNum then return end
 
-	if not isValidHotbarEntry(player, itemName) then
-		warn("[HOTBAR VALIDÁCIÓ] " .. player.Name .. " érvénytelen hotbar elemet próbált menteni: " .. tostring(itemName))
-		return
-	end
-
 	local hotbar = player:FindFirstChild("Hotbar")
 	if not hotbar then return end
 
 	local slot = hotbar:FindFirstChild("Hotbar_" .. slotNum)
 	if not slot then return end
+
+	if not isValidHotbarEntry(player, itemName) then
+		warn("[HOTBAR VALIDÁCIÓ] " .. player.Name .. " érvénytelen hotbar elemet próbált menteni: " .. tostring(itemName))
+
+		slot.Value = ""
+
+		return
+	end
 
 	slot.Value = itemName or ""
 end)

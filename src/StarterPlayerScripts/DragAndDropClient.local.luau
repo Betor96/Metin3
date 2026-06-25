@@ -36,6 +36,75 @@ local eqNameToServer = {
 	["Pajzs"] = "Pajzs", ["Karkötő"] = "Karkoto"
 }
 
+local classSkillMap = {
+	GUARDIAN = {
+		["Shield Charge"] = true,
+		["Earthbreaker"] = true,
+		["Blade Spirit"] = true,
+		["Iron Skin"] = true,
+	},
+
+	SHADOWBLADE = {
+		["Shadow Strike"] = true,
+		["Whirling Blades"] = true,
+		["Bloodlust"] = true,
+		["Death Mark"] = true,
+	},
+
+	SOULWEAVER = {
+		["Soul Orb"] = true,
+		["Spirit Chain"] = true,
+		["Spirit Blessing"] = true,
+		["Soul Explosion"] = true,
+	},
+
+	SEALER = {
+		["Seal of Power"] = true,
+		["Seal of Protection"] = true,
+		["Explosive Seal"] = true,
+		["Dragon Shackles"] = true,
+	}
+}
+
+local function canPlaceOnHotbar(itemName)
+	if type(itemName) ~= "string" or itemName == "" then
+		return false
+	end
+
+	if SkillDatabase.Skills and SkillDatabase.Skills[itemName] then
+		local playerClass = player:GetAttribute("Class")
+		if not playerClass then return false end
+
+		local allowedSkills = classSkillMap[playerClass]
+		if not allowedSkills or not allowedSkills[itemName] then
+			return false
+		end
+
+		if SkillDatabase.playerHasUnlockedSkill and not SkillDatabase.playerHasUnlockedSkill(player, itemName) then
+			return false
+		end
+
+		return true
+	end
+
+	if ItemDatabase[itemName] then
+		return true
+	end
+
+	return false
+end
+
+local function setHotbarSlotIfAllowed(slotObj, itemName)
+	if not slotObj then return end
+
+	if canPlaceOnHotbar(itemName) then
+		slotObj.Value = itemName
+	else
+		warn("[HOTBAR UI] Tiltott vagy még nem feloldott elem nem kerülhet hotbarra: " .. tostring(itemName))
+	end
+end
+
+
 -- ==========================================
 -- KOVÁCS ABLAK (METINESÍTVE)
 -- ==========================================
@@ -800,21 +869,31 @@ UserInputService.InputEnded:Connect(function(input)
 			if fromFolderStr == "Skill" then
 				if toFolderStr == "Hotbar" then
 					local targetHb = player.Hotbar:FindFirstChild(toSlotName)
-					if targetHb then targetHb.Value = itemName end
+					setHotbarSlotIfAllowed(targetHb, itemName)
 				end
 
 			elseif fromFolderStr == "Hotbar" then
 				local hbFolder = player:FindFirstChild("Hotbar")
-				if hbFolder and hbFolder:FindFirstChild(fromSlotName) then hbFolder[fromSlotName].Value = "" end
 
 				if toFolderStr == "Hotbar" then
 					local targetHb = player.Hotbar:FindFirstChild(toSlotName)
-					if targetHb then targetHb.Value = itemName end
+
+					if canPlaceOnHotbar(itemName) then
+						if hbFolder and hbFolder:FindFirstChild(fromSlotName) then
+							hbFolder[fromSlotName].Value = ""
+						end
+
+						setHotbarSlotIfAllowed(targetHb, itemName)
+					end
+				else
+					if hbFolder and hbFolder:FindFirstChild(fromSlotName) then
+						hbFolder[fromSlotName].Value = ""
+					end
 				end
 
 			elseif toFolderStr == "Hotbar" and fromFolderStr == "Inventory" then
 				local hotbarSlot = player.Hotbar:FindFirstChild(toSlotName)
-				if hotbarSlot then hotbarSlot.Value = itemName end
+				setHotbarSlotIfAllowed(hotbarSlot, itemName)
 
 			elseif fromFolderStr ~= "Hotbar" and toFolderStr ~= "Hotbar" and toFolderStr ~= "Skill" then
 				if fromSlotName ~= toSlotName or fromFolderStr ~= toFolderStr then

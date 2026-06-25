@@ -33,13 +33,16 @@ end
 function TooltipManager.init()
 	tooltipGui = Instance.new("ScreenGui")
 	tooltipGui.Name = "SkillTooltipGUI"
-	tooltipGui.DisplayOrder = 100 -- Legyen mindig legfelül
+	tooltipGui.DisplayOrder = 999999 -- Mindig minden UI fölött legyen
+	tooltipGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	tooltipGui.IgnoreGuiInset = true
 	tooltipGui.ResetOnSpawn = false
 	tooltipGui.Parent = player:WaitForChild("PlayerGui")
 
 	-- Fő Ablak (Metines stílus)
 	tooltipFrame = Instance.new("Frame", tooltipGui)
 	tooltipFrame.Size = UDim2.new(0, 320, 0, 0)
+	tooltipFrame.ZIndex = 999999
 	tooltipFrame.BackgroundColor3 = Color3.fromRGB(15, 12, 10) 
 	tooltipFrame.BackgroundTransparency = 0.1
 	tooltipFrame.BorderColor3 = Color3.fromRGB(180, 140, 50) 
@@ -161,6 +164,12 @@ function TooltipManager.init()
 	local bottomLayout = Instance.new("UIListLayout", bottomContainer)
 	bottomLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	bottomLayout.Padding = UDim.new(0, 4)
+
+	for _, obj in pairs(tooltipFrame:GetDescendants()) do
+		if obj:IsA("GuiObject") then
+			obj.ZIndex = 999999
+		end
+	end
 end
 
 function TooltipManager.show(data)
@@ -231,9 +240,11 @@ function TooltipManager.show(data)
 			row.Size = UDim2.new(1, 0, 0, 16)
 			row.BackgroundTransparency = 1
 			row.LayoutOrder = i
+			row.ZIndex = 999999
 
 			local lblLeft = Instance.new("TextLabel", row)
 			lblLeft.Size = UDim2.new(0.5, 0, 1, 0)
+			lblLeft.ZIndex = 999999
 			lblLeft.BackgroundTransparency = 1
 			lblLeft.Font = Enum.Font.Gotham
 			lblLeft.TextSize = 13
@@ -243,6 +254,7 @@ function TooltipManager.show(data)
 
 			local lblRight = Instance.new("TextLabel", row)
 			lblRight.Size = UDim2.new(0.5, 0, 1, 0)
+			lblRight.ZIndex = 999999
 			lblRight.Position = UDim2.new(0.5, 0, 0, 0)
 			lblRight.BackgroundTransparency = 1
 			lblRight.Font = Enum.Font.Gotham

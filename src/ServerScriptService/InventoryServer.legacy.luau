@@ -80,10 +80,29 @@ end
 -- ==========================================
 -- BIZTONSÁG 3: SLOT NÉV VALIDÁCIÓ
 -- ==========================================
-local function isValidSlotName(name)
-	if type(name) ~= "string" then return false end
-	if name:match("^Slot_%d+$") then return true end
-	if typeToSlot[name] then return true end
+local validEquipmentSlots = {}
+
+for _, slotName in pairs(typeToSlot) do
+	validEquipmentSlots[slotName] = true
+end
+
+local function isValidSlotForFolder(folderStr, slotName)
+	if type(folderStr) ~= "string" or type(slotName) ~= "string" then
+		return false
+	end
+
+	if string.len(slotName) > 40 then
+		return false
+	end
+
+	if folderStr == "Inventory" or folderStr == "Bank" then
+		return slotName:match("^Slot_%d+$") ~= nil
+	end
+
+	if folderStr == "Equipment" then
+		return validEquipmentSlots[slotName] == true
+	end
+
 	return false
 end
 
@@ -121,7 +140,9 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 	if toFolderStr ~= "Inventory" and toFolderStr ~= "Equipment" and toFolderStr ~= "Bank" then return end
 
 	-- BIZTONSÁG: Név-injektálás védelem
-	if not isValidSlotName(fromSlotName) or not isValidSlotName(toSlotName) then return end
+	if not isValidSlotForFolder(fromFolderStr, fromSlotName) or not isValidSlotForFolder(toFolderStr, toSlotName) then
+		return
+	end
 
 	local inv = player:FindFirstChild("Inventory")
 	local eq = player:FindFirstChild("Equipment")
