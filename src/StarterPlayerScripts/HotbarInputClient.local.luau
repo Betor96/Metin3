@@ -7,6 +7,42 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
+
+local function applyMouseTargetFilter()
+	local spawnZones = workspace:FindFirstChild("SpawnZones")
+	if spawnZones then
+		mouse.TargetFilter = spawnZones
+	end
+end
+
+applyMouseTargetFilter()
+
+workspace.ChildAdded:Connect(function(child)
+	if child.Name == "SpawnZones" then
+		mouse.TargetFilter = child
+	end
+end)
+
+local function getTargetRoot(model)
+	if not model then return nil end
+
+	return model:FindFirstChild("HumanoidRootPart")
+		or model.PrimaryPart
+		or model:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function getValidTargetModelFromPart(part)
+	if not part then return nil end
+
+	local model = part:FindFirstAncestorOfClass("Model")
+	if not model then return nil end
+	if model == player.Character then return nil end
+	if not model:FindFirstChild("Humanoid") then return nil end
+	if not getTargetRoot(model) then return nil end
+
+	return model
+end
+
 local Events = ReplicatedStorage:WaitForChild("Events")
 local UseItem = Events:WaitForChild("UseItem")
 local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
@@ -39,18 +75,20 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 			local hum = char and char:FindFirstChild("Humanoid")
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 
-			-- ==========================================
-			-- 1. CÉLPONT MEGHATÁROZÁSA (Okos Kijelölés)
-			-- ==========================================
 			local finalTargetPart = mouse.Target
-			local finalTargetModel = finalTargetPart and finalTargetPart:FindFirstAncestorOfClass("Model")
+			local finalTargetModel = getValidTargetModelFromPart(finalTargetPart)
 			local mousePos = Vector3.zero
 
-			-- Ha van fix KÉK kijelölt célpontunk (ezt a CombatClient fogja adni), az felülír mindent!
+			-- Ha van fix KÉK kijelölt célpontunk, az felülír mindent.
 			local selectedTargetVal = player:FindFirstChild("SelectedTarget")
 			if selectedTargetVal and selectedTargetVal.Value then
 				finalTargetModel = selectedTargetVal.Value
-				finalTargetPart = finalTargetModel:FindFirstChild("HumanoidRootPart") or finalTargetModel.PrimaryPart
+			end
+
+			if finalTargetModel then
+				finalTargetPart = getTargetRoot(finalTargetModel)
+			else
+				finalTargetPart = nil
 			end
 
 			-- Pozíció beállítása (Nem számít, hova néz az egér, a kijelölt célpont helyét veszi!)
@@ -74,7 +112,7 @@ UserInputService.InputBegan:Connect(function(input, isTyping)
 			-- 2. AUTO-APPROACH (Sétálás a rádiuszba)
 			-- ==========================================
 			if maxRange and maxRange > 0 and finalTargetModel and finalTargetModel:FindFirstChild("Humanoid") then
-				local targetRoot = finalTargetModel:FindFirstChild("HumanoidRootPart")
+				local targetRoot = getTargetRoot(finalTargetModel)
 
 				if root and targetRoot and hum then
 					-- Csak X és Z tengelyen mérünk távolságot, hogy a hegyek/ugrás ne zavarjanak be

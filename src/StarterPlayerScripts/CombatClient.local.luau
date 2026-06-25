@@ -8,6 +8,44 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
+local function applyMouseTargetFilter()
+	local spawnZones = workspace:FindFirstChild("SpawnZones")
+	if spawnZones then
+		mouse.TargetFilter = spawnZones
+	end
+end
+
+applyMouseTargetFilter()
+
+workspace.ChildAdded:Connect(function(child)
+	if child.Name == "SpawnZones" then
+		mouse.TargetFilter = child
+	end
+end)
+
+local function getTargetRoot(model)
+	if not model then return nil end
+
+	return model:FindFirstChild("HumanoidRootPart")
+		or model.PrimaryPart
+		or model:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function getValidTargetModelFromPart(part)
+	if not part then return nil end
+
+	local model = part:FindFirstAncestorOfClass("Model")
+	if not model then return nil end
+	if model == player.Character then return nil end
+
+	local hum = model:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then return nil end
+
+	if not getTargetRoot(model) then return nil end
+
+	return model
+end
+
 local Events = ReplicatedStorage:WaitForChild("Events")
 local MeleeAttack = Events:WaitForChild("MeleeAttack")
 
@@ -65,8 +103,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		local hitPos = mouse.Hit.Position
 
 		if targetObj then
-			local model = targetObj:FindFirstAncestorOfClass("Model")
-			if model and model:FindFirstChild("Humanoid") and model ~= player.Character then
+			local model = getValidTargetModelFromPart(targetObj)
+			if model then
 				if protectedNPCs[model.Name] then
 					selectedTargetVal.Value = model
 					isAttacking = false
@@ -91,8 +129,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		local targetObj = mouse.Target
 		if targetObj then
-			local model = targetObj:FindFirstAncestorOfClass("Model")
-			if model and model:FindFirstChild("Humanoid") and model ~= player.Character then
+			local model = getValidTargetModelFromPart(targetObj)
+			if model then
 				selectedTargetVal.Value = model
 				isAttacking = false 
 				walkToNPC = nil
@@ -134,10 +172,11 @@ RunService.Heartbeat:Connect(function()
 		end
 	end
 
-	-- GYŰRŰ RAJZOLÁSA ÉS SZÍNEZÉSE
-	if targetModel and targetModel:FindFirstChild("HumanoidRootPart") then
+	local targetRootForRing = targetModel and getTargetRoot(targetModel)
+
+	if targetModel and targetRootForRing then
 		selectionRing.Parent = workspace
-		local rootPos = targetModel.HumanoidRootPart.Position
+		local rootPos = targetRootForRing.Position
 
 		if isAttacking then
 			selectionRing.Color = Color3.fromRGB(255, 50, 50) -- PIROS
@@ -173,12 +212,12 @@ RunService.Heartbeat:Connect(function()
 
 			if tick() - lastAttackTime >= currentCooldown then
 				lastAttackTime = tick()
-				MeleeAttack:FireServer()
+				MeleeAttack:FireServer(selectedTargetVal.Value)
 			end
 
-		elseif isAttacking and targetModel and targetModel:FindFirstChild("HumanoidRootPart") then
+		elseif isAttacking and targetModel and getTargetRoot(targetModel) then
 			-- Célpont üldözése / Auto-Attack
-			local targetRoot = targetModel.HumanoidRootPart
+			local targetRoot = getTargetRoot(targetModel)
 			local dist = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(targetRoot.Position.X, 0, targetRoot.Position.Z)).Magnitude
 
 			if dist > ATTACK_RANGE then
@@ -192,7 +231,7 @@ RunService.Heartbeat:Connect(function()
 
 				if tick() - lastAttackTime >= currentCooldown then
 					lastAttackTime = tick()
-					MeleeAttack:FireServer()
+					MeleeAttack:FireServer(selectedTargetVal.Value)
 				end
 			end
 
