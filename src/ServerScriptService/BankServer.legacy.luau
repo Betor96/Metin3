@@ -66,17 +66,6 @@ CheckBankPwd.OnServerInvoke = function(player, pwdAttempt)
 	end
 end
 
-
--- ==========================================
--- BANK BEZÁRÁSA
--- ==========================================
-local CloseBank = Events:FindFirstChild("CloseBank") or Instance.new("RemoteEvent", Events)
-CloseBank.Name = "CloseBank"
-
-CloseBank.OnServerEvent:Connect(function(player)
-	player:SetAttribute("BankUnlocked", false)
-end)
-
 -- ==========================================
 -- JELSZÓ MEGVÁLTOZTATÁSA
 -- ==========================================

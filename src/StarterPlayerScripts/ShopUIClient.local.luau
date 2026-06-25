@@ -147,15 +147,89 @@ gridLayout.Parent = scrollFrame
 local SHOPS = {
 	["Fegyverkereskedo"] = {
 		Title = "FEGYVERKERESKEDŐ",
-		Items = {"Kezdőkard", "Hosszúkard", "Vámpír Kard"}
+		Items = {
+			"Kezdőkard",
+			"Hosszúkard",
+
+			-- Kaszt / játékstílus szerinti alap fegyverek
+			"Őrző Pallos",      -- Guardian / tankosabb karakternek
+			"Árnyék Tőr",       -- Shadowblade / gyors krites karakternek
+			"Lélekbot",         -- Soulweaver / Sealer / INT karakternek
+
+			-- Kicsit későbbi fegyverek
+			"Metinromboló Kard",
+			"Vérivó Kard",
+			"Párbajpenge"
+		}
 	},
+
 	["Pancelkereskedo"] = {
 		Title = "PÁNCÉLKERESKEDŐ",
-		Items = {"Vadfarkas Páncél", "Vas Páncél","Arany nyaklánc","Réz Nyaklánc","Bőrcipő","Jézus Páncél"}
+		Items = {
+			-- Páncélok
+			"Vadfarkas Páncél",
+			"Vas Páncél",
+			"Őrző Lemezvért",
+			"Árnyék Kabát",
+			"Lélek Köntös",
+			"Sárkány Páncél",
+
+			-- Sisakok / sapkák
+			"Bőr Sisak",
+			"Harcos Sisak",
+			"Árnyék Csuklya",
+			"Bölcs Csuklya",
+
+			-- Cipők
+			"Bőrcipő",
+			"Farkasjáró Csizma",
+			"Árnylépő Csizma",
+
+			-- Pajzsok
+			"Fa Pajzs",
+			"Vas Pajzs",
+			"Metin Pajzs",
+			"Párbaj Pajzs",
+
+			-- Nyakláncok
+			"Réz Nyaklánc",
+			"Vadász Nyaklánc",
+			"Rubin Nyaklánc",
+			"Hold Nyaklánc",
+
+			-- Karkötők
+			"Bőr Karkötő",
+			"Vadász Karkötő",
+			"Vér Karkötő",
+			"Párbaj Karkötő",
+
+			-- Fülbevalók
+			"Ezüst Fülbevaló",
+			"Harcos Fülbevaló",
+			"Árny Fülbevaló",
+			"Lélek Fülbevaló"
+		}
 	},
+
 	["Vegyesbolt"] = {
 		Title = "VEGYESBOLT",
-		Items = {"Életerő Ital", "Mana Ital","Zöld Ital","Ügyesség itala","Csákány+0"}
+		Items = {
+			-- Italok
+			"Életerő Ital",
+			"Nagy Életerő Ital",
+			"Mana Ital",
+			"Nagy Mana Ital",
+
+			-- Buff italok
+			"Zöld Ital",
+			"Ügyesség itala",
+			"Kritikus Ital",
+			"Vadász Ital",
+			"Metinromboló Ital",
+
+			-- Csákány maradjon itt
+			"Csákány+0"
+		}
 	}
 }
 

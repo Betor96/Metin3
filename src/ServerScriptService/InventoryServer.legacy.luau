@@ -91,16 +91,19 @@ local function isValidSlotForFolder(folderStr, slotName)
 		return false
 	end
 
-	if string.len(slotName) > 40 then
+	local safeFolderStr = tostring(folderStr)
+	local safeSlotName = tostring(slotName)
+
+	if #safeSlotName > 40 then
 		return false
 	end
 
-	if folderStr == "Inventory" or folderStr == "Bank" then
-		return slotName:match("^Slot_%d+$") ~= nil
+	if safeFolderStr == "Inventory" or safeFolderStr == "Bank" then
+		return safeSlotName:match("^Slot_%d+$") ~= nil
 	end
 
-	if folderStr == "Equipment" then
-		return validEquipmentSlots[slotName] == true
+	if safeFolderStr == "Equipment" then
+		return validEquipmentSlots[safeSlotName] == true
 	end
 
 	return false
@@ -223,26 +226,48 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 		end
 
 		if splitAmount and (fromFolderStr == "Inventory" or fromFolderStr == "Bank") and (toFolderStr == "Inventory" or toFolderStr == "Bank") then
+			local splitAmountValue = tonumber(splitAmount)
+			if not splitAmountValue then return end
+
 			local fromAmtObj = fromSlot:FindFirstChild("Amount")
-			if not fromAmtObj or fromAmtObj.Value < splitAmount then return end
+			if not fromAmtObj or fromAmtObj.Value < splitAmountValue then return end
 
 			if toSlot.Value == "" then
 				toSlot.Value = itemName
-				if not toSlot:FindFirstChild("Amount") then Instance.new("IntValue", toSlot).Name = "Amount" end
-				toSlot.Amount.Value = splitAmount
-				fromAmtObj.Value = fromAmtObj.Value - splitAmount
-				if fromAmtObj.Value <= 0 then fromSlot.Value = "" end
+
+				if not toSlot:FindFirstChild("Amount") then
+					Instance.new("IntValue", toSlot).Name = "Amount"
+				end
+
+				toSlot.Amount.Value = splitAmountValue
+				fromAmtObj.Value = fromAmtObj.Value - splitAmountValue
+
+				if fromAmtObj.Value <= 0 then
+					fromSlot.Value = ""
+				end
+
 				return
+
 			elseif toSlot.Value == itemName and fromSlot ~= toSlot then
 				local toAmtObj = toSlot:FindFirstChild("Amount")
-				local spaceLeft = maxStack - (toAmtObj and toAmtObj.Value or 1)
+				if not toAmtObj then
+					toAmtObj = Instance.new("IntValue", toSlot)
+					toAmtObj.Name = "Amount"
+					toAmtObj.Value = 1
+				end
+
+				local spaceLeft = maxStack - toAmtObj.Value
 
 				if spaceLeft > 0 then
-					local transferAmt = math.min(splitAmount, spaceLeft)
+					local transferAmt = math.min(splitAmountValue, spaceLeft)
 					toAmtObj.Value = toAmtObj.Value + transferAmt
 					fromAmtObj.Value = fromAmtObj.Value - transferAmt
-					if fromAmtObj.Value <= 0 then fromSlot.Value = "" end
+
+					if fromAmtObj.Value <= 0 then
+						fromSlot.Value = ""
+					end
 				end
+
 				return
 			else 
 				return 
@@ -382,8 +407,8 @@ DestroyItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmo
 	if checkSpam(player, 0.1) then return end
 
 	-- BIZTONSÁG: Bank jelszó bypass védelem
-	if folderStr == "Bank" and not player:GetAttribute("BankUnlocked") then 
-		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül próbált tárgyat törölni a raktárból!")
+	if folderStr == "Bank" and not isBankSessionValid(player) then 
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül vagy lejárt bank sessionnel próbált tárgyat törölni a raktárból!")
 		return 
 	end
 
@@ -415,8 +440,8 @@ AutoStack.OnServerEvent:Connect(function(player, targetSlotName, isBank)
 	if checkSpam(player, 0.2) then return end
 
 	-- BIZTONSÁG: Bank jelszó bypass védelem
-	if isBank and not player:GetAttribute("BankUnlocked") then
-		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül próbált stackelni a raktárban!")
+	if isBank and not isBankSessionValid(player) then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül vagy lejárt bank sessionnel próbált stackelni a raktárban!")
 		return
 	end
 

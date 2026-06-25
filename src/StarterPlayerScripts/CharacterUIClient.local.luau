@@ -91,7 +91,7 @@ mainFrame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local highest = 0
 		for _, gui in pairs(player.PlayerGui:GetChildren()) do
-			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" then
+			if gui:IsA("ScreenGui") and gui ~= screenGui and gui.Name ~= "TooltipHUD" and gui.Name ~= "SkillTooltipGUI" then
 				if gui.DisplayOrder > highest then highest = gui.DisplayOrder end
 			end
 		end

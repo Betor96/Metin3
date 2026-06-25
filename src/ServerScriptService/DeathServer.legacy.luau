@@ -11,6 +11,27 @@ RespawnPlayer.Name = "RespawnPlayer"
 
 local deathPositions = {}
 
+local validRespawnTypes = {
+	Here = true,
+	Town = true,
+}
+
+local function canPlayerRespawn(player)
+	local deathPos = deathPositions[player.UserId]
+	if not deathPos then
+		return false
+	end
+
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid and humanoid.Health > 0 then
+		return false
+	end
+
+	return true
+end
+
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function(character)
 		local hum = character:WaitForChild("Humanoid", 5)
@@ -28,11 +49,21 @@ end)
 
 
 RespawnPlayer.OnServerEvent:Connect(function(player, spawnType)
-	
+	if not validRespawnTypes[spawnType] then
+		warn("[RESPAWN EXPLOIT GYANÚ] " .. player.Name .. " érvénytelen respawn típust küldött: " .. tostring(spawnType))
+		return
+	end
+
 	if respawnLocks[player.UserId] and tick() - respawnLocks[player.UserId] < 3 then return end
 	respawnLocks[player.UserId] = tick()
-	
-	local dPos = deathPositions[player.UserId] or Vector3.new(0, 50, 0)
+
+	if not canPlayerRespawn(player) then
+		warn("[RESPAWN EXPLOIT GYANÚ] " .. player.Name .. " respawnolni próbált, de nincs halott állapotban.")
+		return
+	end
+
+	local dPos = deathPositions[player.UserId]
+	deathPositions[player.UserId] = nil
 
 	player:LoadCharacter()
 	local newChar = player.Character or player.CharacterAdded:Wait()

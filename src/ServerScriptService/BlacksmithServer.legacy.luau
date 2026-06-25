@@ -63,7 +63,17 @@ ProcessUpgrade.OnServerEvent:Connect(function(player, folderStr, slotName)
 
 	local stats = player:FindFirstChild("PlayerStats")
 	local inv = player:FindFirstChild("Inventory")
+
+	if not stats or not inv then
+		UpgradeResult:FireClient(player, "A karakter adatai még nem töltöttek be teljesen.")
+		return
+	end
+
 	local gold = stats:FindFirstChild("Gold")
+	if not gold then
+		UpgradeResult:FireClient(player, "A pénz adat nem található.")
+		return
+	end
 
 	if gold.Value < itemData.UpgradeCost then
 		UpgradeResult:FireClient(player, "Nincs elég pénzed a fejlesztéshez!")

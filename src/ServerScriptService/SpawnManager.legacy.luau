@@ -146,7 +146,7 @@ task.spawn(function()
 	print("🚀 SpawnManager elindult, zónák betöltése...")
 
 	for zoneName, zoneData in pairs(SpawnDatabase) do
-		local zonePart = spawnZonesFolder:FindFirstChild(zoneName)
+		local zonePart = spawnZonesFolder:FindFirstChild(zoneName, true)
 		if zonePart then
 			local maxPacks = zoneData.MaxPacks or 1 
 			print("📌 [" .. zoneName .. "] Zóna megtalálva! " .. maxPacks .. " falka fog spawnolni.")

@@ -14,6 +14,27 @@ local mouseConnection
 
 local uiElements = {}
 
+local TOOLTIP_DISPLAY_OFFSET = 1000
+
+local function bringTooltipToFront()
+	if not tooltipGui then return end
+
+	local playerGui = player:FindFirstChild("PlayerGui")
+	if not playerGui then return end
+
+	local highest = 0
+
+	for _, gui in pairs(playerGui:GetChildren()) do
+		if gui:IsA("ScreenGui") and gui ~= tooltipGui then
+			if gui.DisplayOrder > highest then
+				highest = gui.DisplayOrder
+			end
+		end
+	end
+
+	tooltipGui.DisplayOrder = highest + TOOLTIP_DISPLAY_OFFSET
+end
+
 local SkillDatabase = nil
 do
 	local shared = ReplicatedStorage:FindFirstChild("Shared")
@@ -170,11 +191,15 @@ function TooltipManager.init()
 			obj.ZIndex = 999999
 		end
 	end
+
+	bringTooltipToFront()
 end
 
 function TooltipManager.show(data)
 	if not tooltipGui then TooltipManager.init() end
 	if not data then return end
+
+	bringTooltipToFront()
 
 	uiElements.Name.Text = data.Name or "Ismeretlen"
 	uiElements.Icon.Image = data.Icon or ""
@@ -271,6 +296,8 @@ function TooltipManager.show(data)
 
 	if not mouseConnection then
 		mouseConnection = RunService.RenderStepped:Connect(function()
+			bringTooltipToFront()
+
 			local screenX = mouse.ViewSizeX
 			local screenY = mouse.ViewSizeY
 
