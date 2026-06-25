@@ -219,12 +219,20 @@ CompleteQuest.OnServerEvent:Connect(function(player, questName)
 				for i = 1, maxUnlocked do
 					local slot = inv:FindFirstChild("Slot_" .. i)
 					if slot and slot.Value == "" then
+
+						-- JAVÍTÁS 3: Ne hozzunk létre új Amount-ot, hanem írjuk felül a meglévőt!
 						slot.Value = questData.RewardItem
-						if questData.RewardItemCount and questData.RewardItemCount > 1 then
+
+						local amt = slot:FindFirstChild("Amount")
+						if amt then
+							amt.Value = questData.RewardItemCount or 1
+						else
+							-- Csak akkor csinálunk újat, ha valamilyen csoda folytán nem létezik (Fail-safe)
 							local newAmt = Instance.new("IntValue", slot)
 							newAmt.Name = "Amount"
-							newAmt.Value = questData.RewardItemCount
+							newAmt.Value = questData.RewardItemCount or 1
 						end
+
 						break
 					end
 				end

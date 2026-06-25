@@ -31,6 +31,33 @@ local playerCooldowns = {}
 -- ==========================================
 local playerLocks = {}
 
+local classSkillMap = {
+	GUARDIAN = {
+		["Shield Charge"] = true,
+		["Earthbreaker"] = true,
+		["Blade Spirit"] = true,
+		["Iron Skin"] = true,
+	},
+	SHADOWBLADE = {
+		["Shadow Strike"] = true,
+		["Whirling Blades"] = true,
+		["Bloodlust"] = true,
+		["Death Mark"] = true,
+	},
+	SOULWEAVER = {
+		["Soul Orb"] = true,
+		["Spirit Chain"] = true,
+		["Spirit Blessing"] = true,
+		["Soul Explosion"] = true,
+	},
+	SEALER = {
+		["Seal of Power"] = true,
+		["Seal of Protection"] = true,
+		["Explosive Seal"] = true,
+		["Dragon Shackles"] = true,
+	}
+}
+
 UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 	-- Anti-Spam: Max 10 kérés másodpercenként (0.1 sec limit)
 	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < 0.1 then return end
@@ -47,34 +74,51 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 	-- 1. HA KÉPESSÉG (SKILL) LETT HASZNÁLVA
 	-- ==========================================
 	if SkillDatabase.Skills[itemName] then
+
+		-- JAVÍTÁS 1.a: Kaszt validáció
+		local playerClass = player:GetAttribute("Class") or (stats:FindFirstChild("Class") and stats.Class.Value)
+		playerClass = playerClass and string.upper(tostring(playerClass)) or ""
+
+		local allowedSkills = classSkillMap[playerClass]
+		if not allowedSkills or not allowedSkills[itemName] then
+			warn("[EXPLOIT GYANÚ] " .. player.Name .. " (" .. playerClass .. ") egy illegális skillt próbált használni: " .. tostring(itemName))
+			return
+		end
+
 		local skill = SkillDatabase.Skills[itemName]
+
+		-- JAVÍTÁS 1.b: Szerver oldali távolság ellenőrzés
+		local range = SkillDatabase.Ranges and SkillDatabase.Ranges[itemName] or skill.Range
+		if range and range > 0 and target and target.Parent then
+			local targetRoot = target.Parent:FindFirstChild("HumanoidRootPart") or target.Parent.PrimaryPart
+			if targetRoot then
+				local dist = (root.Position - targetRoot.Position).Magnitude
+				if dist > range + 5 then 
+					return 
+				end
+			end
+		end
 
 		if not playerCooldowns[player.UserId] then playerCooldowns[player.UserId] = {} end
 		local lastUsed = playerCooldowns[player.UserId][itemName] or 0
 
-		-- Közös Cooldown (Újratöltés) ellenőrzés szerver oldalon
+		-- Közös Cooldown ellenőrzés
 		if tick() - lastUsed < skill.Cooldown then return end 
 
 		local manaStat = stats:FindFirstChild("Mana")
 
-		-- Toggle (Kibe/Bekapcsolós) képességek Cooldown kezelése
+		-- Toggle képességek
 		if skill.IsToggle then
 			local currentToggleState = player:GetAttribute(skill.ToggleAttribute)
-
-			-- Ha BE akarjuk kapcsolni, ellenőrizzük, hogy van-e elég mana
 			if not currentToggleState then
 				if not manaStat or manaStat.Value < skill.Mana then return end
 			end
 
-			-- BIZTONSÁG 2: Azonnal beállítjuk a cooldownt, Még MIELŐTT a skill lefutna!
-			-- Így ha a skill yieldel (vár), akkor sem lehet duplán elindítani.
 			playerCooldowns[player.UserId][itemName] = tick()
-
 			local success = skill.Execute(player, character, root, mousePos, target)
 
 			if success then
 				SkillCooldown:FireClient(player, itemName, skill.Cooldown)
-
 				if not currentToggleState then
 					if manaStat then manaStat.Value -= skill.Mana end
 					ApplyEffect:FireClient(player, itemName, itemName, 0, 99999) 
@@ -82,7 +126,6 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 					ApplyEffect:FireClient(player, itemName, itemName, 0, 0)
 				end
 			else
-				-- Ha valamiért mégsem sikerült (pl. rossz target), visszaadjuk a cooldownt
 				playerCooldowns[player.UserId][itemName] = 0
 			end
 			return
@@ -90,15 +133,12 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 
 		-- Normál aktív képességek
 		if manaStat and manaStat.Value >= skill.Mana then
-			-- BIZTONSÁG 2: Cooldown előre rögzítve!
 			playerCooldowns[player.UserId][itemName] = tick() 
-
 			local success = skill.Execute(player, character, root, mousePos, target)
 
 			if success then
 				manaStat.Value -= skill.Mana
 				SkillCooldown:FireClient(player, itemName, skill.Cooldown)
-
 				if skill.Duration then
 					ApplyEffect:FireClient(player, itemName, itemName, 0, skill.Duration)
 				end
@@ -131,12 +171,10 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 
 	if not foundSlot then return end
 
-	-- BIZTONSÁG 3: Ellenőrizzük, hogy van-e még belőle (Race Condition védelem)
 	local amtObj = foundSlot:FindFirstChild("Amount")
 	local currentAmt = amtObj and amtObj.Value or 1
 	if currentAmt <= 0 then return end
 
-	-- BIZTONSÁG 4: AZONNAL vonjuk le a tárgyat! (Ne utólag!)
 	if amtObj then
 		amtObj.Value -= 1
 		if amtObj.Value <= 0 then
@@ -147,13 +185,10 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 		foundSlot.Value = ""
 	end
 
-	-- EFFEKTEK ALKALMAZÁSA (Miután a tárgy már biztonságosan el is tűnt a táskából)
 	if itemName == "Életerő Ital" and humanoid then
 		humanoid.Health = math.min(humanoid.Health + (itemData.HealAmount or 0), humanoid.MaxHealth)
-
 	elseif itemName == "Mana Ital" and stats:FindFirstChild("Mana") and stats:FindFirstChild("MaxMana") then
 		stats.Mana.Value = math.min(stats.Mana.Value + (itemData.HealAmount or 0), stats.MaxMana.Value)
-
 	elseif itemData.Effect then
 		if not itemData.Value or not itemData.Duration then return end
 		local statObj = stats:FindFirstChild(itemData.Effect)
