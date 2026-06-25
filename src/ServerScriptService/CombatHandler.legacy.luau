@@ -212,8 +212,28 @@ MeleeAttack.OnServerEvent:Connect(function(player)
 						end
 					end
 
+					local attackersFolder = obj:FindFirstChild("Attackers")
+					if not attackersFolder then
+						attackersFolder = Instance.new("Folder")
+						attackersFolder.Name = "Attackers"
+						attackersFolder.Parent = obj
+					end
+					if not attackersFolder:FindFirstChild(player.Name) then
+						local pTag = Instance.new("ObjectValue")
+						pTag.Name = player.Name
+						pTag.Value = player
+						pTag.Parent = attackersFolder
+					end
+
+
 					targetHum:TakeDamage(finalDamage)
-					ShowDamage:FireAllClients(finalDamage, targetRoot.Position, isCrit, false)
+					ShowDamage:FireClient(player, finalDamage, targetRoot.Position, isCrit, false)
+
+					-- Ha a célpont egy JÁTÉKOS (PvP), neki is elküldjük, hogy lássa, mennyit sebeztek rajta
+					local targetPlayer = Players:GetPlayerFromCharacter(obj)
+					if targetPlayer then
+						ShowDamage:FireClient(targetPlayer, finalDamage, targetRoot.Position, isCrit, false)
+					end
 				end
 			end
 		end

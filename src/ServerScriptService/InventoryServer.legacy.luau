@@ -84,6 +84,26 @@ PromptRobuxUnlock.OnServerEvent:Connect(function(player)
 end)
 
 MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName, splitAmount)
+	
+	-- BIZTONSÁG: Slot limit megkerülés elleni védelem
+	local numStr = toSlotName:match("%d+")
+	if numStr then
+		local slotNum = tonumber(numStr)
+		local stats = player:FindFirstChild("PlayerStats")
+
+		-- Megnézzük, hogy raktárba vagy táskába próbál pakolni
+		local isBank = (toFolderStr == "Bank")
+		local unlockedPagesObj = isBank and stats:FindFirstChild("BankUnlockedPages") or stats:FindFirstChild("UnlockedPages")
+
+		-- 1 oldal = 32 slot
+		local maxAllowedSlots = (unlockedPagesObj and unlockedPagesObj.Value or 1) * 32
+
+		if slotNum > maxAllowedSlots then
+			warn("[EXPLOIT GYANÚ] " .. player.Name .. " feloldatlan (fizetős) slotba próbált pakolni!")
+			return
+		end
+	end
+	
 	if checkSpam(player, 0.05) then return end
 	splitAmount = sanitizeAmount(splitAmount) -- Letisztítjuk a bejövő számot!
 

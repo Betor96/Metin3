@@ -75,8 +75,6 @@ local function setupMetinStone(stone)
 	local isActive = false 
 	local isDead = false
 
-	-- ÚJ: Támadók listája
-	local attackers = {}
 	local lastHp = humanoid.MaxHealth
 
 	local function spawnMonsters()
@@ -107,6 +105,17 @@ local function setupMetinStone(stone)
 				monster:SetAttribute("NoDrop", true)
 				local mHum = monster:FindFirstChild("Humanoid")
 				if mHum then mHum.Health = 0 end
+			end
+		end
+
+		-- ==========================================
+		-- JAVÍTÁS: Támadók biztonságos kiolvasása a mappából! (AFK Leech védelem)
+		-- ==========================================
+		local attackers = {}
+		local attFolder = stone:FindFirstChild("Attackers")
+		if attFolder then
+			for _, tag in pairs(attFolder:GetChildren()) do
+				if tag.Value and tag.Value.Parent then table.insert(attackers, tag.Value) end
 			end
 		end
 
@@ -158,7 +167,7 @@ local function setupMetinStone(stone)
 		end
 
 		-- ==========================================
-		-- ÚJ: LOOT SZÉTOSZTÁSA A TÁMADÓK KÖZÖTT
+		-- LOOT SZÉTOSZTÁSA A TÁMADÓK KÖZÖTT
 		-- ==========================================
 		-- Megkeverjük a támadókat, hogy a maradékot (pl. 3 item 2 emberre) mindig random kapja valaki
 		local shuffledAttackers = {}
@@ -269,19 +278,7 @@ local function setupMetinStone(stone)
 	humanoid.HealthChanged:Connect(function(currentHp)
 		if isDead then return end
 
-		-- ÚJ: Mindenkit, aki közel van és sebzéskor ott áll, felírunk a listára!
-		if currentHp < lastHp then
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-					local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-					if dist <= 15 then 
-						if not table.find(attackers, plr) then
-							table.insert(attackers, plr)
-						end
-					end
-				end
-			end
-		end
+		-- JAVÍTÁS: TÖRÖLTÜK a távolság alapú AFK játékos keresést (Óriási Teljesítmény javítás)
 		lastHp = currentHp
 
 		if currentHp <= 0 then

@@ -223,8 +223,18 @@ local function setupPlayer(player)
 		leaderstats.Level.Changed:Connect(function() recalculateStats(player) end)
 	end
 
+	-- JAVÍTÁS: Csak ezekre a statokra oszthat pontot a játékos! (Exploit védelem)
+	local validStats = {["STR"] = true, ["VIT"] = true, ["INT"] = true, ["DEX"] = true}
+
 	AddStatPoint.OnServerEvent:Connect(function(plr, statName)
 		if plr ~= player then return end
+
+		-- Szigorú ellenőrzés: benne van a fehérlistában?
+		if not validStats[statName] then
+			warn("[EXPLOIT GYANÚ] " .. plr.Name .. " illegális statra próbált pontot rakni: " .. tostring(statName))
+			return
+		end
+
 		local pts = stats:FindFirstChild("StatPoints")
 		local targetStat = stats:FindFirstChild(statName)
 		if pts and pts.Value > 0 and targetStat then

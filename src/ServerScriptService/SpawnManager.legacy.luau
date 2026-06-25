@@ -96,7 +96,12 @@ local function spawnPack(zoneName, zoneData, zonePart)
 	-- AGRESSZÍV RESPAWN FIGYELŐ
 	-- ==========================================
 	task.spawn(function()
-		if #packEntities == 0 then return end
+		if #packEntities == 0 then 
+			warn("⚠️ [" .. zoneName .. "] Üres falka! Újrapróbálkozás 10 másodperc múlva...")
+			task.wait(10)
+			spawnPack(zoneName, zoneData, zonePart)
+			return 
+		end
 		local waitTime = zoneData.RespawnTime or 15
 
 		while true do

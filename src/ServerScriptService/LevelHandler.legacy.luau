@@ -95,16 +95,16 @@ Players.PlayerAdded:Connect(function(player)
 	-- SZINTLÉPÉS LOGIKA (SZINTKORLÁTTAL)
 	-- ==========================================
 	exp.Changed:Connect(function()
-		-- Ha már elérte a maximum szintet, ne tudjon tovább fejlődni!
 		if level.Value >= MAX_LEVEL then
 			if exp.Value > maxExp.Value then
-				exp.Value = maxExp.Value -- A sáv tele marad, de nem lép szintet
+				exp.Value = maxExp.Value 
 			end
 			return
 		end
 
+		local leveledUp = false -- JAVÍTÁS: Flag a gyógyításhoz
+
 		while exp.Value >= maxExp.Value do
-			-- Dupla ellenőrzés a ciklusban is, nehogy véletlenül átcsússzon 51-re
 			if level.Value >= MAX_LEVEL then
 				exp.Value = maxExp.Value
 				break
@@ -112,15 +112,20 @@ Players.PlayerAdded:Connect(function(player)
 
 			exp.Value = exp.Value - maxExp.Value
 			level.Value = level.Value + 1
-			leaderLevel.Value = level.Value -- Jobb felső sarok frissítése
+			leaderLevel.Value = level.Value 
 
 			statPoints.Value = statPoints.Value + 3
 			maxExp.Value = getNextLevelXP(level.Value)
 
-			-- Feltöltjük a HP-t és a Manát szintlépéskor
-			healCharacter(player)
-
+			leveledUp = true
 			print(player.Name .. " szintet lépett! Új szint: " .. level.Value)
+		end
+
+		-- JAVÍTÁS: A gyógyítást (amiben task.wait van) csak a ciklus UTÁN, egyszer hívjuk meg!
+		if leveledUp then
+			task.spawn(function()
+				healCharacter(player)
+			end)
 		end
 	end)
 end)

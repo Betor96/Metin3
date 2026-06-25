@@ -63,25 +63,12 @@ local function setupOre(ore)
 	local isDead = false
 
 	-- ÚJ: Támadók listája
-	local attackers = {}
 	local lastHp = humanoid.MaxHealth
 
 	humanoid.HealthChanged:Connect(function(currentHp)
 		if isDead then return end
 
-		-- Támadók regisztrálása
-		if currentHp < lastHp then
-			for _, plr in pairs(Players:GetPlayers()) do
-				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-					local dist = (rootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-					if dist <= 15 then 
-						if not table.find(attackers, plr) then
-							table.insert(attackers, plr)
-						end
-					end
-				end
-			end
-		end
+		-- JAVÍTÁS: TÖRÖLTÜK a felesleges játékos kereső for ciklust! (Teljesítmény javítás)
 		lastHp = currentHp
 
 		if currentHp <= 0 then
@@ -90,8 +77,18 @@ local function setupOre(ore)
 			hpText.Text = "0 / " .. humanoid.MaxHealth
 			billboard:Destroy()
 
+			-- JAVÍTÁS: Csak azok kapnak lootot, akik tényleg beütöttek! (AFK Leech védelem)
+			local attackers = {}
+			local attFolder = ore:FindFirstChild("Attackers")
+			if attFolder then
+				for _, tag in pairs(attFolder:GetChildren()) do
+					if tag.Value and tag.Value.Parent then table.insert(attackers, tag.Value) end
+				end
+			end
+
 			if #attackers == 0 then
 				local shortestDist = 50
+				-- ... (a kód innen folytatódik tovább változatlanul)
 				local nearest = nil
 				for _, plr in pairs(Players:GetPlayers()) do
 					if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
