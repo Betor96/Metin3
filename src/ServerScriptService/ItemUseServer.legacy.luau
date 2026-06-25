@@ -85,6 +85,13 @@ UseItem.OnServerEvent:Connect(function(player, itemName, mousePos, target)
 			return
 		end
 
+		if not SkillDatabase.playerHasUnlockedSkill(player, itemName) then
+			local requiredLevel = SkillDatabase.getSkillRequiredLevel(itemName)
+
+			warn("[SKILL LOCK] " .. player.Name .. " túl alacsony szinten próbálta használni ezt a skillt: " .. tostring(itemName) .. " | Szükséges szint: " .. tostring(requiredLevel))
+			return
+		end
+
 		local skill = SkillDatabase.Skills[itemName]
 
 		-- JAVÍTÁS 1.b: Szerver oldali távolság ellenőrzés

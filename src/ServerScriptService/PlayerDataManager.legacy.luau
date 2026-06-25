@@ -7,6 +7,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 
+
+local ItemDatabase = require(ReplicatedStorage:WaitForChild("ItemDatabase"))
+local SkillDatabase = require(ReplicatedStorage:WaitForChild("SkillDatabase"))
+
 local GetCharacterList = Events:WaitForChild("GetCharacterList")
 local CreateCharacter = Events:WaitForChild("CreateCharacter")
 local SelectCharacter = Events:WaitForChild("SelectCharacter")
@@ -29,22 +33,110 @@ if RunService:IsStudio() then
 	SESSION_ID = "STUDIO_TEST_" .. tostring(math.random(1000, 9999))
 end
 
--- Hotbar szinkron
-SyncHotbarSlot.OnServerEvent:Connect(function(player, slotNum, itemName)
-	if type(slotNum) == "number" and slotNum >= 1 and slotNum <= 8 then
+local classSkillMap = {
+	GUARDIAN = {
+		["Shield Charge"] = true,
+		["Earthbreaker"] = true,
+		["Blade Spirit"] = true,
+		["Iron Skin"] = true,
+	},
 
-		-- JAVÍTÁS 3: itemName biztonsági ellenőrzése (Típus és hossz limit)
-		if type(itemName) ~= "string" or string.len(itemName) > 50 then 
-			warn("[EXPLOIT GYANÚ] " .. player.Name .. " érvénytelen adatot küldött a Hotbarra!")
-			return 
-		end
+	SHADOWBLADE = {
+		["Shadow Strike"] = true,
+		["Whirling Blades"] = true,
+		["Bloodlust"] = true,
+		["Death Mark"] = true,
+	},
 
-		local hotbar = player:FindFirstChild("Hotbar")
-		if hotbar then
-			local slotVal = hotbar:FindFirstChild("Hotbar_" .. slotNum)
-			if slotVal then slotVal.Value = itemName end -- A tostring() már nem kell, mert string
+	SOULWEAVER = {
+		["Soul Orb"] = true,
+		["Spirit Chain"] = true,
+		["Spirit Blessing"] = true,
+		["Soul Explosion"] = true,
+	},
+
+	SEALER = {
+		["Seal of Power"] = true,
+		["Seal of Protection"] = true,
+		["Explosive Seal"] = true,
+		["Dragon Shackles"] = true,
+	}
+}
+
+local function playerOwnsInventoryItem(player, itemName)
+	local inv = player:FindFirstChild("Inventory")
+	if not inv then return false end
+
+	for _, slot in pairs(inv:GetChildren()) do
+		if slot:IsA("StringValue") and slot.Value == itemName then
+			local amount = slot:FindFirstChild("Amount")
+			if not amount or amount.Value > 0 then
+				return true
+			end
 		end
 	end
+
+	return false
+end
+
+local function isValidHotbarEntry(player, itemName)
+	-- Üres hotbar slot engedélyezett
+	if itemName == nil or itemName == "" then
+		return true
+	end
+
+	if type(itemName) ~= "string" then
+		return false
+	end
+
+	if string.len(itemName) > 50 then
+		return false
+	end
+
+
+	-- Skill validáció
+	if SkillDatabase.Skills and SkillDatabase.Skills[itemName] then
+		local playerClass = player:GetAttribute("Class")
+		if not playerClass then return false end
+
+		local allowedSkills = classSkillMap[playerClass]
+		if not allowedSkills or not allowedSkills[itemName] then
+			return false
+		end
+
+		if not SkillDatabase.playerHasUnlockedSkill(player, itemName) then
+			return false
+		end
+
+		return true
+	end
+
+	-- Item validáció
+	if ItemDatabase[itemName] then
+		return playerOwnsInventoryItem(player, itemName)
+	end
+
+	return false
+end
+
+-- Hotbar szinkron
+SyncHotbarSlot.OnServerEvent:Connect(function(player, slotNum, itemName)
+	if type(slotNum) ~= "number" then return end
+	if slotNum < 1 or slotNum > 8 then return end
+	if math.floor(slotNum) ~= slotNum then return end
+
+	if not isValidHotbarEntry(player, itemName) then
+		warn("[HOTBAR VALIDÁCIÓ] " .. player.Name .. " érvénytelen hotbar elemet próbált menteni: " .. tostring(itemName))
+		return
+	end
+
+	local hotbar = player:FindFirstChild("Hotbar")
+	if not hotbar then return end
+
+	local slot = hotbar:FindFirstChild("Hotbar_" .. slotNum)
+	if not slot then return end
+
+	slot.Value = itemName or ""
 end)
 
 -- ==========================================

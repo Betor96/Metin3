@@ -3,6 +3,8 @@
 local TooltipManager = {}
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
@@ -11,6 +13,22 @@ local tooltipFrame
 local mouseConnection
 
 local uiElements = {}
+
+local SkillDatabase = nil
+do
+	local shared = ReplicatedStorage:FindFirstChild("Shared")
+	local skillModule = shared and shared:FindFirstChild("SkillDatabase") or ReplicatedStorage:FindFirstChild("SkillDatabase")
+
+	if skillModule then
+		local success, result = pcall(function()
+			return require(skillModule)
+		end)
+
+		if success then
+			SkillDatabase = result
+		end
+	end
+end
 
 function TooltipManager.init()
 	tooltipGui = Instance.new("ScreenGui")
@@ -60,6 +78,17 @@ function TooltipManager.init()
 	nameLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
 	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
 	uiElements.Name = nameLbl
+
+	local unlockLbl = Instance.new("TextLabel", topContainer)
+	unlockLbl.Size = UDim2.new(1, -145, 0, 20)
+	unlockLbl.Position = UDim2.new(0, 56, 0, 24)
+	unlockLbl.BackgroundTransparency = 1
+	unlockLbl.Font = Enum.Font.Gotham
+	unlockLbl.TextSize = 13
+	unlockLbl.TextColor3 = Color3.fromRGB(180, 220, 180)
+	unlockLbl.TextXAlignment = Enum.TextXAlignment.Left
+	unlockLbl.Visible = false
+	uiElements.UnlockLevel = unlockLbl
 
 	local cdLbl = Instance.new("TextLabel", topContainer)
 	cdLbl.Size = UDim2.new(0, 60, 0, 20)
@@ -140,6 +169,38 @@ function TooltipManager.show(data)
 
 	uiElements.Name.Text = data.Name or "Ismeretlen"
 	uiElements.Icon.Image = data.Icon or ""
+
+	-- ÚJ: Skill feloldási szint kijelzése
+	local requiredLevel = nil
+	local isSkill = false
+
+	if SkillDatabase and SkillDatabase.Skills and data.Name and SkillDatabase.Skills[data.Name] then
+		isSkill = true
+
+		if SkillDatabase.getSkillRequiredLevel then
+			requiredLevel = SkillDatabase.getSkillRequiredLevel(data.Name)
+		else
+			requiredLevel = 1
+		end
+	end
+
+	if isSkill and requiredLevel then
+		local stats = player:FindFirstChild("PlayerStats")
+		local levelObj = stats and stats:FindFirstChild("Level")
+		local playerLevel = levelObj and levelObj.Value or 1
+
+		uiElements.UnlockLevel.Visible = true
+		uiElements.UnlockLevel.Text = "Feloldás: " .. tostring(requiredLevel) .. ". szint"
+
+		if playerLevel < requiredLevel then
+			uiElements.UnlockLevel.TextColor3 = Color3.fromRGB(255, 100, 100)
+		else
+			uiElements.UnlockLevel.TextColor3 = Color3.fromRGB(180, 220, 180)
+		end
+	else
+		uiElements.UnlockLevel.Visible = false
+		uiElements.UnlockLevel.Text = ""
+	end
 
 	-- ÚJ: Csak akkor írjuk ki a Cooldown-t és a Manát, ha Képességről van szó!
 	if data.Cooldown ~= nil or data.Mana ~= nil then

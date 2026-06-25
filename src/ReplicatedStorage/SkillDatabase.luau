@@ -1751,4 +1751,97 @@ if RunService:IsServer() then
 	end)
 end
 
+-- =======================================
+-- SKILL UNLOCK / SZINTKÖVETELMÉNY RENDSZER
+-- =======================================
+
+SkillDatabase.UnlockRequirements = {
+	-- GUARDIAN
+	["Shield Charge"] = {
+		Level = 1,
+	},
+	["Earthbreaker"] = {
+		Level = 5,
+	},
+	["Blade Spirit"] = {
+		Level = 10,
+	},
+	["Iron Skin"] = {
+		Level = 15,
+	},
+
+	-- SHADOWBLADE
+	["Shadow Strike"] = {
+		Level = 1,
+	},
+	["Whirling Blades"] = {
+		Level = 5,
+	},
+	["Bloodlust"] = {
+		Level = 10,
+	},
+	["Death Mark"] = {
+		Level = 15,
+	},
+
+	-- SOULWEAVER
+	["Soul Orb"] = {
+		Level = 1,
+	},
+	["Spirit Chain"] = {
+		Level = 5,
+	},
+	["Spirit Blessing"] = {
+		Level = 10,
+	},
+	["Soul Explosion"] = {
+		Level = 15,
+	},
+
+	-- SEALER
+	["Seal of Power"] = {
+		Level = 1,
+	},
+	["Seal of Protection"] = {
+		Level = 5,
+	},
+	["Explosive Seal"] = {
+		Level = 10,
+	},
+	["Dragon Shackles"] = {
+		Level = 15,
+	},
+}
+
+function SkillDatabase.getSkillRequiredLevel(skillName)
+	local req = SkillDatabase.UnlockRequirements[skillName]
+	if not req then
+		return 1
+	end
+
+	return req.Level or 1
+end
+
+function SkillDatabase.playerHasUnlockedSkill(player, skillName)
+	if not player or type(skillName) ~= "string" then
+		return false
+	end
+
+	if not SkillDatabase.Skills[skillName] then
+		return false
+	end
+
+	local stats = player:FindFirstChild("PlayerStats")
+	if not stats then
+		return false
+	end
+
+	local levelObj = stats:FindFirstChild("Level")
+	local playerLevel = levelObj and levelObj.Value or 1
+	local requiredLevel = SkillDatabase.getSkillRequiredLevel(skillName)
+
+	return playerLevel >= requiredLevel
+end
+
+
 return SkillDatabase

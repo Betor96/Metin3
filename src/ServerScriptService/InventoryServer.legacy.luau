@@ -21,6 +21,27 @@ UnlockPageGold.Name = "UnlockPageGold"
 local PromptRobuxUnlock = Events:FindFirstChild("PromptRobuxUnlock") or Instance.new("RemoteEvent", Events)
 PromptRobuxUnlock.Name = "PromptRobuxUnlock"
 
+
+local BANK_SESSION_SECONDS = 300 -- 5 perc
+
+local function isBankSessionValid(player)
+	local isUnlocked = player:GetAttribute("BankUnlocked")
+	local unlockTime = player:GetAttribute("BankUnlockTime")
+
+	if isUnlocked ~= true or type(unlockTime) ~= "number" then
+		return false
+	end
+
+	if os.time() - unlockTime > BANK_SESSION_SECONDS then
+		player:SetAttribute("BankUnlocked", false)
+		player:SetAttribute("BankUnlockTime", nil)
+		return false
+	end
+
+	return true
+end
+
+
 local typeToSlot = {
 	["Sapka"] = "Sapka", ["Páncél"] = "Pancel", ["Cipő"] = "Cipo", 
 	["Fegyver"] = "Fegyver", ["Fülbevaló"] = "Fulbevalo", ["Nyaklánc"] = "Nyaklanc", 
@@ -102,11 +123,19 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 	-- BIZTONSÁG: Név-injektálás védelem
 	if not isValidSlotName(fromSlotName) or not isValidSlotName(toSlotName) then return end
 
+	local inv = player:FindFirstChild("Inventory")
+	local eq = player:FindFirstChild("Equipment")
+	local bank = player:FindFirstChild("Bank")
+	local stats = player:FindFirstChild("PlayerStats")
+
+	if not inv or not eq or not bank or not stats then
+		return
+	end
+
 	-- BIZTONSÁG: Slot limit megkerülés elleni védelem
 	local numStr = toSlotName:match("%d+")
 	if numStr then
 		local slotNum = tonumber(numStr)
-		local stats = player:FindFirstChild("PlayerStats")
 
 		local isBank = (toFolderStr == "Bank")
 		local unlockedPagesObj = isBank and stats:FindFirstChild("BankUnlockedPages") or stats:FindFirstChild("UnlockedPages")
@@ -121,18 +150,18 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 
 	splitAmount = sanitizeAmount(splitAmount)
 
-	local inv = player:FindFirstChild("Inventory")
-	local eq = player:FindFirstChild("Equipment")
-	local bank = player:FindFirstChild("Bank")
-	local stats = player:FindFirstChild("PlayerStats")
-	if not inv or not eq or not bank or not stats then return end
-
 	local fromFolder = (fromFolderStr == "Inventory") and inv or ((fromFolderStr == "Equipment") and eq or bank)
 	local toFolder = (toFolderStr == "Inventory") and inv or ((toFolderStr == "Equipment") and eq or bank)
 
-	if (fromFolderStr == "Bank" or toFolderStr == "Bank") and not player:GetAttribute("BankUnlocked") then
-		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül próbált a raktárhoz nyúlni!")
-		return
+	if fromFolderStr == "Bank" or toFolderStr == "Bank" then
+		local unlockTime = player:GetAttribute("BankUnlockTime")
+		local isUnlocked = player:GetAttribute("BankUnlocked")
+
+		if not isUnlocked or not unlockTime or os.time() - unlockTime > 300 then
+			player:SetAttribute("BankUnlocked", false)
+			warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül vagy lejárt bank sessionnel próbált a raktárhoz nyúlni!")
+			return
+		end
 	end
 
 	if toFolderStr == "Inventory" or toFolderStr == "Bank" then
@@ -194,7 +223,9 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 					if fromAmtObj.Value <= 0 then fromSlot.Value = "" end
 				end
 				return
-			else return end
+			else 
+				return 
+			end
 		end
 
 		if (fromFolderStr == "Inventory" or fromFolderStr == "Bank") and (toFolderStr == "Inventory" or toFolderStr == "Bank") and itemName == targetItemName and maxStack > 1 and fromSlot ~= toSlot then
@@ -287,6 +318,11 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 				local itemTag = Instance.new("StringValue", droppedItem)
 				itemTag.Name = "ItemName"
 				itemTag.Value = itemName
+				
+				local amountTag = Instance.new("IntValue")
+				amountTag.Name = "ItemAmount"
+				amountTag.Value = dropQty
+				amountTag.Parent = droppedItem
 
 				game.Debris:AddItem(droppedItem, 300)
 
@@ -302,7 +338,12 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 				nameLabel.Size = UDim2.new(1, 0, 1, 0)
 				nameLabel.BackgroundTransparency = 1
 				nameLabel.RichText = true
-				nameLabel.Text = '<font color="rgb(180, 180, 180)">' .. itemName .. '</font>'
+				local displayName = itemName
+				if dropQty > 1 then
+					displayName = itemName .. " x" .. dropQty
+				end
+
+				nameLabel.Text = '<font color="rgb(180, 180, 180)">' .. displayName .. '</font>'
 				nameLabel.Font = Enum.Font.GothamBold
 				nameLabel.TextScaled = true
 				nameLabel.TextStrokeTransparency = 0

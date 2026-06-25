@@ -38,6 +38,14 @@ end
 local CheckBankPwd = Events:FindFirstChild("CheckBankPwd") or Instance.new("RemoteFunction", Events)
 CheckBankPwd.Name = "CheckBankPwd"
 
+local CloseBank = Events:FindFirstChild("CloseBank") or Instance.new("RemoteEvent", Events)
+CloseBank.Name = "CloseBank"
+
+CloseBank.OnServerEvent:Connect(function(player)
+	player:SetAttribute("BankUnlocked", false)
+	player:SetAttribute("BankUnlockTime", nil)
+end)
+
 CheckBankPwd.OnServerInvoke = function(player, pwdAttempt)
 	local stats = player:FindFirstChild("PlayerStats")
 	if not stats then return false end
@@ -49,11 +57,25 @@ CheckBankPwd.OnServerInvoke = function(player, pwdAttempt)
 	-- JAVÍTÁS: Csak akkor kapja meg az engedélyt, ha a jelszó jó!
 	if realPwd == attempt then
 		player:SetAttribute("BankUnlocked", true)
+		player:SetAttribute("BankUnlockTime", os.time())
 		return true
 	else
+		player:SetAttribute("BankUnlocked", false)
+		player:SetAttribute("BankUnlockTime", nil)
 		return false
 	end
 end
+
+
+-- ==========================================
+-- BANK BEZÁRÁSA
+-- ==========================================
+local CloseBank = Events:FindFirstChild("CloseBank") or Instance.new("RemoteEvent", Events)
+CloseBank.Name = "CloseBank"
+
+CloseBank.OnServerEvent:Connect(function(player)
+	player:SetAttribute("BankUnlocked", false)
+end)
 
 -- ==========================================
 -- JELSZÓ MEGVÁLTOZTATÁSA

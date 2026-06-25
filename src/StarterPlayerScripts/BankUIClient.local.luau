@@ -13,6 +13,7 @@ screenGui.Parent = player:WaitForChild("PlayerGui")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local CheckBankPwd = Events:WaitForChild("CheckBankPwd")
 local ChangeBankPwd = Events:WaitForChild("ChangeBankPwd")
+local CloseBank = Events:WaitForChild("CloseBank")
 
 -- ==========================================
 -- ÚJ: TOOLTIP MANAGER ÉS ITEM DATABASE BEHÍVÁSA
@@ -468,8 +469,9 @@ buyRobuxBtn.MouseButton1Click:Connect(function()
 end)
 
 bankCloseBtn.MouseButton1Click:Connect(function() 
-	bankMainFrame.Visible = false 
-	TooltipManager.hide() -- Biztonság kedvéért bezáráskor is elrejtjük
+	bankMainFrame.Visible = false
+	CloseBank:FireServer()
+	TooltipManager.hide()
 end)
 
 task.spawn(function()
@@ -521,7 +523,10 @@ changePwdBtn.MouseButton1Click:Connect(function()
 	newPwdInput2.Text = ""
 	changeFrame.Visible = true
 end)
-pwdCancel.MouseButton1Click:Connect(function() pwdFrame.Visible = false end)
+pwdCancel.MouseButton1Click:Connect(function()
+	pwdFrame.Visible = false
+	CloseBank:FireServer()
+end)
 chgCancel.MouseButton1Click:Connect(function() changeFrame.Visible = false end)
 
 pwdSubmit.MouseButton1Click:Connect(function()

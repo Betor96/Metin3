@@ -20,67 +20,113 @@ PickupItems.OnServerEvent:Connect(function(player)
 	local maxUnlockedSlots = (stats:FindFirstChild("UnlockedPages") and stats.UnlockedPages.Value or 1) * 32
 
 	for _, itemPart in pairs(droppedFolder:GetChildren()) do
+		if not itemPart:IsA("BasePart") then
+			continue
+		end
+
 		local dist = (itemPart.Position - rootPart.Position).Magnitude
+		if dist > PICKUP_RADIUS then
+			continue
+		end
 
-		if dist <= PICKUP_RADIUS then
-			if itemPart:GetAttribute("PickedUp") then continue end
-			-- ==========================================
-			-- ÚJ: TULAJDONJOG ELLENŐRZÉSE
-			-- ==========================================
-			local ownerTag = itemPart:FindFirstChild("Owner")
-			if ownerTag and ownerTag.Value ~= "" and ownerTag.Value ~= player.Name then
-				continue -- Ha van tulajdonosa, és az NEM a játékos, akkor nem veheti fel! (Ugrás a következőre)
-			end
+		if itemPart:GetAttribute("PickedUp") then
+			continue
+		end
 
-			itemPart:SetAttribute("PickedUp", true)
+		local ownerTag = itemPart:FindFirstChild("Owner")
+		if ownerTag and ownerTag.Value ~= "" and ownerTag.Value ~= player.Name then
+			continue
+		end
 
-			local itemTag = itemPart:FindFirstChild("ItemName")
-			if itemTag then
-				local itemName = itemTag.Value
-				local itemData = ItemDatabase[itemName]
-				local maxStack = (itemData and itemData.MaxStack) or 1
+		local itemTag = itemPart:FindFirstChild("ItemName")
+		if not itemTag then
+			continue
+		end
 
-				local amtTag = itemPart:FindFirstChild("ItemAmount")
-				local dropAmount = amtTag and amtTag.Value or 1
+		local itemName = itemTag.Value
+		local itemData = ItemDatabase[itemName]
+		if not itemData then
+			continue
+		end
 
-				if maxStack > 1 then
-					for i = 1, maxUnlockedSlots do
-						local slot = inv:FindFirstChild("Slot_" .. i)
-						if slot and slot.Value == itemName then
-							local amt = slot:FindFirstChild("Amount")
-							if amt and amt.Value < maxStack then
-								local spaceLeft = maxStack - amt.Value
-								local transfer = math.min(dropAmount, spaceLeft)
+		local maxStack = itemData.MaxStack or 1
+		local amtTag = itemPart:FindFirstChild("ItemAmount")
+		local dropAmount = amtTag and amtTag.Value or 1
 
-								amt.Value = amt.Value + transfer
-								dropAmount = dropAmount - transfer
+		if dropAmount <= 0 then
+			itemPart:Destroy()
+			continue
+		end
 
-								if dropAmount <= 0 then
-									itemPart:Destroy()
-									break
-								end
-							end
-						end
-					end
-				end
+		-- Csak most foglaljuk le ideiglenesen, amikor már tudjuk, hogy valid item.
+		itemPart:SetAttribute("PickedUp", true)
 
-				if dropAmount > 0 then
-					for i = 1, maxUnlockedSlots do
-						local slot = inv:FindFirstChild("Slot_" .. i)
-						if slot and slot.Value == "" then
-							slot.Value = itemName
-							local amt = slot:FindFirstChild("Amount")
-							if amt then
-								amt.Value = dropAmount
-							end
+		local originalDropAmount = dropAmount
 
-							dropAmount = 0
-							itemPart:Destroy()
-							break 
+		-- 1. Először próbáljuk meglévő stackekbe tölteni.
+		if maxStack > 1 then
+			for i = 1, maxUnlockedSlots do
+				local slot = inv:FindFirstChild("Slot_" .. i)
+				if slot and slot.Value == itemName then
+					local amt = slot:FindFirstChild("Amount")
+					if amt and amt.Value < maxStack then
+						local spaceLeft = maxStack - amt.Value
+						local transfer = math.min(dropAmount, spaceLeft)
+
+						amt.Value += transfer
+						dropAmount -= transfer
+
+						if dropAmount <= 0 then
+							break
 						end
 					end
 				end
 			end
+		end
+
+		-- 2. Ha maradt belőle, új üres slotba rakjuk.
+		if dropAmount > 0 then
+			for i = 1, maxUnlockedSlots do
+				local slot = inv:FindFirstChild("Slot_" .. i)
+				if slot and slot.Value == "" then
+					slot.Value = itemName
+
+					local amt = slot:FindFirstChild("Amount")
+					if amt then
+						amt.Value = dropAmount
+					end
+
+					dropAmount = 0
+					break
+				end
+			end
+		end
+
+		-- 3. Eredmény kezelése.
+		if dropAmount <= 0 then
+			itemPart:Destroy()
+		elseif dropAmount < originalDropAmount then
+			-- Részben sikerült felvenni, maradék marad a földön.
+			if amtTag then
+				amtTag.Value = dropAmount
+			end
+
+			local billboard = itemPart:FindFirstChildOfClass("BillboardGui")
+			if billboard then
+				local label = billboard:FindFirstChildOfClass("TextLabel")
+				if label then
+					local displayName = itemName
+					if dropAmount > 1 then
+						displayName = itemName .. " x" .. dropAmount
+					end
+					label.Text = '<font color="rgb(180, 180, 180)">' .. displayName .. '</font>'
+				end
+			end
+
+			itemPart:SetAttribute("PickedUp", nil)
+		else
+			-- Semmit nem tudott felvenni, például tele az inventory.
+			itemPart:SetAttribute("PickedUp", nil)
 		end
 	end
 end)
