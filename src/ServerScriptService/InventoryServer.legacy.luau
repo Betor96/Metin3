@@ -35,7 +35,7 @@ local playerLocks = {}
 local function checkSpam(player, cooldown)
 	cooldown = cooldown or 0.1
 	if playerLocks[player.UserId] and tick() - playerLocks[player.UserId] < cooldown then
-		return true -- Túl gyors, blokkoljuk!
+		return true
 	end
 	playerLocks[player.UserId] = tick()
 	return false
@@ -47,14 +47,23 @@ end)
 
 -- ==========================================
 -- BIZTONSÁG 2: BEMENETI ADATOK TISZTÍTÁSA (Sanitization)
--- Megakadályozza a negatív (-50) és tört (0.5) szám exploitokat!
 -- ==========================================
 local function sanitizeAmount(amt)
 	if amt == nil then return nil end
 	if type(amt) ~= "number" then return nil end
-	if amt <= 0 then return nil end -- Nem lehet 0 vagy negatív!
-	if amt ~= math.floor(amt) then return nil end -- Csak egész szám lehet!
+	if amt <= 0 then return nil end
+	if amt ~= math.floor(amt) then return nil end
 	return amt
+end
+
+-- ==========================================
+-- BIZTONSÁG 3: SLOT NÉV VALIDÁCIÓ
+-- ==========================================
+local function isValidSlotName(name)
+	if type(name) ~= "string" then return false end
+	if name:match("^Slot_%d+$") then return true end
+	if typeToSlot[name] then return true end
+	return false
 end
 
 -- ==========================================
@@ -84,18 +93,24 @@ PromptRobuxUnlock.OnServerEvent:Connect(function(player)
 end)
 
 MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toFolderStr, toSlotName, splitAmount)
-	
+	if checkSpam(player, 0.05) then return end
+
+	-- BIZTONSÁG: Mappanév Whitelist
+	if fromFolderStr ~= "Inventory" and fromFolderStr ~= "Equipment" and fromFolderStr ~= "Bank" then return end
+	if toFolderStr ~= "Inventory" and toFolderStr ~= "Equipment" and toFolderStr ~= "Bank" then return end
+
+	-- BIZTONSÁG: Név-injektálás védelem
+	if not isValidSlotName(fromSlotName) or not isValidSlotName(toSlotName) then return end
+
 	-- BIZTONSÁG: Slot limit megkerülés elleni védelem
 	local numStr = toSlotName:match("%d+")
 	if numStr then
 		local slotNum = tonumber(numStr)
 		local stats = player:FindFirstChild("PlayerStats")
 
-		-- Megnézzük, hogy raktárba vagy táskába próbál pakolni
 		local isBank = (toFolderStr == "Bank")
 		local unlockedPagesObj = isBank and stats:FindFirstChild("BankUnlockedPages") or stats:FindFirstChild("UnlockedPages")
 
-		-- 1 oldal = 32 slot
 		local maxAllowedSlots = (unlockedPagesObj and unlockedPagesObj.Value or 1) * 32
 
 		if slotNum > maxAllowedSlots then
@@ -103,9 +118,8 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 			return
 		end
 	end
-	
-	if checkSpam(player, 0.05) then return end
-	splitAmount = sanitizeAmount(splitAmount) -- Letisztítjuk a bejövő számot!
+
+	splitAmount = sanitizeAmount(splitAmount)
 
 	local inv = player:FindFirstChild("Inventory")
 	local eq = player:FindFirstChild("Equipment")
@@ -117,7 +131,7 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 	local toFolder = (toFolderStr == "Inventory") and inv or ((toFolderStr == "Equipment") and eq or bank)
 
 	if (fromFolderStr == "Bank" or toFolderStr == "Bank") and not player:GetAttribute("BankUnlocked") then
-		warn("[EXPLOIT] " .. player.Name .. " jelszó nélkül próbált a raktárhoz nyúlni!")
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül próbált a raktárhoz nyúlni!")
 		return
 	end
 
@@ -144,7 +158,6 @@ MoveItem.OnServerEvent:Connect(function(player, fromFolderStr, fromSlotName, toF
 			local expectedSlot = typeToSlot[itemData.Type]
 			if expectedSlot ~= toSlotName then return end 
 
-			-- JAVÍTÁS: Felszerelés szintkövetelményének szerver-oldali védelme!
 			local playerLevel = stats:FindFirstChild("Level") and stats.Level.Value or 1
 			local requiredLevel = itemData.Level or 1
 
@@ -215,11 +228,13 @@ end)
 -- TÁRGY ELDOBÁSA (Nincs rajta tulajdonos)
 -- ==========================================
 DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
-	-- Szigorúbb cooldown az eldobásra, hogy ne laggoltassák be a szervert
 	if checkSpam(player, 0.2) then return end
+
+	-- BIZTONSÁG: Whitelist
+	if folderStr ~= "Inventory" and folderStr ~= "Equipment" then return end 
+
 	splitAmount = sanitizeAmount(splitAmount)
 
-	if folderStr == "Bank" then return end 
 	local folder = (folderStr == "Inventory") and player:FindFirstChild("Inventory") or player:FindFirstChild("Equipment")
 
 	if folder then
@@ -231,7 +246,6 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 			if slot:FindFirstChild("Amount") then
 				dropQty = (splitAmount and splitAmount <= slot.Amount.Value) and splitAmount or slot.Amount.Value
 
-				-- Biztonsági dupla ellenőrzés
 				if dropQty <= 0 then return end
 
 				slot.Amount.Value = slot.Amount.Value - dropQty
@@ -274,8 +288,7 @@ DropItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount
 				itemTag.Name = "ItemName"
 				itemTag.Value = itemName
 
-				-- JAVÍTÁS: A földre dobott tárgy el is tűnik magától (Memory Leak védelem!)
-				game.Debris:AddItem(droppedItem, 300) -- 5 perc múlva automatikusan törlődik a földről
+				game.Debris:AddItem(droppedItem, 300)
 
 				local textBillboard = Instance.new("BillboardGui")
 				textBillboard.Size = UDim2.new(0, 150, 0, 25)
@@ -305,6 +318,13 @@ end)
 -- ==========================================
 DestroyItem.OnServerEvent:Connect(function(player, folderStr, slotName, splitAmount)
 	if checkSpam(player, 0.1) then return end
+
+	-- BIZTONSÁG: Bank jelszó bypass védelem
+	if folderStr == "Bank" and not player:GetAttribute("BankUnlocked") then 
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül próbált tárgyat törölni a raktárból!")
+		return 
+	end
+
 	splitAmount = sanitizeAmount(splitAmount)
 
 	local folder = nil
@@ -332,10 +352,14 @@ end)
 AutoStack.OnServerEvent:Connect(function(player, targetSlotName, isBank)
 	if checkSpam(player, 0.2) then return end
 
+	-- BIZTONSÁG: Bank jelszó bypass védelem
+	if isBank and not player:GetAttribute("BankUnlocked") then
+		warn("[EXPLOIT GYANÚ] " .. player.Name .. " jelszó nélkül próbált stackelni a raktárban!")
+		return
+	end
+
 	local folder = isBank and player:FindFirstChild("Bank") or player:FindFirstChild("Inventory")
 	if not folder then return end
-
-
 
 	local targetSlot = folder:FindFirstChild(targetSlotName)
 	if not targetSlot or targetSlot.Value == "" then return end

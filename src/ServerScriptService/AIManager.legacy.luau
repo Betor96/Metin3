@@ -140,14 +140,34 @@ local function setupMonster(npc)
 
 		local deathPosition = rootPart.Position
 		local killer = nil
-		local shortestDist = 50
 
-		for _, plr in pairs(Players:GetPlayers()) do
-			if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-				local dist = (deathPosition - plr.Character.HumanoidRootPart.Position).Magnitude
-				if dist < shortestDist then shortestDist = dist; killer = plr end
+		-- ==========================================
+		-- JAVÍTÁS 4: Kill-steal / AFK Leech védelem a szörnyeknél
+		-- ==========================================
+		local attackers = {}
+		local attFolder = npc:FindFirstChild("Attackers")
+		if attFolder then
+			for _, tag in pairs(attFolder:GetChildren()) do
+				if tag.Value and tag.Value.Parent then table.insert(attackers, tag.Value) end
 			end
 		end
+
+		if #attackers > 0 then
+			-- Ha többen is ütötték, véletlenszerűen (vagy logikusan) választunk a tényleges támadók közül
+			killer = attackers[math.random(1, #attackers)]
+		else
+			-- Biztonsági tartalék (pl. ha a szerver azonnal megölt egy szörnyet, vagy admin skill volt)
+			local shortestDist = 50
+			for _, plr in pairs(Players:GetPlayers()) do
+				if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+					local dist = (deathPosition - plr.Character.HumanoidRootPart.Position).Magnitude
+					if dist < shortestDist then shortestDist = dist; killer = plr end
+				end
+			end
+		end
+
+		-- Loot és Pénz (Mint a régi kódodban, csak most centralizálva)
+		-- ... (Innen marad minden a régiben, a "doubleDropActive" változótól lefelé)
 
 		-- Loot és Pénz (Mint a régi kódodban, csak most centralizálva)
 		local doubleDropActive, isDoubleGold = false, false

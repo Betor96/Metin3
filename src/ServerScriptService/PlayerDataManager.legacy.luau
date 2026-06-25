@@ -32,10 +32,17 @@ end
 -- Hotbar szinkron
 SyncHotbarSlot.OnServerEvent:Connect(function(player, slotNum, itemName)
 	if type(slotNum) == "number" and slotNum >= 1 and slotNum <= 8 then
+
+		-- JAVÍTÁS 3: itemName biztonsági ellenőrzése (Típus és hossz limit)
+		if type(itemName) ~= "string" or string.len(itemName) > 50 then 
+			warn("[EXPLOIT GYANÚ] " .. player.Name .. " érvénytelen adatot küldött a Hotbarra!")
+			return 
+		end
+
 		local hotbar = player:FindFirstChild("Hotbar")
 		if hotbar then
 			local slotVal = hotbar:FindFirstChild("Hotbar_" .. slotNum)
-			if slotVal then slotVal.Value = tostring(itemName) end
+			if slotVal then slotVal.Value = itemName end -- A tostring() már nem kell, mert string
 		end
 	end
 end)

@@ -137,9 +137,11 @@ MarketplaceService.ProcessReceipt = function(receiptInfo)
 				unlockedPages.Value += 1
 			end
 		end
-	end
 
-	-- JAVÍTÁS: MINDIG visszaadjuk, hogy "Megkaptuk!". Ez azonnal kitisztítja 
-	-- a beragadt tranzakciókat és feloldja a Roblox blokkolását!
-	return Enum.ProductPurchaseDecision.PurchaseGranted
+		-- JAVÍTÁS 5: Csak sikeres Stats betöltés után jelezzük a Robloxnak, hogy kész!
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	else
+		-- JAVÍTÁS 5: VÉDELEM! Ha a szerver még nem töltötte be az adatokat, NEM vonhatjuk le a Robuxot!
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
 end
